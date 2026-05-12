@@ -1,0 +1,454 @@
+// ignore: unused_import
+import 'package:intl/intl.dart' as intl;
+import 'app_localizations.dart';
+
+// ignore_for_file: type=lint
+
+/// The translations for Arabic (`ar`).
+class AppLocalizationsAr extends AppLocalizations {
+  AppLocalizationsAr([String locale = 'ar']) : super(locale);
+
+  @override
+  String get appTitle => 'زيارات العملاء';
+
+  @override
+  String get appTagline => 'تابع زياراتك الميدانية بدقة';
+
+  @override
+  String get commonRequired => 'مطلوب';
+
+  @override
+  String get commonRetry => 'إعادة المحاولة';
+
+  @override
+  String get commonLoading => 'جاري التحميل…';
+
+  @override
+  String get commonSearch => 'بحث…';
+
+  @override
+  String get commonCancel => 'إلغاء';
+
+  @override
+  String get commonSave => 'حفظ';
+
+  @override
+  String get commonClose => 'إغلاق';
+
+  @override
+  String get commonOptional => '(اختياري)';
+
+  @override
+  String get commonLogout => 'تسجيل الخروج';
+
+  @override
+  String get commonRefresh => 'تحديث';
+
+  @override
+  String get commonYes => 'نعم';
+
+  @override
+  String get commonNo => 'لا';
+
+  @override
+  String unitMeters(String value) {
+    return '$value م';
+  }
+
+  @override
+  String unitMinutes(String value) {
+    return '$value د';
+  }
+
+  @override
+  String get themeMode => 'المظهر';
+
+  @override
+  String get themeLight => 'فاتح';
+
+  @override
+  String get themeDark => 'داكن';
+
+  @override
+  String get themeSystem => 'حسب النظام';
+
+  @override
+  String get language => 'اللغة';
+
+  @override
+  String get languageArabic => 'العربية';
+
+  @override
+  String get languageEnglish => 'English';
+
+  @override
+  String get loginTitle => 'زيارات العملاء';
+
+  @override
+  String get loginSubtitle => 'سجّل دخولك لبدء يومك الميداني';
+
+  @override
+  String get loginUsername => 'البريد / المستخدم';
+
+  @override
+  String get loginPassword => 'كلمة السر';
+
+  @override
+  String get loginSubmit => 'تسجيل الدخول';
+
+  @override
+  String get errInvalidCredentials => 'بيانات الدخول غير صحيحة';
+
+  @override
+  String get errAuthRequired => 'يجب تسجيل الدخول';
+
+  @override
+  String get errPermissionDenied => 'ليس لديك صلاحية لهذا الإجراء';
+
+  @override
+  String get errValidation => 'بيانات غير صحيحة — راجعها وحاول مرة أخرى';
+
+  @override
+  String get errNotFound => 'العنصر غير موجود';
+
+  @override
+  String get errLocationRequired => 'هذا العميل ليس له إحداثيات مسجّلة';
+
+  @override
+  String get errServerError => 'خطأ في الخادم — حاول لاحقاً';
+
+  @override
+  String get errNetworkTimeout => 'انتهت مهلة الاتصال';
+
+  @override
+  String get errNetworkUnreachable => 'تعذر الاتصال بالخادم';
+
+  @override
+  String get errNetworkUnknown => 'حدث خطأ في الشبكة';
+
+  @override
+  String get errLocationPermission => 'فعّل خدمة الموقع وامنح الإذن للتطبيق';
+
+  @override
+  String get errUnknown => 'حدث خطأ غير متوقع';
+
+  @override
+  String get errCustomerLoadFailed => 'تعذر تحميل بيانات العميل';
+
+  @override
+  String get errLocationSharingDisabled => 'صلاحية الموقع غير مفعّلة';
+
+  @override
+  String get customersTitle => 'العملاء';
+
+  @override
+  String get customersSearchHint => 'بحث عن عميل…';
+
+  @override
+  String get customersEmpty => 'لا توجد عملاء';
+
+  @override
+  String get customerDetailTitle => 'تفاصيل العميل';
+
+  @override
+  String get customerLastVisit => 'آخر زيارة';
+
+  @override
+  String get customerActionCheckIn => 'بدء الزيارة';
+
+  @override
+  String get customerActionCall => 'اتصال';
+
+  @override
+  String get customerActionNavigate => 'اتجاهات';
+
+  @override
+  String customerActionNearby(String radius) {
+    return 'عرض الموظفين القريبين ($radius م)';
+  }
+
+  @override
+  String get customerAlreadyCheckedIn => 'أنت مسجّل وصول هنا الآن';
+
+  @override
+  String get customerActiveVisitBadge => 'زيارة نشطة';
+
+  @override
+  String customerCheckInBlocked(String customer) {
+    return 'أنهِ زيارتك الحالية عند $customer أولاً';
+  }
+
+  @override
+  String get customerCheckInBlockedShort => 'زيارة جارية في مكان آخر';
+
+  @override
+  String get checkInSuccess => 'تم تسجيل الوصول';
+
+  @override
+  String get visitActiveTitle => 'زيارة نشطة';
+
+  @override
+  String get visitActiveEmpty =>
+      'لا توجد زيارة نشطة الآن.\nاختر عميل وابدأ تسجيل الوصول.';
+
+  @override
+  String visitStartedAt(String time) {
+    return 'بدأت الساعة $time';
+  }
+
+  @override
+  String get visitLiveIndicator => 'مباشر';
+
+  @override
+  String get visitNotesLabel => 'ملاحظات (اختياري)';
+
+  @override
+  String get visitActionCheckOut => 'إنهاء الزيارة';
+
+  @override
+  String get checkOutSuccess => 'تم إنهاء الزيارة';
+
+  @override
+  String get employeesTitle => 'الموظفين';
+
+  @override
+  String get employeesEmpty => 'لا يوجد موظفين معدّين بعد';
+
+  @override
+  String get employeesSearchHint => 'بحث عن موظف…';
+
+  @override
+  String get createVisitTitle => 'زيارة جديدة';
+
+  @override
+  String get createVisitCustomerLabel => 'العميل';
+
+  @override
+  String get createVisitEmployeeLabel => 'الموظف';
+
+  @override
+  String get createVisitDateLabel => 'تاريخ الزيارة';
+
+  @override
+  String get createVisitTypeLabel => 'نوع الزيارة (اختياري)';
+
+  @override
+  String get createVisitNotesLabel => 'ملاحظات (اختياري)';
+
+  @override
+  String get createVisitSubmit => 'إنشاء الزيارة';
+
+  @override
+  String get createVisitSuccess => 'تم إنشاء الزيارة';
+
+  @override
+  String get createVisitCustomerRequired => 'اختار عميل';
+
+  @override
+  String get createVisitEmployeeRequired => 'اختار موظف';
+
+  @override
+  String get createVisitDateRequired => 'حدد تاريخ الزيارة';
+
+  @override
+  String get createVisitTooltip => 'إنشاء زيارة';
+
+  @override
+  String get createVisitPickType => 'اختار نوع الزيارة';
+
+  @override
+  String get createVisitPickCustomer => 'اختار العميل';
+
+  @override
+  String get createVisitPickEmployee => 'اختار الموظف';
+
+  @override
+  String get visitsSearchHint => 'بحث باسم العميل…';
+
+  @override
+  String get pickerSearchHint => 'بحث…';
+
+  @override
+  String get pickerNoResults => 'لا توجد نتائج';
+
+  @override
+  String get visitsHistoryTitle => 'سجل الزيارات';
+
+  @override
+  String get visitsHistoryEmpty => 'لا يوجد سجل زيارات';
+
+  @override
+  String get visitsListTitle => 'الزيارات';
+
+  @override
+  String get visitsFilterToday => 'اليوم';
+
+  @override
+  String get visitsFilterAll => 'الكل';
+
+  @override
+  String get visitsTodayEmpty => 'لا توجد زيارات مجدولة لليوم';
+
+  @override
+  String get visitDetailTitle => 'تفاصيل الزيارة';
+
+  @override
+  String get visitDetailNotesSection => 'الملاحظات';
+
+  @override
+  String get visitDetailNoNotes => 'لا توجد ملاحظات';
+
+  @override
+  String get visitDetailEditNotes => 'تعديل الملاحظات';
+
+  @override
+  String get visitDetailMetaSection => 'بيانات الزيارة';
+
+  @override
+  String get visitDetailTimelineSection => 'التوقيتات';
+
+  @override
+  String get visitDetailVisitDate => 'تاريخ الزيارة';
+
+  @override
+  String get visitDetailVisitType => 'نوع الزيارة';
+
+  @override
+  String get visitDetailSaveChanges => 'حفظ التعديلات';
+
+  @override
+  String get visitDetailReadOnlyHint =>
+      'هذه الحقول قابلة للتعديل من قِبل المدير فقط.';
+
+  @override
+  String get visitDetailNotesEditableHint =>
+      'يمكنك إضافة ملاحظات أثناء تسجيل الوصول.';
+
+  @override
+  String get visitDetailSaved => 'تم حفظ التعديلات';
+
+  @override
+  String get roleManager => 'مدير';
+
+  @override
+  String get roleUser => 'موظف ميداني';
+
+  @override
+  String get visitsHistoryActiveBadge => 'نشطة الآن';
+
+  @override
+  String get visitsHistoryCompletedBadge => 'مكتملة';
+
+  @override
+  String get visitsHistoryIncompleteBadge => 'غير مكتملة';
+
+  @override
+  String get visitsHistoryRunning => 'جارية';
+
+  @override
+  String get timelineCheckIn => 'وصول';
+
+  @override
+  String get timelineCheckOut => 'مغادرة';
+
+  @override
+  String timelineDuration(String value) {
+    return '$value د';
+  }
+
+  @override
+  String get visitRangeInRange => 'ضمن النطاق';
+
+  @override
+  String get visitRangeOutOfRange => 'خارج النطاق';
+
+  @override
+  String get visitShowLocation => 'عرض موقع العميل';
+
+  @override
+  String get visitDetailCustomerLocationSection => 'موقع العميل';
+
+  @override
+  String get visitDetailNavigate => 'بدء التوجيه';
+
+  @override
+  String get visitDetailNoCustomerLocation => 'موقع العميل غير متاح';
+
+  @override
+  String visitDetailCheckInStartedAt(String customer) {
+    return 'بدأت الزيارة عند $customer — تم تسجيل موقعك';
+  }
+
+  @override
+  String get visitLocationDialogTitle => 'موقع تسجيل الوصول';
+
+  @override
+  String get visitLocationCustomer => 'مكتب العميل';
+
+  @override
+  String get visitLocationCheckIn => 'نقطة الوصول';
+
+  @override
+  String get visitLocationCheckOut => 'نقطة المغادرة';
+
+  @override
+  String get visitLocationNotAvailable => 'موقع العميل غير متاح';
+
+  @override
+  String get homeTabCustomers => 'العملاء';
+
+  @override
+  String get homeTabActive => 'النشطة';
+
+  @override
+  String get homeTabHistory => 'السجل';
+
+  @override
+  String get homeLocationSharingOn => 'مشاركة الموقع مفعّلة';
+
+  @override
+  String get homeLocationSharingOff => 'مشاركة الموقع متوقفة';
+
+  @override
+  String get nearbyTitle => 'الموظفين القريبين';
+
+  @override
+  String nearbyRadiusLabel(String radius) {
+    return 'نصف القطر: $radius متر';
+  }
+
+  @override
+  String get nearbyEmpty => 'لا يوجد موظفين داخل النطاق';
+
+  @override
+  String nearbyLastUpdate(String time) {
+    return 'آخر تحديث: $time';
+  }
+
+  @override
+  String get settingsTitle => 'الإعدادات';
+
+  @override
+  String get settingsAppearance => 'المظهر';
+
+  @override
+  String get settingsAccount => 'الحساب';
+
+  @override
+  String get settingsAbout => 'حول التطبيق';
+
+  @override
+  String get settingsVersion => 'الإصدار';
+
+  @override
+  String get confirmLogoutTitle => 'تسجيل الخروج';
+
+  @override
+  String get confirmLogoutMessage => 'هل تريد تسجيل الخروج من التطبيق؟';
+
+  @override
+  String get confirmExitTitle => 'إنهاء التطبيق';
+
+  @override
+  String get confirmExitMessage => 'هل تريد إنهاء التطبيق؟';
+}
