@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   AppTheme._();
@@ -26,20 +28,46 @@ class AppTheme {
           : const Color(0xFFFFFFFF),
     );
 
+    // Cairo reads cleanly in both Arabic and English. We let `google_fonts`
+    // build the full Material text theme so every text style (display,
+    // headline, body, label) gets the same family with proper weights.
+    final baseTextTheme = ThemeData(brightness: brightness).textTheme;
+    final cairoTextTheme = GoogleFonts.cairoTextTheme(baseTextTheme).apply(
+      bodyColor: scheme.onSurface,
+      displayColor: scheme.onSurface,
+    );
+
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: scheme.surface,
+      textTheme: cairoTextTheme,
       appBarTheme: AppBarTheme(
         backgroundColor: scheme.surface,
         foregroundColor: scheme.onSurface,
         surfaceTintColor: scheme.surfaceTint,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: TextStyle(
+        titleTextStyle: GoogleFonts.cairo(
           color: scheme.onSurface,
           fontSize: 18,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
+        ),
+        // Make the status bar follow the app's theme — light icons on
+        // dark backgrounds, dark icons on light. Avoids the white-on-
+        // white invisible icons when system theme doesn't match ours.
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarBrightness: brightness == Brightness.light
+              ? Brightness.light
+              : Brightness.dark,
+          statusBarIconBrightness: brightness == Brightness.light
+              ? Brightness.dark
+              : Brightness.light,
+          systemNavigationBarColor: scheme.surface,
+          systemNavigationBarIconBrightness: brightness == Brightness.light
+              ? Brightness.dark
+              : Brightness.light,
         ),
       ),
       cardTheme: CardThemeData(
@@ -76,9 +104,9 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(_radius),
           ),
-          textStyle: const TextStyle(
+          textStyle: GoogleFonts.cairo(
             fontSize: 15,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -89,9 +117,9 @@ class AppTheme {
             borderRadius: BorderRadius.circular(_radius),
           ),
           side: BorderSide(color: scheme.outline),
-          textStyle: const TextStyle(
+          textStyle: GoogleFonts.cairo(
             fontSize: 15,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -109,7 +137,7 @@ class AppTheme {
         elevation: 1,
         height: 64,
         labelTextStyle: WidgetStateProperty.all(
-          const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ),
       listTileTheme: ListTileThemeData(

@@ -13,6 +13,12 @@ class CreateVisitState extends Equatable {
   final int? createdVisitId;
   final ApiException? error;
 
+  /// Initial lifecycle the admin wants the visit to land in. Defaults
+  /// to `draft` because a brand-new visit hasn't been worked yet —
+  /// flipping it to `submit` happens once the employee actually goes
+  /// out, not at the moment of creation.
+  final VisitLifecycleState lifecycleState;
+
   const CreateVisitState({
     this.status = CreateVisitStatus.idle,
     this.customer,
@@ -23,6 +29,7 @@ class CreateVisitState extends Equatable {
     this.notes = '',
     this.createdVisitId,
     this.error,
+    this.lifecycleState = VisitLifecycleState.draft,
   });
 
   bool get isValid =>
@@ -39,6 +46,7 @@ class CreateVisitState extends Equatable {
     String? notes,
     int? createdVisitId,
     ApiException? error,
+    VisitLifecycleState? lifecycleState,
   }) =>
       CreateVisitState(
         status: status ?? this.status,
@@ -51,6 +59,7 @@ class CreateVisitState extends Equatable {
         notes: notes ?? this.notes,
         createdVisitId: createdVisitId ?? this.createdVisitId,
         error: error,
+        lifecycleState: lifecycleState ?? this.lifecycleState,
       );
 
   @override
@@ -64,5 +73,6 @@ class CreateVisitState extends Equatable {
         notes,
         createdVisitId,
         error,
+        lifecycleState,
       ];
 }

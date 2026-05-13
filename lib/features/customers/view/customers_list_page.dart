@@ -61,11 +61,6 @@ class _CustomersListPageState extends State<CustomersListPage> {
           child: BlocBuilder<CustomersBloc, CustomersState>(
             builder: (context, state) {
               final isLoading = state.status == CustomersStatus.loading;
-              // Show skeleton whenever the bloc is fetching — including
-              // pull-to-refresh — so the user sees the refresh in progress.
-              if (isLoading) {
-                return const SkeletonList(itemCount: 8);
-              }
               if (state.status == CustomersStatus.failure &&
                   state.items.isEmpty) {
                 return ErrorView(
@@ -74,17 +69,38 @@ class _CustomersListPageState extends State<CustomersListPage> {
                   onRetry: _refresh,
                 );
               }
-              if (state.items.isEmpty) {
-                return EmptyView(message: context.s.customersEmpty);
-              }
-              return RefreshIndicator(
-                onRefresh: _refresh,
-                child: ListView.separated(
+
+              Widget body;
+              if (isLoading) {
+                body = const SkeletonList(
+                  key: ValueKey('skeleton'),
+                  itemCount: 8,
+                );
+              } else if (state.items.isEmpty) {
+                body = ScaleFadeIn(
+                  key: const ValueKey('empty'),
+                  child: EmptyView(message: context.s.customersEmpty),
+                );
+              } else {
+                body = ListView.separated(
+                  key: const ValueKey('list'),
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
                   itemCount: state.items.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, i) =>
-                      _CustomerTile(customer: state.items[i]),
+                  itemBuilder: (context, i) => AnimatedListItem(
+                    index: i,
+                    child: _CustomerTile(customer: state.items[i]),
+                  ),
+                );
+              }
+
+              return AppRefreshIndicator(
+                onRefresh: _refresh,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 280),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  child: body,
                 ),
               );
             },

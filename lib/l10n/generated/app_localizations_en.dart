@@ -239,6 +239,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get createVisitNotesLabel => 'Notes (optional)';
 
   @override
+  String get createVisitStateLabel => 'Initial state';
+
+  @override
+  String get visitStateDraft => 'Draft';
+
+  @override
+  String get visitStateSubmit => 'Submit';
+
+  @override
+  String get visitStateUnderReview => 'Under review';
+
+  @override
+  String get visitStateDone => 'Done';
+
+  @override
+  String get visitStateCancel => 'Cancelled';
+
+  @override
+  String get visitDetailVisitTypeLabel => 'Visit type';
+
+  @override
+  String get visitDetailEditVisitType => 'Change visit type';
+
+  @override
+  String get visitDetailMarkAsDone => 'Mark as reviewed';
+
+  @override
+  String get visitDetailMarkAsDoneSuccess => 'Visit marked as done';
+
+  @override
+  String get visitDetailSendToEmployee => 'Send to employee';
+
+  @override
+  String get visitDetailSentToEmployeeSuccess => 'Visit sent to employee';
+
+  @override
+  String get visitDetailEditState => 'Change state';
+
+  @override
+  String get visitDetailPickState => 'Pick state';
+
+  @override
   String get createVisitSubmit => 'Create visit';
 
   @override
@@ -275,6 +317,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pickerNoResults => 'No results';
 
   @override
+  String get groupToday => 'Today';
+
+  @override
+  String get groupYesterday => 'Yesterday';
+
+  @override
+  String get groupEarlierThisWeek => 'Earlier this week';
+
+  @override
+  String get groupEarlier => 'Earlier';
+
+  @override
+  String get groupTomorrow => 'Tomorrow';
+
+  @override
+  String get groupLaterThisWeek => 'Later this week';
+
+  @override
+  String get groupUpcoming => 'Upcoming';
+
+  @override
+  String get statsTotal => 'Total';
+
+  @override
+  String get statsActive => 'Active';
+
+  @override
+  String get statsCompleted => 'Completed';
+
+  @override
+  String get statsPendingReview => 'Pending review';
+
+  @override
+  String get statsDone => 'Done';
+
+  @override
   String get visitsHistoryTitle => 'History';
 
   @override
@@ -288,6 +366,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get visitsFilterAll => 'All';
+
+  @override
+  String get filterStatusLabel => 'Status';
+
+  @override
+  String get filterStatusAll => 'All';
+
+  @override
+  String get filterStatusCompleted => 'Completed';
+
+  @override
+  String get filterStatusPendingReview => 'Pending review';
+
+  @override
+  String get filterStatusIncomplete => 'Incomplete';
+
+  @override
+  String get filterTimingLabel => 'Timing';
+
+  @override
+  String get filterTimingAll => 'All';
+
+  @override
+  String get filterTimingOnTime => 'On schedule';
+
+  @override
+  String get filterTimingEarly => 'Earlier';
+
+  @override
+  String get filterTimingOverdue => 'Past due';
 
   @override
   String get visitsTodayEmpty => 'No visits scheduled for today';
@@ -331,6 +439,64 @@ class AppLocalizationsEn extends AppLocalizations {
   String get visitDetailSaved => 'Changes saved';
 
   @override
+  String get visitDetailDelete => 'Delete visit';
+
+  @override
+  String get visitDetailNotStartedYet => 'Not started yet';
+
+  @override
+  String get visitDetailNotEndedYet => 'Not ended yet';
+
+  @override
+  String get visitDetailOpenCheckInLocation => 'Show check-in location';
+
+  @override
+  String get visitDetailOpenCheckOutLocation => 'Show check-out location';
+
+  @override
+  String get visitDetailTimelineLocationsSection => 'Timeline & locations';
+
+  @override
+  String get visitDetailEditCustomer => 'Change customer';
+
+  @override
+  String get visitDetailEditEmployee => 'Change employee';
+
+  @override
+  String get visitDetailCustomer => 'Customer';
+
+  @override
+  String get visitDetailEmployee => 'Employee';
+
+  @override
+  String get visitDetailStatusLabel => 'Status';
+
+  @override
+  String get visitDetailStateBadgeDraft => 'Draft';
+
+  @override
+  String get visitDetailStateBadgeSubmitted => 'In progress';
+
+  @override
+  String get visitDetailStateBadgeUnderReview => 'Under review';
+
+  @override
+  String get visitDetailStateBadgeDone => 'Done';
+
+  @override
+  String get confirmDeleteVisitTitle => 'Delete visit';
+
+  @override
+  String get confirmDeleteVisitMessage =>
+      'Are you sure you want to delete this visit? This action cannot be undone.';
+
+  @override
+  String get visitDeletedSuccess => 'Visit deleted';
+
+  @override
+  String get nearbyAdjustRadius => 'Adjust radius';
+
+  @override
   String get roleManager => 'Manager';
 
   @override
@@ -344,6 +510,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get visitsHistoryIncompleteBadge => 'Incomplete';
+
+  @override
+  String get visitsHistoryOverdueBadge => 'Past due';
+
+  @override
+  String get visitDetailOverdueHint =>
+      'The scheduled day has passed and the visit hasn\'t been completed yet. Reschedule or follow up.';
+
+  @override
+  String get visitExecutedOnTime => 'Completed on schedule';
+
+  @override
+  String visitExecutedEarly(int days) {
+    return 'Completed $days day(s) earlier than scheduled';
+  }
+
+  @override
+  String visitExecutedLate(int days) {
+    return 'Completed $days day(s) later than scheduled';
+  }
 
   @override
   String get visitsHistoryRunning => 'Running';
@@ -372,7 +558,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get visitDetailCustomerLocationSection => 'Customer location';
 
   @override
-  String get visitDetailNavigate => 'Navigate';
+  String get visitDetailNavigate => 'Show customer location on map';
 
   @override
   String get visitDetailNoCustomerLocation => 'Customer location not available';
@@ -396,6 +582,62 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get visitLocationNotAvailable => 'Customer location not available';
+
+  @override
+  String get offlineNoQueue =>
+      'You\'re offline — actions will be saved locally';
+
+  @override
+  String offlineWithQueue(int count) {
+    return 'Offline — $count action(s) waiting to sync';
+  }
+
+  @override
+  String offlineSyncing(int count) {
+    return 'Syncing $count pending action(s)…';
+  }
+
+  @override
+  String get offlineCheckInQueued =>
+      'Saved locally — will sync when you\'re back online';
+
+  @override
+  String get dashboardTabTitle => 'Dashboard';
+
+  @override
+  String get dashboardKpiOverdue => 'Past due';
+
+  @override
+  String get dashboardKpiPending => 'Pending review';
+
+  @override
+  String get dashboardKpiToday => 'Today';
+
+  @override
+  String get dashboardKpiActive => 'Active now';
+
+  @override
+  String get dashboardActiveOnMapTitle => 'Live employees';
+
+  @override
+  String get dashboardActiveEmpty => 'No employees checked in right now';
+
+  @override
+  String dashboardActiveMore(int count) {
+    return '+$count more';
+  }
+
+  @override
+  String get dashboardTopCustomers => 'Most-visited customers';
+
+  @override
+  String get dashboardTopEmployees => 'Top employees (completed visits)';
+
+  @override
+  String get dashboardNoData => 'Not enough data yet';
+
+  @override
+  String get visitsTabTitle => 'Visits';
 
   @override
   String get homeTabCustomers => 'Customers';

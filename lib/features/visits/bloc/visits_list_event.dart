@@ -7,7 +7,15 @@ sealed class VisitsListEvent extends Equatable {
 }
 
 class VisitsListLoadRequested extends VisitsListEvent {
-  const VisitsListLoadRequested();
+  /// True when the request is being made on behalf of an admin — the
+  /// repository will also return draft visits in that case so the
+  /// manager has visibility over the full pipeline. Defaults to false
+  /// for safety (field users keep the trimmed view).
+  final bool includeDrafts;
+  const VisitsListLoadRequested({this.includeDrafts = false});
+
+  @override
+  List<Object?> get props => [includeDrafts];
 }
 
 class VisitsListFilterChanged extends VisitsListEvent {
@@ -24,4 +32,21 @@ class VisitsListSearchChanged extends VisitsListEvent {
   const VisitsListSearchChanged(this.query);
   @override
   List<Object?> get props => [query];
+}
+
+/// Admin-only quick filter on lifecycle state. Client-side; no refetch.
+class VisitsListStatusFilterChanged extends VisitsListEvent {
+  final VisitStatusFilter filter;
+  const VisitsListStatusFilterChanged(this.filter);
+  @override
+  List<Object?> get props => [filter];
+}
+
+/// Admin-only quick filter on execution timing (on time / early /
+/// overdue). Client-side; no refetch.
+class VisitsListTimingFilterChanged extends VisitsListEvent {
+  final VisitTimingFilter filter;
+  const VisitsListTimingFilterChanged(this.filter);
+  @override
+  List<Object?> get props => [filter];
 }

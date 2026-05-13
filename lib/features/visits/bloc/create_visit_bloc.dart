@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 import '../../../core/api/api_exceptions.dart';
 import '../../customers/data/models/customer.dart';
 import '../../employees/data/models/employee.dart';
+import '../data/models/visit.dart';
 import '../data/visits_repository.dart';
 
 part 'create_visit_event.dart';
@@ -18,8 +19,14 @@ class CreateVisitBloc extends Bloc<CreateVisitEvent, CreateVisitState> {
     on<CreateVisitDateSelected>(_onDateSelected);
     on<CreateVisitTypeSelected>(_onTypeSelected);
     on<CreateVisitNotesChanged>(_onNotesChanged);
+    on<CreateVisitLifecycleSelected>(_onLifecycleSelected);
     on<CreateVisitSubmitted>(_onSubmit);
     on<CreateVisitReset>(_onReset);
+  }
+
+  void _onLifecycleSelected(
+      CreateVisitLifecycleSelected event, Emitter<CreateVisitState> emit) {
+    emit(state.copyWith(lifecycleState: event.state));
   }
 
   void _onCustomerSelected(
@@ -70,6 +77,7 @@ class CreateVisitBloc extends Bloc<CreateVisitEvent, CreateVisitState> {
         visitDate: state.date!,
         visitTypeId: state.visitTypeId,
         description: state.notes,
+        state: state.lifecycleState,
       );
       emit(state.copyWith(
         status: CreateVisitStatus.success,

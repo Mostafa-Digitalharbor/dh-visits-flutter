@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../auth/bloc/auth_bloc.dart';
-import '../../employees/view/employees_list_page.dart';
+import '../../dashboard/view/dashboard_page.dart';
 import '../../live_location/bloc/live_location_bloc.dart';
 import '../../visits/bloc/visit_bloc.dart';
 import '../../visits/bloc/visits_list_bloc.dart';
@@ -32,13 +32,20 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      final user = context.read<AuthBloc>().state.user;
+      final isManager = user?.canEditVisits ?? false;
       context
           .read<LiveLocationBloc>()
           .add(const LiveLocationStartRequested());
-      context.read<VisitBloc>().add(const VisitResumeRequested());
+      // Only try to resume an active visit for field users — admins
+      // don't go on visits, so any "active" visit in the system would
+      // belong to another user and end up misrepresented on their bar.
+      if (!isManager) {
+        context.read<VisitBloc>().add(const VisitResumeRequested());
+      }
       context
           .read<VisitsListBloc>()
-          .add(const VisitsListLoadRequested());
+          .add(VisitsListLoadRequested(includeDrafts: isManager));
     });
   }
 
@@ -65,7 +72,9 @@ class _HomeShellState extends State<HomeShell> {
         if (didPop) return;
         _confirmExit(context);
       },
-      child: isManager ? _ManagerShell(state: this) : _UserShell(state: this),
+      child: isManager
+          ? _ManagerShell(state: this)
+          : _UserShell(state: this),
     );
   }
 }
@@ -79,7 +88,12 @@ class _UserShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const _AppBar(),
-      body: const VisitsListPage(),
+      body: const Column(
+        children: [
+          OfflineBanner(),
+          Expanded(child: VisitsListPage()),
+        ],
+      ),
       bottomNavigationBar: const PersistentVisitBar(onTap: _noop),
     );
   }
@@ -87,9 +101,12 @@ class _UserShell extends StatelessWidget {
   static void _noop() {}
 }
 
-/// Manager layout: Customers + Visits tabs. Visits tab uses the new list
-/// (no more dedicated Active / History split — the persistent bar covers
-/// the live-timer affordance and active visits float to the top).
+/// Manager layout: two-tab shell (Visits + Dashboard) with a FAB to
+/// create new visits. The Visits tab keeps the existing list; the
+/// Dashboard tab is the new admin overview. No PersistentVisitBar —
+/// admins don't go on visits themselves, so a "running visit"
+/// indicator at the bottom would just surface someone else's
+/// work-in-progress.
 class _ManagerShell extends StatefulWidget {
   final _HomeShellState state;
   const _ManagerShell({required this.state});
@@ -99,75 +116,57 @@ class _ManagerShell extends StatefulWidget {
 }
 
 class _ManagerShellState extends State<_ManagerShell> {
-  int _index = 0;
-
-  static const List<Widget> _pages = [
-    VisitsListPage(),
-    EmployeesListPage(),
-  ];
-
-  String _title(BuildContext context) {
-    switch (_index) {
-      case 0:
-        return context.s.visitsListTitle;
-      case 1:
-        return context.s.employeesTitle;
-      default:
-        return context.s.appTitle;
-    }
-  }
+  int _tabIndex = 0;
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<VisitBloc, VisitState>(
-      // When the user just checked-in, snap to the Visits tab so they see
-      // the running visit at the top of the list (and the persistent bar).
-      listenWhen: (prev, curr) =>
-          prev.status != VisitStatus.checkedIn &&
-          curr.status == VisitStatus.checkedIn,
-      listener: (context, state) {
-        if (_index != 0) setState(() => _index = 0);
-      },
-      child: Scaffold(
-        appBar: _AppBar(title: _title(context)),
-        body: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          transitionBuilder: (child, animation) =>
-              FadeTransition(opacity: animation, child: child),
-          child: KeyedSubtree(
-            key: ValueKey(_index),
-            child: _pages[_index],
-          ),
-        ),
-        floatingActionButton: _index == 0
-            ? FloatingActionButton.extended(
-                onPressed: () => context.push('/visits/create'),
-                icon: const Icon(Icons.add),
-                label: Text(context.s.createVisitTooltip),
-              )
-            : null,
-        bottomNavigationBar: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            PersistentVisitBar(onTap: () => setState(() => _index = 0)),
-            NavigationBar(
-              selectedIndex: _index,
-              onDestinationSelected: (i) => setState(() => _index = i),
-              destinations: [
-                NavigationDestination(
-                  icon: const Icon(Icons.event_note_outlined),
-                  selectedIcon: const Icon(Icons.event_note),
-                  label: context.s.visitsListTitle,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.badge_outlined),
-                  selectedIcon: const Icon(Icons.badge),
-                  label: context.s.employeesTitle,
-                ),
+    final isVisits = _tabIndex == 0;
+    return Scaffold(
+      appBar: _AppBar(
+        title: isVisits
+            ? context.s.visitsListTitle
+            : context.s.dashboardTabTitle,
+      ),
+      body: Column(
+        children: [
+          const OfflineBanner(),
+          Expanded(
+            child: IndexedStack(
+              index: _tabIndex,
+              children: const [
+                VisitsListPage(),
+                DashboardPage(),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
+      // FAB is only meaningful on the Visits tab. Hide it on the
+      // Dashboard so the bottom-right corner stays clean.
+      floatingActionButton: isVisits
+          ? FloatingActionButton.extended(
+              heroTag: 'create-visit-hero',
+              onPressed: () => context.push('/visits/create'),
+              icon: const Icon(Icons.add),
+              label: Text(context.s.createVisitTooltip),
+            )
+          : null,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tabIndex,
+        onDestinationSelected: (i) {
+          HapticFeedback.selectionClick();
+          setState(() => _tabIndex = i);
+        },
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(Icons.list_alt_rounded),
+            label: context.s.visitsTabTitle,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.dashboard_rounded),
+            label: context.s.dashboardTabTitle,
+          ),
+        ],
       ),
     );
   }

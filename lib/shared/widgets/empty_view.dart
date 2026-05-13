@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../extensions/context_extensions.dart';
 
-class EmptyView extends StatelessWidget {
+class EmptyView extends StatefulWidget {
   final String message;
   final IconData icon;
   final Widget? action;
@@ -15,6 +15,23 @@ class EmptyView extends StatelessWidget {
   });
 
   @override
+  State<EmptyView> createState() => _EmptyViewState();
+}
+
+class _EmptyViewState extends State<EmptyView>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2400),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Center(
@@ -23,43 +40,65 @@ class EmptyView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Decorative icon with halo
-            Container(
-              width: 110,
-              height: 110,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    colors.primaryContainer.withValues(alpha: 0.45),
-                    colors.primaryContainer.withValues(alpha: 0.0),
-                  ],
+            // Brand-tinted icon with a softly pulsing halo.
+            AnimatedBuilder(
+              animation: _pulse,
+              builder: (_, child) {
+                final t = Curves.easeInOut.transform(_pulse.value);
+                return Container(
+                  width: 130,
+                  height: 130,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        Color.lerp(
+                                colors.primary, colors.tertiary, 0.5)!
+                            .withValues(alpha: 0.22 + 0.10 * t),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  child: child,
+                );
+              },
+              child: Center(
+                child: Container(
+                  width: 78,
+                  height: 78,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        colors.surfaceContainerHighest,
+                        colors.surfaceContainerHigh,
+                      ],
+                    ),
+                    border: Border.all(
+                      color: colors.outlineVariant,
+                      width: 1,
+                    ),
+                  ),
+                  child: Icon(widget.icon,
+                      size: 36, color: colors.primary),
                 ),
-              ),
-              alignment: Alignment.center,
-              child: Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: colors.surfaceContainerHighest,
-                  border: Border.all(color: colors.outlineVariant),
-                ),
-                child: Icon(icon, size: 34, color: colors.onSurfaceVariant),
               ),
             ),
             const SizedBox(height: 18),
             Text(
-              message,
+              widget.message,
               textAlign: TextAlign.center,
               style: context.text.bodyLarge?.copyWith(
                 color: colors.onSurfaceVariant,
                 height: 1.45,
+                fontWeight: FontWeight.w500,
               ),
             ),
-            if (action != null) ...[
+            if (widget.action != null) ...[
               const SizedBox(height: 20),
-              action!,
+              widget.action!,
             ],
           ],
         ),

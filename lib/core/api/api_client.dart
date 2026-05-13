@@ -6,12 +6,18 @@ import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:flutter/foundation.dart';
 
 import '../constants.dart';
+import '../network/connectivity_status.dart';
 import 'api_exceptions.dart';
 import 'pretty_log_interceptor.dart';
 
 class ApiClient {
   late final Dio dio;
   final PersistCookieJar cookieJar;
+
+  /// Tracks whether the last network call we observed succeeded.
+  /// Optional so unit-test instances and feature-disabled builds keep
+  /// working — `null` means "don't bother updating connectivity".
+  final ConnectivityStatus? connectivity;
 
   final _unauthorizedController = StreamController<void>.broadcast();
 
@@ -20,7 +26,7 @@ class ApiClient {
   /// trigger an automatic logout.
   Stream<void> get onUnauthorized => _unauthorizedController.stream;
 
-  ApiClient({required this.cookieJar}) {
+  ApiClient({required this.cookieJar, this.connectivity}) {
     dio = Dio(
       BaseOptions(
         baseUrl: AppConstants.baseUrl,
@@ -61,6 +67,9 @@ class ApiClient {
       final body = response.data;
       debugPrint('[debug] ApiClient.jsonRpc <- status=${response.statusCode} '
           'bodyType=${body.runtimeType}');
+      // Got a response from the server — we're online, even if the
+      // response itself is a server-side error.
+      connectivity?.markOnline();
       if (body is Map && body['error'] != null) {
         debugPrint('[debug] ApiClient.jsonRpc Odoo error block: ${body['error']}');
         throw ApiException.fromJson(Map<String, dynamic>.from(body));
@@ -82,6 +91,7 @@ class ApiClient {
     try {
       final response =
           await dio.get(path, queryParameters: queryParameters);
+      connectivity?.markOnline();
       return _unwrap(response);
     } on DioException catch (e) {
       throw _mapDioError(e);
@@ -97,6 +107,7 @@ class ApiClient {
   }) async {
     try {
       final response = await dio.post(path, data: data);
+      connectivity?.markOnline();
       return _unwrap(response);
     } on DioException catch (e) {
       throw _mapDioError(e);
@@ -145,9 +156,11 @@ class ApiClient {
       case DioExceptionType.receiveTimeout:
       case DioExceptionType.sendTimeout:
         mapped = ApiException.timeout();
+        connectivity?.markOffline();
         break;
       case DioExceptionType.connectionError:
         mapped = ApiException.network();
+        connectivity?.markOffline();
         break;
       default:
         mapped = ApiException.unknown(e.message);

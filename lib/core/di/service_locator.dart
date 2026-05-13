@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
 import '../location/location_service.dart';
+import '../network/connectivity_status.dart';
+import '../network/pending_actions_queue.dart';
 import '../settings/settings_repository.dart';
 import '../storage/session_storage.dart';
 import '../../features/auth/data/auth_repository.dart';
@@ -23,7 +25,10 @@ Future<void> setupServiceLocator() async {
 
   sl.registerSingleton<SharedPreferences>(prefs);
   sl.registerSingleton<PersistCookieJar>(cookieJar);
-  sl.registerSingleton<ApiClient>(ApiClient(cookieJar: cookieJar));
+  final connectivity = ConnectivityStatus();
+  sl.registerSingleton<ConnectivityStatus>(connectivity);
+  sl.registerSingleton<ApiClient>(
+      ApiClient(cookieJar: cookieJar, connectivity: connectivity));
   sl.registerSingleton<SessionStorage>(SessionStorage());
   sl.registerSingleton<LocationService>(LocationService());
   sl.registerSingleton<SettingsRepository>(SettingsRepository(prefs: prefs));
@@ -36,4 +41,12 @@ Future<void> setupServiceLocator() async {
   sl.registerSingleton<LiveLocationRepository>(
       LiveLocationRepository(api: sl()));
   sl.registerSingleton<NearbyRepository>(NearbyRepository(api: sl()));
+
+  final queue = PendingActionsQueue(
+    prefs: prefs,
+    repository: sl<VisitsRepository>(),
+    connectivity: connectivity,
+  );
+  queue.startBackgroundFlush();
+  sl.registerSingleton<PendingActionsQueue>(queue);
 }

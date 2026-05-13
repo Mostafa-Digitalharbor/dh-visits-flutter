@@ -3,6 +3,11 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_exceptions.dart';
 import '../../l10n/generated/app_localizations.dart';
 
+/// Visual kind for snackbars — drives the leading icon and accent color
+/// on `context.showSnack`. Defaults to `info` for plain messages and
+/// switches to `success` / `error` for explicit results.
+enum SnackKind { info, success, error }
+
 extension AppContext on BuildContext {
   AppLocalizations get s => AppLocalizations.of(this);
   ThemeData get theme => Theme.of(this);
@@ -10,10 +15,52 @@ extension AppContext on BuildContext {
   TextTheme get text => Theme.of(this).textTheme;
   bool get isRtl => Directionality.of(this) == TextDirection.rtl;
 
-  void showSnack(String message) {
+  void showSnack(String message, {SnackKind kind = SnackKind.info}) {
+    final scheme = colors;
+    final (icon, bg, fg) = switch (kind) {
+      SnackKind.success => (
+        Icons.check_circle_rounded,
+        Colors.green.shade600,
+        Colors.white,
+      ),
+      SnackKind.error => (
+        Icons.error_outline_rounded,
+        scheme.error,
+        scheme.onError,
+      ),
+      SnackKind.info => (
+        Icons.info_outline_rounded,
+        scheme.inverseSurface,
+        scheme.onInverseSurface,
+      ),
+    };
     ScaffoldMessenger.of(this)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(SnackBar(
+        backgroundColor: bg,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        elevation: 4,
+        duration: const Duration(seconds: 3),
+        content: Row(
+          children: [
+            Icon(icon, color: fg, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: text.bodyMedium?.copyWith(
+                  color: fg,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ));
   }
 }
 

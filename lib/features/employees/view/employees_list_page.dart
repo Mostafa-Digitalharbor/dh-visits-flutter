@@ -65,9 +65,6 @@ class _EmployeesListPageState extends State<EmployeesListPage> {
         Expanded(
           child: BlocBuilder<EmployeesBloc, EmployeesState>(
             builder: (context, state) {
-              if (state.status == EmployeesStatus.loading) {
-                return const SkeletonList(itemCount: 8);
-              }
               if (state.status == EmployeesStatus.failure &&
                   state.items.isEmpty) {
                 return ErrorView(
@@ -76,20 +73,41 @@ class _EmployeesListPageState extends State<EmployeesListPage> {
                   onRetry: _refresh,
                 );
               }
-              if (state.items.isEmpty) {
-                return EmptyView(
-                  icon: Icons.badge_outlined,
-                  message: context.s.employeesEmpty,
+
+              Widget body;
+              if (state.status == EmployeesStatus.loading) {
+                body = const SkeletonList(
+                  key: ValueKey('skeleton'),
+                  itemCount: 8,
                 );
-              }
-              return RefreshIndicator(
-                onRefresh: _refresh,
-                child: ListView.separated(
+              } else if (state.items.isEmpty) {
+                body = ScaleFadeIn(
+                  key: const ValueKey('empty'),
+                  child: EmptyView(
+                    icon: Icons.badge_outlined,
+                    message: context.s.employeesEmpty,
+                  ),
+                );
+              } else {
+                body = ListView.separated(
+                  key: const ValueKey('list'),
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
                   itemCount: state.items.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, i) =>
-                      _EmployeeTile(employee: state.items[i]),
+                  itemBuilder: (context, i) => AnimatedListItem(
+                    index: i,
+                    child: _EmployeeTile(employee: state.items[i]),
+                  ),
+                );
+              }
+
+              return AppRefreshIndicator(
+                onRefresh: _refresh,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 280),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  child: body,
                 ),
               );
             },

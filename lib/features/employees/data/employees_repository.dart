@@ -1,51 +1,25 @@
 import '../../../core/api/api_client.dart';
 import 'models/employee.dart';
 
-/// Reads `res.users` filtered to the two Customer Visits groups (User +
-/// Manager) so the picker only surfaces accounts that can actually receive
-/// and act on a visit.
+/// Reads `res.users` for the Create-Visit / re-assign picker. We mirror
+/// Odoo's own `salesperson_id` field — any **internal** active user can
+/// be a salesperson, including admins/managers themselves. Filtering
+/// down to a single role on the mobile side was hiding real
+/// salespersons (admins who *do* go on visits), so we now show the same
+/// list the Odoo web UI shows.
 ///
-/// We don't have a dedicated REST endpoint for users, so everything goes
-/// through Odoo's standard `/web/dataset/call_kw` JSON-RPC.
+/// We don't have a dedicated REST endpoint for users, so everything
+/// goes through Odoo's standard `/web/dataset/call_kw` JSON-RPC.
 class EmployeesRepository {
   final ApiClient api;
   EmployeesRepository({required this.api});
 
-  static const _userGroupXml = 'dh_customer_visits.group_customer_visit_user';
-  static const _managerGroupXml =
-      'dh_customer_visits.group_customer_visit_manager';
-
-  List<int>? _cachedGroupIds;
-
-  Future<List<int>> _resolveGroupIds() async {
-    if (_cachedGroupIds != null) return _cachedGroupIds!;
-    final ids = <int>[];
-    for (final xml in [_userGroupXml, _managerGroupXml]) {
-      final parts = xml.split('.');
-      final result = await api.jsonRpc(
-        '/web/dataset/call_kw',
-        params: {
-          'model': 'ir.model.data',
-          'method': 'check_object_reference',
-          'args': [parts[0], parts[1]],
-          'kwargs': {},
-        },
-      );
-      if (result is List && result.length >= 2) {
-        final id = (result[1] as num).toInt();
-        ids.add(id);
-      }
-    }
-    _cachedGroupIds = ids;
-    return ids;
-  }
-
   Future<List<Employee>> list({String? search, int limit = 50}) async {
-    final groupIds = await _resolveGroupIds();
     final domain = <dynamic>[
+      // share=false keeps portal / public users out — only internal
+      // employees should ever be a salesperson.
       ['share', '=', false],
       ['active', '=', true],
-      ['all_group_ids', 'in', groupIds],
     ];
     if (search != null && search.isNotEmpty) {
       domain.add(['name', 'ilike', search]);

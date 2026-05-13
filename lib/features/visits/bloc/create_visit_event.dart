@@ -42,6 +42,13 @@ class CreateVisitNotesChanged extends CreateVisitEvent {
   List<Object?> get props => [notes];
 }
 
+class CreateVisitLifecycleSelected extends CreateVisitEvent {
+  final VisitLifecycleState state;
+  const CreateVisitLifecycleSelected(this.state);
+  @override
+  List<Object?> get props => [state];
+}
+
 class CreateVisitSubmitted extends CreateVisitEvent {
   const CreateVisitSubmitted();
 }

@@ -236,6 +236,48 @@ class AppLocalizationsAr extends AppLocalizations {
   String get createVisitNotesLabel => 'ملاحظات (اختياري)';
 
   @override
+  String get createVisitStateLabel => 'الحالة الابتدائية';
+
+  @override
+  String get visitStateDraft => 'Draft';
+
+  @override
+  String get visitStateSubmit => 'Submit';
+
+  @override
+  String get visitStateUnderReview => 'Under review';
+
+  @override
+  String get visitStateDone => 'Done';
+
+  @override
+  String get visitStateCancel => 'ملغية';
+
+  @override
+  String get visitDetailVisitTypeLabel => 'نوع الزيارة';
+
+  @override
+  String get visitDetailEditVisitType => 'تغيير النوع';
+
+  @override
+  String get visitDetailMarkAsDone => 'تأكيد المراجعة';
+
+  @override
+  String get visitDetailMarkAsDoneSuccess => 'تم اعتماد الزيارة كمنتهية';
+
+  @override
+  String get visitDetailSendToEmployee => 'إرسال للموظف';
+
+  @override
+  String get visitDetailSentToEmployeeSuccess => 'تم إرسال الزيارة للموظف';
+
+  @override
+  String get visitDetailEditState => 'تغيير الحالة';
+
+  @override
+  String get visitDetailPickState => 'اختار الحالة';
+
+  @override
   String get createVisitSubmit => 'إنشاء الزيارة';
 
   @override
@@ -272,6 +314,42 @@ class AppLocalizationsAr extends AppLocalizations {
   String get pickerNoResults => 'لا توجد نتائج';
 
   @override
+  String get groupToday => 'اليوم';
+
+  @override
+  String get groupYesterday => 'أمس';
+
+  @override
+  String get groupEarlierThisWeek => 'هذا الأسبوع';
+
+  @override
+  String get groupEarlier => 'سابقاً';
+
+  @override
+  String get groupTomorrow => 'غداً';
+
+  @override
+  String get groupLaterThisWeek => 'خلال الأسبوع';
+
+  @override
+  String get groupUpcoming => 'قادم';
+
+  @override
+  String get statsTotal => 'الإجمالي';
+
+  @override
+  String get statsActive => 'نشطة';
+
+  @override
+  String get statsCompleted => 'مكتملة';
+
+  @override
+  String get statsPendingReview => 'للمراجعة';
+
+  @override
+  String get statsDone => 'منتهية';
+
+  @override
   String get visitsHistoryTitle => 'سجل الزيارات';
 
   @override
@@ -285,6 +363,36 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get visitsFilterAll => 'الكل';
+
+  @override
+  String get filterStatusLabel => 'الحالة';
+
+  @override
+  String get filterStatusAll => 'الكل';
+
+  @override
+  String get filterStatusCompleted => 'مكتملة';
+
+  @override
+  String get filterStatusPendingReview => 'قيد المراجعة';
+
+  @override
+  String get filterStatusIncomplete => 'غير مكتملة';
+
+  @override
+  String get filterTimingLabel => 'التوقيت';
+
+  @override
+  String get filterTimingAll => 'الكل';
+
+  @override
+  String get filterTimingOnTime => 'في ميعادها';
+
+  @override
+  String get filterTimingEarly => 'قبل الميعاد';
+
+  @override
+  String get filterTimingOverdue => 'فات الميعاد';
 
   @override
   String get visitsTodayEmpty => 'لا توجد زيارات مجدولة لليوم';
@@ -328,6 +436,64 @@ class AppLocalizationsAr extends AppLocalizations {
   String get visitDetailSaved => 'تم حفظ التعديلات';
 
   @override
+  String get visitDetailDelete => 'حذف الزيارة';
+
+  @override
+  String get visitDetailNotStartedYet => 'لم تبدأ الزيارة بعد';
+
+  @override
+  String get visitDetailNotEndedYet => 'لم تنتهِ الزيارة بعد';
+
+  @override
+  String get visitDetailOpenCheckInLocation => 'عرض موقع البدء على الخريطة';
+
+  @override
+  String get visitDetailOpenCheckOutLocation => 'عرض موقع الإنهاء على الخريطة';
+
+  @override
+  String get visitDetailTimelineLocationsSection => 'التوقيتات والمواقع';
+
+  @override
+  String get visitDetailEditCustomer => 'تغيير العميل';
+
+  @override
+  String get visitDetailEditEmployee => 'تغيير الموظف';
+
+  @override
+  String get visitDetailCustomer => 'العميل';
+
+  @override
+  String get visitDetailEmployee => 'الموظف';
+
+  @override
+  String get visitDetailStatusLabel => 'الحالة';
+
+  @override
+  String get visitDetailStateBadgeDraft => 'مسودة';
+
+  @override
+  String get visitDetailStateBadgeSubmitted => 'قيد التنفيذ';
+
+  @override
+  String get visitDetailStateBadgeUnderReview => 'قيد المراجعة';
+
+  @override
+  String get visitDetailStateBadgeDone => 'منتهية';
+
+  @override
+  String get confirmDeleteVisitTitle => 'حذف الزيارة';
+
+  @override
+  String get confirmDeleteVisitMessage =>
+      'هل أنت متأكد من حذف هذه الزيارة؟ لا يمكن التراجع عن هذا الإجراء.';
+
+  @override
+  String get visitDeletedSuccess => 'تم حذف الزيارة';
+
+  @override
+  String get nearbyAdjustRadius => 'ضبط نصف القطر';
+
+  @override
   String get roleManager => 'مدير';
 
   @override
@@ -341,6 +507,26 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get visitsHistoryIncompleteBadge => 'غير مكتملة';
+
+  @override
+  String get visitsHistoryOverdueBadge => 'فات الميعاد';
+
+  @override
+  String get visitDetailOverdueHint =>
+      'ميعاد الزيارة عدّى والزيارة لسه ما خلصتش. يا تأجل التاريخ يا تعمل follow-up.';
+
+  @override
+  String get visitExecutedOnTime => 'اتعملت في ميعادها';
+
+  @override
+  String visitExecutedEarly(int days) {
+    return 'اتعملت قبل ميعادها بـ $days يوم';
+  }
+
+  @override
+  String visitExecutedLate(int days) {
+    return 'اتعملت بعد ميعادها بـ $days يوم';
+  }
 
   @override
   String get visitsHistoryRunning => 'جارية';
@@ -369,7 +555,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get visitDetailCustomerLocationSection => 'موقع العميل';
 
   @override
-  String get visitDetailNavigate => 'بدء التوجيه';
+  String get visitDetailNavigate => 'عرض موقع العميل على الخريطة';
 
   @override
   String get visitDetailNoCustomerLocation => 'موقع العميل غير متاح';
@@ -393,6 +579,60 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get visitLocationNotAvailable => 'موقع العميل غير متاح';
+
+  @override
+  String get offlineNoQueue => 'إنت أوفلاين — الأكشن هيتحفظ محلياً';
+
+  @override
+  String offlineWithQueue(int count) {
+    return 'أوفلاين — $count إجراء في انتظار المزامنة';
+  }
+
+  @override
+  String offlineSyncing(int count) {
+    return 'جاري المزامنة لـ $count إجراء…';
+  }
+
+  @override
+  String get offlineCheckInQueued => 'اتحفظ محلياً — هيترفع لما الشبكة ترجع';
+
+  @override
+  String get dashboardTabTitle => 'لوحة المتابعة';
+
+  @override
+  String get dashboardKpiOverdue => 'متأخرة';
+
+  @override
+  String get dashboardKpiPending => 'بانتظار المراجعة';
+
+  @override
+  String get dashboardKpiToday => 'زيارات اليوم';
+
+  @override
+  String get dashboardKpiActive => 'جارية الآن';
+
+  @override
+  String get dashboardActiveOnMapTitle => 'الموظفين في الميدان';
+
+  @override
+  String get dashboardActiveEmpty => 'لا يوجد موظفين عاملين دلوقتي';
+
+  @override
+  String dashboardActiveMore(int count) {
+    return '+$count كمان';
+  }
+
+  @override
+  String get dashboardTopCustomers => 'أكثر العملاء زيارة';
+
+  @override
+  String get dashboardTopEmployees => 'أفضل موظفين (زيارات منتهية)';
+
+  @override
+  String get dashboardNoData => 'البيانات لسه قليلة';
+
+  @override
+  String get visitsTabTitle => 'الزيارات';
 
   @override
   String get homeTabCustomers => 'العملاء';

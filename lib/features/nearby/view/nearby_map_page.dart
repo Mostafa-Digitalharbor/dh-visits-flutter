@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/constants.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
+import '../../auth/bloc/auth_bloc.dart';
 import '../../customers/data/models/customer.dart';
 import '../bloc/nearby_bloc.dart';
 import '../data/models/nearby_employee.dart';
@@ -370,6 +371,8 @@ class _BottomPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tf = DateFormat('HH:mm:ss');
+    final canEdit =
+        context.watch<AuthBloc>().state.user?.canEditVisits ?? false;
     return AppCard(
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -428,6 +431,10 @@ class _BottomPanel extends StatelessWidget {
                 ),
             ],
           ),
+          if (canEdit) ...[
+            const SizedBox(height: 6),
+            _RadiusSlider(currentRadius: state.radius),
+          ],
           const SizedBox(height: 12),
           if (state.employees.isEmpty)
             Padding(
@@ -463,6 +470,64 @@ class _BottomPanel extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Manager-only slider for the search radius. Uses local draft state during
+/// the drag so the bloc only refetches when the user releases the thumb
+/// (otherwise we'd spam `/nearby-employees` on every pixel of movement).
+class _RadiusSlider extends StatefulWidget {
+  final double currentRadius;
+  const _RadiusSlider({required this.currentRadius});
+
+  @override
+  State<_RadiusSlider> createState() => _RadiusSliderState();
+}
+
+class _RadiusSliderState extends State<_RadiusSlider> {
+  static const double _min = 5;
+  static const double _max = 200;
+
+  double? _draft;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = (_draft ?? widget.currentRadius).clamp(_min, _max);
+    return Row(
+      children: [
+        Icon(Icons.adjust_rounded,
+            size: 16, color: context.colors.onSurfaceVariant),
+        const SizedBox(width: 6),
+        Text(
+          context.s.unitMeters(value.toStringAsFixed(0)),
+          style: context.text.labelMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        Expanded(
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 3,
+              overlayShape:
+                  const RoundSliderOverlayShape(overlayRadius: 16),
+            ),
+            child: Slider(
+              min: _min,
+              max: _max,
+              value: value,
+              divisions: ((_max - _min) ~/ 5),
+              label:
+                  context.s.unitMeters(value.toStringAsFixed(0)),
+              onChanged: (v) => setState(() => _draft = v),
+              onChangeEnd: (v) {
+                setState(() => _draft = null);
+                context.read<NearbyBloc>().add(NearbyRadiusChanged(v));
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

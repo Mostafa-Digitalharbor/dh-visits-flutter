@@ -13,8 +13,10 @@ import '../../employees/data/employees_repository.dart';
 import '../../employees/data/models/employee.dart';
 import '../bloc/create_visit_bloc.dart';
 import '../bloc/visits_list_bloc.dart';
+import '../data/models/visit.dart';
 import '../data/models/visit_type.dart';
 import '../data/visits_repository.dart';
+import 'visit_state_picker.dart';
 
 /// Manager-only form to create a new `customer.visit` (state=draft).
 ///
@@ -66,8 +68,11 @@ class _CreateVisitView extends StatelessWidget {
         if (state.status == CreateVisitStatus.success) {
           HapticFeedback.mediumImpact();
           context.showSnack(context.s.createVisitSuccess);
-          // Refresh the visits list so the new draft appears immediately.
-          context.read<VisitsListBloc>().add(const VisitsListLoadRequested());
+          // Refresh the visits list so the new visit appears immediately.
+          // This screen is admin-only so always include drafts.
+          context
+              .read<VisitsListBloc>()
+              .add(const VisitsListLoadRequested(includeDrafts: true));
           if (context.canPop()) context.pop();
         } else if (state.status == CreateVisitStatus.failure &&
             state.error != null) {
@@ -79,6 +84,29 @@ class _CreateVisitView extends StatelessWidget {
         final submitting = state.status == CreateVisitStatus.submitting;
         return Scaffold(
           appBar: AppBar(
+            leading: Hero(
+              tag: 'create-visit-hero',
+              // The flight shuttle keeps the FAB-style icon while it
+              // animates from the home FAB to the AppBar's leading slot.
+              flightShuttleBuilder: (_, animation, __, ___, ____) {
+                final colors = Theme.of(context).colorScheme;
+                return Material(
+                  type: MaterialType.transparency,
+                  child: Center(
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: colors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.add, color: colors.onPrimary),
+                    ),
+                  ),
+                );
+              },
+              child: const BackButton(),
+            ),
             title: Text(context.s.createVisitTitle),
             actions: [
               TextButton(
@@ -110,6 +138,8 @@ class _CreateVisitView extends StatelessWidget {
                 _DateField(),
                 SizedBox(height: 12),
                 _TypeField(),
+                SizedBox(height: 12),
+                _StateField(),
                 SizedBox(height: 12),
                 _NotesField(),
               ],
@@ -303,6 +333,43 @@ class _TypeField extends StatelessWidget {
           }
         },
       ),
+    );
+  }
+}
+
+class _StateField extends StatelessWidget {
+  const _StateField();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<CreateVisitBloc, CreateVisitState>(
+      buildWhen: (p, c) => p.lifecycleState != c.lifecycleState,
+      builder: (context, state) {
+        return _FieldRow(
+          icon: Icons.flag_outlined,
+          label: context.s.createVisitStateLabel,
+          value: lifecycleStateLabel(context, state.lifecycleState),
+          placeholder: context.s.createVisitStateLabel,
+          onTap: () async {
+            // Creation can never set under-review or done — those
+            // require the employee to have actually visited the
+            // customer.
+            final picked = await showLifecycleStatePicker(
+              context,
+              current: state.lifecycleState,
+              allowedStates: const [
+                VisitLifecycleState.draft,
+                VisitLifecycleState.submit,
+              ],
+            );
+            if (picked != null && context.mounted) {
+              context
+                  .read<CreateVisitBloc>()
+                  .add(CreateVisitLifecycleSelected(picked));
+            }
+          },
+        );
+      },
     );
   }
 }
