@@ -1,0 +1,4 @@
+/* Localized versions of Info.plist keys - English */
+
+CFBundleDisplayName = "Visits";
+NSLocationWhenInUseUsageDescription = "We use your location to record customer visit check-in/out and to share your live position with your manager while you are using the app.";

@@ -1,11 +1,14 @@
+import 'config/app_environment.dart';
+
 class AppConstants {
   AppConstants._();
 
-  static const String baseUrl =
-      'https://dh-abdelrahmanwael-odoo-19-test.odoo.com';
-  // Odoo.sh trial DBs have format `<subdomain>-pros-<buildId>`, not just the
-  // subdomain. Trial instance expires 2026-06-07.
-  static const String database = 'dh-abdelrahmanwael-odoo-19-test-pros-31943069';
+  /// Backend base URL. Sourced from `--dart-define=API_BASE_URL=...`.
+  /// See [AppEnvironment] for build-flavor overrides.
+  static String get baseUrl => AppEnvironment.baseUrl;
+
+  /// Odoo database name. Sourced from `--dart-define=ODOO_DATABASE=...`.
+  static String get database => AppEnvironment.database;
 
   static const Duration locationPingInterval = Duration(seconds: 30);
   static const Duration nearbyRefreshInterval = Duration(seconds: 10);

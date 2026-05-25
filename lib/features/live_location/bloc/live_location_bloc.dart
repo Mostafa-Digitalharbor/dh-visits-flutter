@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../../core/api/api_exceptions.dart';
 import '../../../core/constants.dart';
@@ -12,10 +13,16 @@ import '../data/live_location_repository.dart';
 part 'live_location_event.dart';
 part 'live_location_state.dart';
 
-class LiveLocationBloc extends Bloc<LiveLocationEvent, LiveLocationState> {
+class LiveLocationBloc extends Bloc<LiveLocationEvent, LiveLocationState>
+    with WidgetsBindingObserver {
   final LiveLocationRepository repository;
   final LocationService locationService;
   Timer? _timer;
+
+  /// Tracks whether the user explicitly enabled live sharing. We use this on
+  /// app-resume to decide whether to restart the timer (vs. respecting an
+  /// explicit Stop the user issued earlier).
+  bool _userWantsSharing = false;
 
   LiveLocationBloc({
     required this.repository,
@@ -24,6 +31,7 @@ class LiveLocationBloc extends Bloc<LiveLocationEvent, LiveLocationState> {
     on<LiveLocationStartRequested>(_onStart);
     on<LiveLocationStopRequested>(_onStop);
     on<LiveLocationTickRequested>(_onTick);
+    WidgetsBinding.instance.addObserver(this);
   }
 
   Future<void> _onStart(
@@ -38,11 +46,9 @@ class LiveLocationBloc extends Bloc<LiveLocationEvent, LiveLocationState> {
       ));
       return;
     }
+    _userWantsSharing = true;
     emit(state.copyWith(enabled: true, error: null));
-    _timer?.cancel();
-    _timer = Timer.periodic(AppConstants.locationPingInterval, (_) {
-      add(const LiveLocationTickRequested());
-    });
+    _startTimer();
     add(const LiveLocationTickRequested());
   }
 
@@ -50,6 +56,7 @@ class LiveLocationBloc extends Bloc<LiveLocationEvent, LiveLocationState> {
     LiveLocationStopRequested event,
     Emitter<LiveLocationState> emit,
   ) async {
+    _userWantsSharing = false;
     _timer?.cancel();
     _timer = null;
     emit(state.copyWith(enabled: false));
@@ -95,8 +102,43 @@ class LiveLocationBloc extends Bloc<LiveLocationEvent, LiveLocationState> {
     }
   }
 
+  void _startTimer() {
+    _timer?.cancel();
+    _timer = Timer.periodic(AppConstants.locationPingInterval, (_) {
+      add(const LiveLocationTickRequested());
+    });
+  }
+
+  // Renamed from `state` so it doesn't shadow Bloc's `state` getter, which we
+  // read on resume.
+  @override
+  // ignore: avoid_renaming_method_parameters
+  void didChangeAppLifecycleState(AppLifecycleState lifecycle) {
+    // The app declares foreground-only location use (no ACCESS_BACKGROUND_LOCATION
+    // on Android, no UIBackgroundModes=location on iOS). We stop the periodic
+    // ticker the moment we lose foreground so we never try to read GPS or hit
+    // the API from the background — which would otherwise fail silently and,
+    // worse, make our store privacy declaration inaccurate.
+    switch (lifecycle) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        _timer?.cancel();
+        _timer = null;
+        break;
+      case AppLifecycleState.resumed:
+        if (_userWantsSharing && state.enabled && _timer == null) {
+          _startTimer();
+          add(const LiveLocationTickRequested());
+        }
+        break;
+    }
+  }
+
   @override
   Future<void> close() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     return super.close();
   }

@@ -1,0 +1,4 @@
+/* Localized versions of Info.plist keys - Arabic */
+
+CFBundleDisplayName = "زيارات";
+NSLocationWhenInUseUsageDescription = "نستخدم موقعك لتسجيل تسجيل الدخول/الخروج من زيارات العملاء ولمشاركة موقعك الحالي مع مديرك أثناء استخدامك للتطبيق.";

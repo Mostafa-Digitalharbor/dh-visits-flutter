@@ -239,16 +239,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get createVisitStateLabel => 'الحالة الابتدائية';
 
   @override
-  String get visitStateDraft => 'Draft';
+  String get visitStateDraft => 'مسودة';
 
   @override
-  String get visitStateSubmit => 'Submit';
+  String get visitStateSubmit => 'إرسال';
 
   @override
-  String get visitStateUnderReview => 'Under review';
+  String get visitStateUnderReview => 'قيد المراجعة';
 
   @override
-  String get visitStateDone => 'Done';
+  String get visitStateDone => 'منتهية';
 
   @override
   String get visitStateCancel => 'ملغية';

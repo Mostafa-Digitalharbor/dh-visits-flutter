@@ -1,4 +1,4 @@
-package com.example.location_gps
+package net.digitalharbor.visits
 
 import io.flutter.embedding.android.FlutterActivity
 

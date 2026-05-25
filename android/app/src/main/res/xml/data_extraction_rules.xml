@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ data transfer rules. We disable both cloud backup and
+  device-to-device transfer because the app stores an authenticated session
+  cookie in secure storage that must NOT be carried over to other devices.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" />
+        <exclude domain="root" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" />
+        <exclude domain="root" />
+    </device-transfer>
+</data-extraction-rules>
