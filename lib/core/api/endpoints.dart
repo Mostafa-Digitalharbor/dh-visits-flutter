@@ -6,6 +6,11 @@ class Endpoints {
   static const String destroySession = '/web/session/destroy';
   static const String sessionInfo = '/web/session/get_session_info';
 
+  /// Lists the databases exposed by an Odoo server. Only works when the
+  /// server has `list_db` enabled (single-tenant / on-prem instances). Used to
+  /// auto-detect the database during server setup.
+  static const String databaseList = '/web/database/list';
+
   // Custom REST endpoints (provided by Odoo developer)
   static const String customers = '/api/customers';
   static String customerById(int id) => '/api/customers/$id';

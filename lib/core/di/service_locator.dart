@@ -4,6 +4,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
+import '../config/server_config_repository.dart';
 import '../location/location_service.dart';
 import '../network/connectivity_status.dart';
 import '../network/pending_actions_queue.dart';
@@ -25,16 +26,26 @@ Future<void> setupServiceLocator() async {
 
   sl.registerSingleton<SharedPreferences>(prefs);
   sl.registerSingleton<PersistCookieJar>(cookieJar);
+
+  // Resolve the per-company backend before building the API client so the
+  // first request already targets the user's stored server.
+  final serverConfigRepo = ServerConfigRepository(prefs: prefs);
+  sl.registerSingleton<ServerConfigRepository>(serverConfigRepo);
+  final serverConfig = serverConfigRepo.read();
+
   final connectivity = ConnectivityStatus();
   sl.registerSingleton<ConnectivityStatus>(connectivity);
-  sl.registerSingleton<ApiClient>(
-      ApiClient(cookieJar: cookieJar, connectivity: connectivity));
+  sl.registerSingleton<ApiClient>(ApiClient(
+    cookieJar: cookieJar,
+    connectivity: connectivity,
+    baseUrl: serverConfig.baseUrl,
+  ));
   sl.registerSingleton<SessionStorage>(SessionStorage());
   sl.registerSingleton<LocationService>(LocationService());
   sl.registerSingleton<SettingsRepository>(SettingsRepository(prefs: prefs));
 
-  sl.registerSingleton<AuthRepository>(
-      AuthRepository(api: sl(), session: sl(), cookieJar: sl()));
+  sl.registerSingleton<AuthRepository>(AuthRepository(
+      api: sl(), session: sl(), cookieJar: sl(), serverConfig: sl()));
   sl.registerSingleton<CustomersRepository>(CustomersRepository(api: sl()));
   sl.registerSingleton<EmployeesRepository>(EmployeesRepository(api: sl()));
   sl.registerSingleton<VisitsRepository>(VisitsRepository(api: sl()));

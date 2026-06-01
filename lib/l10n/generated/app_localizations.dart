@@ -101,7 +101,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'Customer Visits'**
+  /// **'Visits'**
   String get appTitle;
 
   /// No description provided for @appTagline.
@@ -236,10 +236,94 @@ abstract class AppLocalizations {
   /// **'English'**
   String get languageEnglish;
 
+  /// No description provided for @commonBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get commonBack;
+
+  /// No description provided for @commonContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get commonContinue;
+
+  /// No description provided for @serverSetupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect your server'**
+  String get serverSetupTitle;
+
+  /// No description provided for @serverSetupSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your organization\'s server address to get started'**
+  String get serverSetupSubtitle;
+
+  /// No description provided for @serverSetupUrlLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Server URL'**
+  String get serverSetupUrlLabel;
+
+  /// No description provided for @serverSetupUrlHint.
+  ///
+  /// In en, this message translates to:
+  /// **'https://your-company.odoo.com'**
+  String get serverSetupUrlHint;
+
+  /// No description provided for @serverSetupContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get serverSetupContinue;
+
+  /// No description provided for @serverSetupInvalidUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid URL (e.g. https://your-company.odoo.com)'**
+  String get serverSetupInvalidUrl;
+
+  /// No description provided for @serverSetupHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask your system administrator if you don\'t know your server address.'**
+  String get serverSetupHelp;
+
+  /// No description provided for @serverSetupDatabaseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Database name'**
+  String get serverSetupDatabaseLabel;
+
+  /// No description provided for @serverSetupDatabaseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. company-main'**
+  String get serverSetupDatabaseHint;
+
+  /// No description provided for @serverSetupDatabasePrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t detect the database automatically. Please enter its name (ask your administrator).'**
+  String get serverSetupDatabasePrompt;
+
+  /// No description provided for @serverSetupChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting…'**
+  String get serverSetupChecking;
+
+  /// No description provided for @loginChangeServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Change server'**
+  String get loginChangeServer;
+
   /// No description provided for @loginTitle.
   ///
   /// In en, this message translates to:
-  /// **'Customer Visits'**
+  /// **'Visits'**
   String get loginTitle;
 
   /// No description provided for @loginSubtitle.

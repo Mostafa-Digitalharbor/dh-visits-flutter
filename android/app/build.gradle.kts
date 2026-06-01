@@ -39,8 +39,10 @@ android {
         // (uses AndroidKeyStore APIs added in M) and permission_handler runtime
         // permission flow.
         minSdk = flutter.minSdkVersion
-        // 34 = Android 14. Required by Google Play as of Aug 2024 for new apps & updates.
-        targetSdk = 34
+        // 35 = Android 15. Google Play requires new apps/updates to target an
+        // API level within one year of the latest major release; as of 2025+
+        // that is API 35. compileSdk (36) must be >= targetSdk.
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 

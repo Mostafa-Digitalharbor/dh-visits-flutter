@@ -16,6 +16,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthStarted>(_onStarted);
     on<AuthLoginRequested>(_onLoginRequested);
     on<AuthLogoutRequested>(_onLogoutRequested);
+    on<AuthServerChanged>(_onServerChanged);
   }
 
   /// Minimum time the splash screen stays visible so its zoom animation can
@@ -69,6 +70,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     await repository.logout();
+    emit(const AuthState.unauthenticated());
+  }
+
+  Future<void> _onServerChanged(
+    AuthServerChanged event,
+    Emitter<AuthState> emit,
+  ) async {
+    await repository.clearLocalSession();
     emit(const AuthState.unauthenticated());
   }
 }

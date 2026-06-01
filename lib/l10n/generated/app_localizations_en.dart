@@ -9,7 +9,7 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Customer Visits';
+  String get appTitle => 'Visits';
 
   @override
   String get appTagline => 'Track your field visits with precision';
@@ -82,7 +82,53 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languageEnglish => 'English';
 
   @override
-  String get loginTitle => 'Customer Visits';
+  String get commonBack => 'Back';
+
+  @override
+  String get commonContinue => 'Continue';
+
+  @override
+  String get serverSetupTitle => 'Connect your server';
+
+  @override
+  String get serverSetupSubtitle =>
+      'Enter your organization\'s server address to get started';
+
+  @override
+  String get serverSetupUrlLabel => 'Server URL';
+
+  @override
+  String get serverSetupUrlHint => 'https://your-company.odoo.com';
+
+  @override
+  String get serverSetupContinue => 'Continue';
+
+  @override
+  String get serverSetupInvalidUrl =>
+      'Enter a valid URL (e.g. https://your-company.odoo.com)';
+
+  @override
+  String get serverSetupHelp =>
+      'Ask your system administrator if you don\'t know your server address.';
+
+  @override
+  String get serverSetupDatabaseLabel => 'Database name';
+
+  @override
+  String get serverSetupDatabaseHint => 'e.g. company-main';
+
+  @override
+  String get serverSetupDatabasePrompt =>
+      'We couldn\'t detect the database automatically. Please enter its name (ask your administrator).';
+
+  @override
+  String get serverSetupChecking => 'Connecting…';
+
+  @override
+  String get loginChangeServer => 'Change server';
+
+  @override
+  String get loginTitle => 'Visits';
 
   @override
   String get loginSubtitle => 'Sign in to start your field day';

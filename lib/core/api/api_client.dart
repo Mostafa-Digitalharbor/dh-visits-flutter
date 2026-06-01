@@ -5,7 +5,6 @@ import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:flutter/foundation.dart';
 
-import '../constants.dart';
 import '../network/connectivity_status.dart';
 import 'api_exceptions.dart';
 import 'pretty_log_interceptor.dart';
@@ -26,10 +25,14 @@ class ApiClient {
   /// trigger an automatic logout.
   Stream<void> get onUnauthorized => _unauthorizedController.stream;
 
-  ApiClient({required this.cookieJar, this.connectivity}) {
+  ApiClient({
+    required this.cookieJar,
+    this.connectivity,
+    String baseUrl = '',
+  }) {
     dio = Dio(
       BaseOptions(
-        baseUrl: AppConstants.baseUrl,
+        baseUrl: baseUrl,
         connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 30),
         contentType: 'application/json',
@@ -46,6 +49,15 @@ class ApiClient {
     if (kDebugMode) {
       dio.interceptors.add(PrettyLogInterceptor());
     }
+  }
+
+  /// Currently active backend base URL (empty until the user configures one).
+  String get baseUrl => dio.options.baseUrl;
+
+  /// Repoints every subsequent request at [baseUrl]. Called when the user
+  /// saves (or changes) their company's server on the setup screen.
+  void updateBaseUrl(String baseUrl) {
+    dio.options.baseUrl = baseUrl;
   }
 
   /// Odoo JSON-RPC call.

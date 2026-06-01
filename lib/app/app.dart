@@ -5,6 +5,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../core/api/api_client.dart';
+import '../core/config/server_config_cubit.dart';
+import '../core/config/server_config_repository.dart';
 import '../core/di/service_locator.dart';
 import '../core/location/location_service.dart';
 import '../core/settings/settings_cubit.dart';
@@ -36,6 +38,7 @@ class CustomerVisitsApp extends StatefulWidget {
 class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
   late final AuthBloc _authBloc;
   late final SettingsCubit _settingsCubit;
+  late final ServerConfigCubit _serverConfigCubit;
   StreamSubscription<void>? _unauthorizedSub;
 
   @override
@@ -45,6 +48,10 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
       ..add(const AuthStarted());
     _settingsCubit =
         SettingsCubit(repository: sl<SettingsRepository>());
+    _serverConfigCubit = ServerConfigCubit(
+      repository: sl<ServerConfigRepository>(),
+      apiClient: sl<ApiClient>(),
+    );
     // Any API call returning 401/AUTH_REQUIRED forces a logout, which the
     // router will pick up and redirect to /login.
     _unauthorizedSub = sl<ApiClient>().onUnauthorized.listen((_) {
@@ -59,16 +66,18 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
     _unauthorizedSub?.cancel();
     _authBloc.close();
     _settingsCubit.close();
+    _serverConfigCubit.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final router = buildRouter(_authBloc);
+    final router = buildRouter(_authBloc, _serverConfigCubit);
     return MultiBlocProvider(
       providers: [
         BlocProvider.value(value: _authBloc),
         BlocProvider.value(value: _settingsCubit),
+        BlocProvider.value(value: _serverConfigCubit),
         BlocProvider(
           create: (_) =>
               CustomersBloc(repository: sl<CustomersRepository>()),

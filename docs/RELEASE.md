@@ -65,7 +65,12 @@ Create `.env.production` (git-ignored) from `.env.example`:
 API_BASE_URL=https://odoo.digitalharbor.net
 ODOO_DATABASE=visits_production
 APP_FLAVOR=production
+SENTRY_DSN=https://<key>@o<org>.ingest.sentry.io/<project>
+SENTRY_TRACES_PERCENT=10
 ```
+
+Leave `SENTRY_DSN` empty in `.env.dev` so local hot-reload exceptions
+don't burn your Sentry quota.
 
 Then build with:
 

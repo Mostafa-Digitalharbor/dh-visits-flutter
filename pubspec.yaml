@@ -55,6 +55,9 @@ dependencies:
   google_fonts: ^6.2.1
   package_info_plus: ^8.1.1
 
+  # Error & crash reporting
+  sentry_flutter: ^8.12.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

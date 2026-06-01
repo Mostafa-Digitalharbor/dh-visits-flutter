@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/config/server_config_cubit.dart';
 import '../features/auth/bloc/auth_bloc.dart';
 import '../features/auth/view/login_page.dart';
 import '../features/auth/view/splash_page.dart';
@@ -9,27 +12,38 @@ import '../features/customers/view/customer_detail_page.dart';
 import '../features/employees/data/models/employee.dart';
 import '../features/home/view/home_shell.dart';
 import '../features/nearby/view/nearby_map_page.dart';
+import '../features/server_config/view/server_setup_page.dart';
 import '../features/settings/view/settings_page.dart';
 import '../features/visits/data/models/visit.dart';
 import '../features/visits/view/create_visit_page.dart';
 import '../features/visits/view/visit_detail_page.dart';
 import 'transitions.dart';
 
-GoRouter buildRouter(AuthBloc authBloc) {
+GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
   return GoRouter(
     initialLocation: '/',
-    refreshListenable: _AuthListenable(authBloc),
+    refreshListenable: _RouterRefresh([authBloc.stream, serverConfigCubit.stream]),
     redirect: (context, state) {
       final status = authBloc.state.status;
       final loc = state.matchedLocation;
+
+      // Gate everything behind server configuration: until the user has saved
+      // a backend URL, the only reachable screen is the setup page.
+      if (!serverConfigCubit.state.isConfigured) {
+        return loc == '/setup' ? null : '/setup';
+      }
 
       if (status == AuthStatus.unknown) {
         return loc == '/' ? null : '/';
       }
       if (status == AuthStatus.unauthenticated ||
           status == AuthStatus.authenticating) {
-        return loc == '/login' ? null : '/login';
+        // Allow /setup too so the user can step back and change the server.
+        return (loc == '/login' || loc == '/setup') ? null : '/login';
       }
+      // Note: /setup is intentionally excluded here. While the user is changing
+      // the server we clear their session, and we don't want a stale
+      // "authenticated" state to bounce them to /home before that completes.
       if (status == AuthStatus.authenticated &&
           (loc == '/login' || loc == '/')) {
         return '/home';
@@ -41,6 +55,11 @@ GoRouter buildRouter(AuthBloc authBloc) {
         path: '/',
         pageBuilder: (_, state) =>
             fadeTransition(state, const SplashPage()),
+      ),
+      GoRoute(
+        path: '/setup',
+        pageBuilder: (_, state) =>
+            fadeTransition(state, const ServerSetupPage()),
       ),
       GoRoute(
         path: '/login',
@@ -112,15 +131,21 @@ GoRouter buildRouter(AuthBloc authBloc) {
   );
 }
 
-class _AuthListenable extends ChangeNotifier {
-  _AuthListenable(AuthBloc bloc) {
-    _sub = bloc.stream.listen((_) => notifyListeners());
+/// Re-runs the router redirect whenever any of the given streams emit
+/// (auth state changes or the server config being saved/cleared).
+class _RouterRefresh extends ChangeNotifier {
+  _RouterRefresh(List<Stream<dynamic>> streams) {
+    for (final stream in streams) {
+      _subs.add(stream.listen((_) => notifyListeners()));
+    }
   }
-  late final dynamic _sub;
+  final List<StreamSubscription<dynamic>> _subs = [];
 
   @override
   void dispose() {
-    _sub?.cancel();
+    for (final sub in _subs) {
+      sub.cancel();
+    }
     super.dispose();
   }
 }

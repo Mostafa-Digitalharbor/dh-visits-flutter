@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/settings/settings_cubit.dart';
 import '../../../shared/extensions/context_extensions.dart';
@@ -32,6 +34,7 @@ class _LoginPageState extends State<LoginPage> {
       debugPrint('[debug] LoginPage form validation failed');
       return;
     }
+    HapticFeedback.lightImpact();
     context.read<AuthBloc>().add(
           AuthLoginRequested(
             login: _loginCtrl.text.trim(),
@@ -51,7 +54,11 @@ class _LoginPageState extends State<LoginPage> {
         listenWhen: (p, n) => p.error != n.error && n.error != null,
         listener: (context, state) {
           if (state.error != null) {
-            context.showSnack(state.error!.localize(context));
+            HapticFeedback.heavyImpact();
+            context.showSnack(
+              state.error!.localize(context),
+              kind: SnackKind.error,
+            );
           }
         },
         builder: (context, state) {
@@ -82,42 +89,59 @@ class _LoginPageState extends State<LoginPage> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              context.s.loginTitle,
-                              style: context.text.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              context.s.loginSubtitle,
-                              style: context.text.bodyMedium?.copyWith(
-                                color: colors.onSurfaceVariant,
+                            AnimatedListItem(
+                              index: 0,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    context.s.loginTitle,
+                                    style: context.text.headlineSmall?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    context.s.loginSubtitle,
+                                    style: context.text.bodyMedium?.copyWith(
+                                      color: colors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(height: 28),
-                            AppTextField(
-                              controller: _loginCtrl,
-                              label: context.s.loginUsername,
-                              prefixIcon: Icons.person_outline,
-                              validator: _requiredValidator,
+                            AnimatedListItem(
+                              index: 1,
+                              child: AppTextField(
+                                controller: _loginCtrl,
+                                label: context.s.loginUsername,
+                                prefixIcon: Icons.person_outline,
+                                validator: _requiredValidator,
+                              ),
                             ),
                             const SizedBox(height: 14),
-                            AppTextField(
-                              controller: _passwordCtrl,
-                              label: context.s.loginPassword,
-                              prefixIcon: Icons.lock_outline,
-                              isPassword: true,
-                              textInputAction: TextInputAction.done,
-                              onSubmitted: (_) => _submit(),
-                              validator: _requiredValidator,
+                            AnimatedListItem(
+                              index: 2,
+                              child: AppTextField(
+                                controller: _passwordCtrl,
+                                label: context.s.loginPassword,
+                                prefixIcon: Icons.lock_outline,
+                                isPassword: true,
+                                textInputAction: TextInputAction.done,
+                                onSubmitted: (_) => _submit(),
+                                validator: _requiredValidator,
+                              ),
                             ),
                             const SizedBox(height: 28),
-                            AppButton(
-                              label: context.s.loginSubmit,
-                              loading: loading,
-                              icon: Icons.login_rounded,
-                              onPressed: _submit,
+                            AnimatedListItem(
+                              index: 3,
+                              child: AppButton(
+                                label: context.s.loginSubmit,
+                                loading: loading,
+                                icon: Icons.login_rounded,
+                                onPressed: _submit,
+                              ),
                             ),
                           ],
                         ),
@@ -153,33 +177,40 @@ class _HeaderActions extends StatelessWidget {
     return BlocBuilder<SettingsCubit, SettingsState>(
       builder: (context, state) {
         final isArabic = state.locale.languageCode == 'ar';
-        return Align(
-          alignment: AlignmentDirectional.topEnd,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                tooltip: context.s.language,
-                icon: Icon(Icons.translate, color: fg),
-                onPressed: () => context.read<SettingsCubit>().setLocale(
-                      Locale(isArabic ? 'en' : 'ar'),
-                    ),
+        return Row(
+          children: [
+            // Step back to the server-setup screen — handy when the user
+            // mistyped the URL or needs to switch companies.
+            IconButton(
+              tooltip: context.s.loginChangeServer,
+              icon: Icon(
+                context.isRtl ? Icons.arrow_forward : Icons.arrow_back,
+                color: fg,
               ),
-              IconButton(
-                tooltip: context.s.themeMode,
-                icon: Icon(
-                  isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-                  color: fg,
-                ),
-                onPressed: () => context.read<SettingsCubit>().setThemeMode(
-                      _nextThemeMode(
-                        state.themeMode,
-                        MediaQuery.platformBrightnessOf(context),
-                      ),
-                    ),
+              onPressed: () => context.go('/setup'),
+            ),
+            const Spacer(),
+            IconButton(
+              tooltip: context.s.language,
+              icon: Icon(Icons.translate, color: fg),
+              onPressed: () => context.read<SettingsCubit>().setLocale(
+                    Locale(isArabic ? 'en' : 'ar'),
+                  ),
+            ),
+            IconButton(
+              tooltip: context.s.themeMode,
+              icon: Icon(
+                isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                color: fg,
               ),
-            ],
-          ),
+              onPressed: () => context.read<SettingsCubit>().setThemeMode(
+                    _nextThemeMode(
+                      state.themeMode,
+                      MediaQuery.platformBrightnessOf(context),
+                    ),
+                  ),
+            ),
+          ],
         );
       },
     );

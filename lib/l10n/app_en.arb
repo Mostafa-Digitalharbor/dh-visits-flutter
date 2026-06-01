@@ -1,7 +1,7 @@
 {
   "@@locale": "en",
 
-  "appTitle": "Customer Visits",
+  "appTitle": "Visits",
   "appTagline": "Track your field visits with precision",
 
   "commonRequired": "Required",
@@ -31,7 +31,23 @@
   "languageArabic": "العربية",
   "languageEnglish": "English",
 
-  "loginTitle": "Customer Visits",
+  "commonBack": "Back",
+  "commonContinue": "Continue",
+
+  "serverSetupTitle": "Connect your server",
+  "serverSetupSubtitle": "Enter your organization's server address to get started",
+  "serverSetupUrlLabel": "Server URL",
+  "serverSetupUrlHint": "https://your-company.odoo.com",
+  "serverSetupContinue": "Continue",
+  "serverSetupInvalidUrl": "Enter a valid URL (e.g. https://your-company.odoo.com)",
+  "serverSetupHelp": "Ask your system administrator if you don't know your server address.",
+  "serverSetupDatabaseLabel": "Database name",
+  "serverSetupDatabaseHint": "e.g. company-main",
+  "serverSetupDatabasePrompt": "We couldn't detect the database automatically. Please enter its name (ask your administrator).",
+  "serverSetupChecking": "Connecting…",
+  "loginChangeServer": "Change server",
+
+  "loginTitle": "Visits",
   "loginSubtitle": "Sign in to start your field day",
   "loginUsername": "Email / Username",
   "loginPassword": "Password",

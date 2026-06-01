@@ -1,6 +1,6 @@
 {
-    "name": "location_gps",
-    "short_name": "location_gps",
+    "name": "Visits",
+    "short_name": "Visits",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

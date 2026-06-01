@@ -9,7 +9,7 @@ class AppLocalizationsAr extends AppLocalizations {
   AppLocalizationsAr([String locale = 'ar']) : super(locale);
 
   @override
-  String get appTitle => 'زيارات العملاء';
+  String get appTitle => 'Visits';
 
   @override
   String get appTagline => 'تابع زياراتك الميدانية بدقة';
@@ -82,7 +82,52 @@ class AppLocalizationsAr extends AppLocalizations {
   String get languageEnglish => 'English';
 
   @override
-  String get loginTitle => 'زيارات العملاء';
+  String get commonBack => 'رجوع';
+
+  @override
+  String get commonContinue => 'متابعة';
+
+  @override
+  String get serverSetupTitle => 'اتصل بالخادم';
+
+  @override
+  String get serverSetupSubtitle => 'أدخل عنوان خادم شركتك للبدء';
+
+  @override
+  String get serverSetupUrlLabel => 'رابط الخادم';
+
+  @override
+  String get serverSetupUrlHint => 'https://your-company.odoo.com';
+
+  @override
+  String get serverSetupContinue => 'متابعة';
+
+  @override
+  String get serverSetupInvalidUrl =>
+      'أدخل رابطاً صحيحاً (مثال: https://your-company.odoo.com)';
+
+  @override
+  String get serverSetupHelp =>
+      'اسأل مسؤول النظام إذا كنت لا تعرف عنوان الخادم.';
+
+  @override
+  String get serverSetupDatabaseLabel => 'اسم قاعدة البيانات';
+
+  @override
+  String get serverSetupDatabaseHint => 'مثال: company-main';
+
+  @override
+  String get serverSetupDatabasePrompt =>
+      'تعذّر اكتشاف قاعدة البيانات تلقائياً. أدخل اسمها (اسأل مسؤول النظام).';
+
+  @override
+  String get serverSetupChecking => 'جاري الاتصال…';
+
+  @override
+  String get loginChangeServer => 'تغيير الخادم';
+
+  @override
+  String get loginTitle => 'Visits';
 
   @override
   String get loginSubtitle => 'سجّل دخولك لبدء يومك الميداني';

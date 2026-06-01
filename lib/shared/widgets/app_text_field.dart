@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class AppTextField extends StatefulWidget {
   final TextEditingController controller;
@@ -12,6 +13,7 @@ class AppTextField extends StatefulWidget {
   final void Function(String)? onSubmitted;
   final void Function(String)? onChanged;
   final int maxLines;
+  final List<TextInputFormatter>? inputFormatters;
 
   const AppTextField({
     super.key,
@@ -26,6 +28,7 @@ class AppTextField extends StatefulWidget {
     this.onSubmitted,
     this.onChanged,
     this.maxLines = 1,
+    this.inputFormatters,
   });
 
   @override
@@ -51,6 +54,7 @@ class _AppTextFieldState extends State<AppTextField> {
       validator: widget.validator,
       onFieldSubmitted: widget.onSubmitted,
       onChanged: widget.onChanged,
+      inputFormatters: widget.inputFormatters,
       maxLines: widget.isPassword ? 1 : widget.maxLines,
       decoration: InputDecoration(
         labelText: widget.label,

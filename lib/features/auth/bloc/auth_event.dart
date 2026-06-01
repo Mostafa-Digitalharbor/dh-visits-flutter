@@ -22,3 +22,10 @@ class AuthLoginRequested extends AuthEvent {
 class AuthLogoutRequested extends AuthEvent {
   const AuthLogoutRequested();
 }
+
+/// Raised when the user saves a (new) backend on the setup screen. Drops any
+/// stored session locally so they always land on the login screen for the
+/// freshly selected server.
+class AuthServerChanged extends AuthEvent {
+  const AuthServerChanged();
+}

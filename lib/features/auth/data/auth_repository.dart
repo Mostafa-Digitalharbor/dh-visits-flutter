@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exceptions.dart';
 import '../../../core/api/endpoints.dart';
+import '../../../core/config/server_config_repository.dart';
 import '../../../core/constants.dart';
 import '../../../core/storage/session_storage.dart';
 import 'models/user.dart';
@@ -12,23 +13,28 @@ class AuthRepository {
   final ApiClient api;
   final SessionStorage session;
   final PersistCookieJar cookieJar;
+  final ServerConfigRepository serverConfig;
 
   AuthRepository({
     required this.api,
     required this.session,
     required this.cookieJar,
+    required this.serverConfig,
   });
 
   Future<AuthUser> login({
     required String login,
     required String password,
   }) async {
-    debugPrint('[debug] AuthRepository.login: db=${AppConstants.database} '
-        'url=${AppConstants.baseUrl}${Endpoints.authenticate}');
+    // Database is taken from the user's per-company server config; fall back to
+    // the build-time default for dev/CI builds that ship one.
+    final db = serverConfig.read().database ?? AppConstants.database;
+    debugPrint('[debug] AuthRepository.login: db=$db '
+        'url=${api.baseUrl}${Endpoints.authenticate}');
     final result = await api.jsonRpc(
       Endpoints.authenticate,
       params: {
-        'db': AppConstants.database,
+        'db': db,
         'login': login,
         'password': password,
       },
@@ -95,6 +101,14 @@ class AuthRepository {
     } catch (_) {
       // ignore network errors during logout
     }
+    await session.clear();
+    await cookieJar.deleteAll();
+  }
+
+  /// Clears the locally stored session and cookies *without* calling the
+  /// backend. Used when the user switches to a different company's server —
+  /// the previous session belongs to the old host and is meaningless now.
+  Future<void> clearLocalSession() async {
     await session.clear();
     await cookieJar.deleteAll();
   }

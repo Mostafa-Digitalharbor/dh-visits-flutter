@@ -1,7 +1,7 @@
 {
   "@@locale": "ar",
 
-  "appTitle": "زيارات العملاء",
+  "appTitle": "Visits",
   "appTagline": "تابع زياراتك الميدانية بدقة",
 
   "commonRequired": "مطلوب",
@@ -29,7 +29,23 @@
   "languageArabic": "العربية",
   "languageEnglish": "English",
 
-  "loginTitle": "زيارات العملاء",
+  "commonBack": "رجوع",
+  "commonContinue": "متابعة",
+
+  "serverSetupTitle": "اتصل بالخادم",
+  "serverSetupSubtitle": "أدخل عنوان خادم شركتك للبدء",
+  "serverSetupUrlLabel": "رابط الخادم",
+  "serverSetupUrlHint": "https://your-company.odoo.com",
+  "serverSetupContinue": "متابعة",
+  "serverSetupInvalidUrl": "أدخل رابطاً صحيحاً (مثال: https://your-company.odoo.com)",
+  "serverSetupHelp": "اسأل مسؤول النظام إذا كنت لا تعرف عنوان الخادم.",
+  "serverSetupDatabaseLabel": "اسم قاعدة البيانات",
+  "serverSetupDatabaseHint": "مثال: company-main",
+  "serverSetupDatabasePrompt": "تعذّر اكتشاف قاعدة البيانات تلقائياً. أدخل اسمها (اسأل مسؤول النظام).",
+  "serverSetupChecking": "جاري الاتصال…",
+  "loginChangeServer": "تغيير الخادم",
+
+  "loginTitle": "Visits",
   "loginSubtitle": "سجّل دخولك لبدء يومك الميداني",
   "loginUsername": "البريد / المستخدم",
   "loginPassword": "كلمة السر",
