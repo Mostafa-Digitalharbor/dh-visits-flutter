@@ -54,6 +54,8 @@ class NearbyBloc extends Bloc<NearbyEvent, NearbyState> {
       }
     }
 
+    // No point polling when the server can't supply live employee data.
+    if (!nearbyRepository.isSupported) return;
     _timer?.cancel();
     _timer = Timer.periodic(AppConstants.nearbyRefreshInterval, (_) {
       add(const NearbyRefreshed());
@@ -90,6 +92,8 @@ class NearbyBloc extends Bloc<NearbyEvent, NearbyState> {
     try {
       final items = await nearbyRepository.fetch(
         customerId: state.customerId!,
+        customerLat: state.customer?.latitude,
+        customerLng: state.customer?.longitude,
         radius: state.radius,
       );
       emit(state.copyWith(

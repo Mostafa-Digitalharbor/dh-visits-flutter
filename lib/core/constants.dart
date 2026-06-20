@@ -21,4 +21,17 @@ class AppConstants {
 
   static const double defaultRadiusMeters = 10.0;
   static const double defaultMapZoom = 19.0;
+
+  /// Max distance (meters) between the customer office and the employee's
+  /// check-in / check-out GPS for the visit to count as "in range". On a
+  /// vanilla Odoo there's no server-side range field, so the app computes
+  /// the badge itself from the customer + check-in coordinates.
+  static const double checkInRangeMeters = 200.0;
+
+  // ---- Standard Odoo models the app talks to via generic JSON-RPC ----
+  // No custom module: customers are partners, visits are calendar events.
+  static const String partnerModel = 'res.partner';
+  static const String calendarEventModel = 'calendar.event';
+  static const String calendarEventTypeModel = 'calendar.event.type';
+  static const String usersModel = 'res.users';
 }

@@ -332,6 +332,18 @@ abstract class AppLocalizations {
   /// **'Sign in to start your field day'**
   String get loginSubtitle;
 
+  /// No description provided for @loginWelcomeBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back'**
+  String get loginWelcomeBack;
+
+  /// No description provided for @loginRoleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in as'**
+  String get loginRoleLabel;
+
   /// No description provided for @loginUsername.
   ///
   /// In en, this message translates to:
@@ -427,6 +439,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to load customer'**
   String get errCustomerLoadFailed;
+
+  /// No description provided for @errFeatureNotAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This feature isn\'t available on this server'**
+  String get errFeatureNotAvailable;
 
   /// No description provided for @errLocationSharingDisabled.
   ///
@@ -581,7 +599,7 @@ abstract class AppLocalizations {
   /// No description provided for @createVisitTitle.
   ///
   /// In en, this message translates to:
-  /// **'New visit'**
+  /// **'Create a new visit'**
   String get createVisitTitle;
 
   /// No description provided for @createVisitCustomerLabel.
@@ -1141,6 +1159,318 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Active now'**
   String get visitsHistoryActiveBadge;
+
+  /// No description provided for @visitsScheduledLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled'**
+  String get visitsScheduledLabel;
+
+  /// No description provided for @dashboardGreeting.
+  ///
+  /// In en, this message translates to:
+  /// **'Good morning'**
+  String get dashboardGreeting;
+
+  /// No description provided for @dashboardTodayProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s progress'**
+  String get dashboardTodayProgress;
+
+  /// No description provided for @dashboardFieldTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Field time'**
+  String get dashboardFieldTime;
+
+  /// No description provided for @dashboardDaySchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Your day\'s schedule'**
+  String get dashboardDaySchedule;
+
+  /// No description provided for @affordanceScheduled.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to start the visit'**
+  String get affordanceScheduled;
+
+  /// No description provided for @affordanceActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit in progress'**
+  String get affordanceActive;
+
+  /// No description provided for @affordanceReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting manager review'**
+  String get affordanceReview;
+
+  /// No description provided for @affordanceApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get affordanceApproved;
+
+  /// No description provided for @affordanceRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected — redo the visit'**
+  String get affordanceRejected;
+
+  /// No description provided for @analyticsTabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Analytics'**
+  String get analyticsTabTitle;
+
+  /// No description provided for @analyticsOnTime.
+  ///
+  /// In en, this message translates to:
+  /// **'On time'**
+  String get analyticsOnTime;
+
+  /// No description provided for @analyticsVisitsThisWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'visits this week'**
+  String get analyticsVisitsThisWeek;
+
+  /// No description provided for @analyticsKm.
+  ///
+  /// In en, this message translates to:
+  /// **'km in the field'**
+  String get analyticsKm;
+
+  /// No description provided for @analyticsAvgDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg. visit duration'**
+  String get analyticsAvgDuration;
+
+  /// No description provided for @analyticsWeeklyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Visits this week'**
+  String get analyticsWeeklyTitle;
+
+  /// No description provided for @analyticsWeeklyCompare.
+  ///
+  /// In en, this message translates to:
+  /// **'vs. last week'**
+  String get analyticsWeeklyCompare;
+
+  /// No description provided for @analyticsByEmployee.
+  ///
+  /// In en, this message translates to:
+  /// **'By employee'**
+  String get analyticsByEmployee;
+
+  /// No description provided for @reviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review visits'**
+  String get reviewTitle;
+
+  /// No description provided for @reviewPendingCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} awaiting your approval'**
+  String reviewPendingCount(int n);
+
+  /// No description provided for @reviewApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get reviewApprove;
+
+  /// No description provided for @reviewReject.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject'**
+  String get reviewReject;
+
+  /// No description provided for @reviewEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No visits awaiting review'**
+  String get reviewEmpty;
+
+  /// No description provided for @reviewApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit approved'**
+  String get reviewApproved;
+
+  /// No description provided for @reviewRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit rejected'**
+  String get reviewRejected;
+
+  /// No description provided for @reviewOutOfRangeBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Out of range · recorded outside the approved location'**
+  String get reviewOutOfRangeBanner;
+
+  /// No description provided for @routeTabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s route'**
+  String get routeTabTitle;
+
+  /// No description provided for @routeStops.
+  ///
+  /// In en, this message translates to:
+  /// **'stops'**
+  String get routeStops;
+
+  /// No description provided for @routeTotalDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Total distance'**
+  String get routeTotalDistance;
+
+  /// No description provided for @routeNextStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Next stop'**
+  String get routeNextStop;
+
+  /// No description provided for @routeStartPoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Start point'**
+  String get routeStartPoint;
+
+  /// No description provided for @routeDriveMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{n} min drive'**
+  String routeDriveMinutes(int n);
+
+  /// No description provided for @routeStartNav.
+  ///
+  /// In en, this message translates to:
+  /// **'Start navigation'**
+  String get routeStartNav;
+
+  /// No description provided for @routeEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No stops on today\'s route'**
+  String get routeEmpty;
+
+  /// No description provided for @reportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit report'**
+  String get reportTitle;
+
+  /// No description provided for @reportOutcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit outcome'**
+  String get reportOutcome;
+
+  /// No description provided for @reportOutcomeDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Successful'**
+  String get reportOutcomeDone;
+
+  /// No description provided for @reportOutcomePostponed.
+  ///
+  /// In en, this message translates to:
+  /// **'Postponed'**
+  String get reportOutcomePostponed;
+
+  /// No description provided for @reportOutcomeAbsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Client absent'**
+  String get reportOutcomeAbsent;
+
+  /// No description provided for @reportNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get reportNotes;
+
+  /// No description provided for @reportNotesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a summary of the visit and key notes...'**
+  String get reportNotesHint;
+
+  /// No description provided for @reportPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Proof photo'**
+  String get reportPhoto;
+
+  /// No description provided for @reportAddPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Add photo'**
+  String get reportAddPhoto;
+
+  /// No description provided for @reportSignature.
+  ///
+  /// In en, this message translates to:
+  /// **'Client signature'**
+  String get reportSignature;
+
+  /// No description provided for @reportSignHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign here'**
+  String get reportSignHere;
+
+  /// No description provided for @reportClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get reportClear;
+
+  /// No description provided for @reportSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish and save report'**
+  String get reportSubmit;
+
+  /// No description provided for @createVisitSectionCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get createVisitSectionCustomer;
+
+  /// No description provided for @createVisitSectionEmployee.
+  ///
+  /// In en, this message translates to:
+  /// **'Field employee'**
+  String get createVisitSectionEmployee;
+
+  /// No description provided for @createVisitSectionType.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit type'**
+  String get createVisitSectionType;
+
+  /// No description provided for @createVisitSectionDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit date'**
+  String get createVisitSectionDate;
+
+  /// No description provided for @createVisitChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get createVisitChange;
 
   /// No description provided for @visitsHistoryCompletedBadge.
   ///

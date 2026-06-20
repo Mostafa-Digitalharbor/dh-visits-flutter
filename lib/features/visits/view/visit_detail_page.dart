@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
+import '../../../app/theme.dart';
+import '../../../core/constants.dart';
 import '../../../core/api/api_exceptions.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/location/location_service.dart';
@@ -22,6 +27,7 @@ import '../bloc/visits_list_bloc.dart';
 import '../data/models/visit.dart';
 import '../data/models/visit_type.dart';
 import '../data/visits_repository.dart';
+import 'report_sheet.dart';
 import 'visit_state_picker.dart';
 
 /// Single-visit detail screen. Used by both User and Manager roles.
@@ -191,6 +197,16 @@ class _VisitDetailPageState extends State<VisitDetailPage> {
   Future<void> _checkOut() async {
     final visit = _visit;
     if (visit == null) return;
+    // Field check-out opens the report sheet first (outcome + notes + photo +
+    // signature). Dismissing it cancels the check-out.
+    final report = await showReportSheet(context);
+    if (report == null || !mounted) return;
+    final outcomeLabel = switch (report.outcome) {
+      VisitOutcome.done => context.s.reportOutcomeDone,
+      VisitOutcome.postponed => context.s.reportOutcomePostponed,
+      VisitOutcome.absent => context.s.reportOutcomeAbsent,
+    };
+    final reportNotes = [outcomeLabel, report.notes].where((s) => s.isNotEmpty).join(' — ');
     setState(() => _busy = true);
     try {
       final ok = await sl<LocationService>().ensurePermission();
@@ -206,8 +222,8 @@ class _VisitDetailPageState extends State<VisitDetailPage> {
         'check_out_lat': pos.latitude,
         'check_out_lng': pos.longitude,
       };
-      if (_notesCtrl.text.trim().isNotEmpty) {
-        payload['description'] = _notesCtrl.text.trim();
+      if (reportNotes.isNotEmpty) {
+        payload['description'] = reportNotes;
       }
       try {
         await sl<VisitsRepository>().update(visit.id, payload);
@@ -376,31 +392,99 @@ class _VisitDetailPageState extends State<VisitDetailPage> {
     final adminCanEdit = canEdit && !isFinished;
 
     final showSave = _hasUnsavedChanges(adminCanEdit);
+    final cs = context.colors;
+    const mapHeight = 300.0;
+    const sheetOverlap = 26.0;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(context.s.visitDetailTitle),
-        actions: [
-          if (showSave)
-            TextButton(
-              onPressed: _busy ? null : _saveEdits,
-              child: Text(context.s.visitDetailSaveChanges),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // ── Map / brand header (fixed behind the sheet) ──────────────────
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: mapHeight,
+            child: _MapHeader(visit: visit),
+          ),
+          // ── Scrollable content sheet overlapping the map ─────────────────
+          Positioned.fill(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  const SizedBox(height: mapHeight - sheetOverlap),
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: cs.surface,
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(Radii.xl)),
+                    ),
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 14),
+                            decoration: BoxDecoration(
+                              color: context.x.outlineVariant,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ),
+                        if (_loading)
+                          const _DetailSkeleton()
+                        else if (canEdit)
+                          _buildAdminBody(visit, allowEdits: adminCanEdit)
+                        else
+                          _buildUserBody(visit),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          if (canEdit)
-            IconButton(
-              tooltip: context.s.visitDetailDelete,
-              icon: Icon(Icons.delete_outline,
-                  color: context.colors.error),
-              onPressed: _busy ? null : _deleteVisit,
+          ),
+          // ── Floating chips over the map ──────────────────────────────────
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+              child: Row(
+                children: [
+                  _FloatingChip(
+                    icon: context.isRtl ? Symbols.arrow_forward_ios : Symbols.arrow_back_ios_new,
+                    onTap: () => context.pop(),
+                  ),
+                  const Spacer(),
+                  if (showSave) ...[
+                    _FloatingChip(
+                      icon: Symbols.save,
+                      tint: cs.primary,
+                      onTap: _busy ? null : _saveEdits,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  if (canEdit)
+                    _FloatingChip(
+                      icon: Symbols.delete,
+                      tint: cs.error,
+                      onTap: _busy ? null : _deleteVisit,
+                    ),
+                ],
+              ),
             ),
+            ),
+          ),
         ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _refreshFromServer,
-        child: _loading
-            ? const _DetailSkeleton()
-            : (canEdit
-                ? _buildAdminBody(visit, allowEdits: adminCanEdit)
-                : _buildUserBody(visit)),
       ),
     );
   }
@@ -426,8 +510,8 @@ class _VisitDetailPageState extends State<VisitDetailPage> {
     final canCheckIn =
         !isActive && !isCompleted && visit.checkInTime == null;
     final notesEditableByUser = isActive;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _CustomerBlock(visit: visit),
         const SizedBox(height: 14),
@@ -489,8 +573,8 @@ class _VisitDetailPageState extends State<VisitDetailPage> {
   /// edit notes. When the visit is already finished (checked_out),
   /// `allowEdits` is false and the page becomes a read-only audit view.
   Widget _buildAdminBody(Visit visit, {required bool allowEdits}) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _CustomerBlock(visit: visit),
         if (visit.isOverdue) ...[
@@ -732,6 +816,159 @@ class _VisitDetailPageState extends State<VisitDetailPage> {
     if (picked != null && mounted) {
       setState(() => _editedEmployee = picked);
     }
+  }
+}
+
+/// Map header behind the detail sheet (design 05/11/12). Shows the customer
+/// office, the geofence ring, and check-in/out pins on a static map; falls
+/// back to a brand-gradient panel when no coordinates are available.
+class _MapHeader extends StatelessWidget {
+  final Visit visit;
+  const _MapHeader({required this.visit});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final x = context.x;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final center = visit.hasCustomerLocation
+        ? LatLng(visit.customerLatitude!, visit.customerLongitude!)
+        : (visit.hasCheckInLocation ? LatLng(visit.checkInLat!, visit.checkInLng!) : null);
+
+    if (center == null) {
+      return Container(
+        decoration: BoxDecoration(gradient: x.brandGradient),
+        alignment: Alignment.center,
+        child: Icon(Symbols.business, fill: 1, size: 64,
+            color: Colors.white.withValues(alpha: 0.85)),
+      );
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        FlutterMap(
+          options: MapOptions(
+            initialCenter: center,
+            initialZoom: 15.5,
+            interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+            backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFE5E5E5),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.digitalharbor.location_gps',
+              maxNativeZoom: 19,
+            ),
+            if (visit.hasCustomerLocation)
+              CircleLayer(circles: [
+                CircleMarker(
+                  point: center,
+                  radius: AppConstants.checkInRangeMeters,
+                  useRadiusInMeter: true,
+                  color: cs.primary.withValues(alpha: 0.12),
+                  borderColor: cs.primary.withValues(alpha: 0.55),
+                  borderStrokeWidth: 1.5,
+                ),
+              ]),
+            MarkerLayer(markers: [
+              if (visit.hasCustomerLocation)
+                Marker(
+                  point: center,
+                  width: 44,
+                  height: 44,
+                  child: _Pin(icon: Symbols.business, gradient: x.avatarGradient),
+                ),
+              if (visit.hasCheckInLocation)
+                Marker(
+                  point: LatLng(visit.checkInLat!, visit.checkInLng!),
+                  width: 34,
+                  height: 34,
+                  child: _Pin(icon: Symbols.login, color: x.success),
+                ),
+              if (visit.hasCheckOutLocation)
+                Marker(
+                  point: LatLng(visit.checkOutLat!, visit.checkOutLng!),
+                  width: 34,
+                  height: 34,
+                  child: _Pin(icon: Symbols.logout, color: cs.error),
+                ),
+            ]),
+          ],
+        ),
+        // Dark tint for dark theme readability.
+        if (isDark)
+          IgnorePointer(child: Container(color: Colors.black.withValues(alpha: 0.26))),
+        // Bottom veil so the sheet edge blends into the map.
+        IgnorePointer(
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.center,
+                colors: [cs.surface.withValues(alpha: 0.55), Colors.transparent],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Pin extends StatelessWidget {
+  final IconData icon;
+  final Color? color;
+  final Gradient? gradient;
+  const _Pin({required this.icon, this.color, this.gradient});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color,
+        gradient: gradient,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2.5),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 6, offset: const Offset(0, 2)),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Icon(icon, fill: 1, size: 18, color: Colors.white),
+    );
+  }
+}
+
+class _FloatingChip extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final Color? tint;
+  const _FloatingChip({required this.icon, required this.onTap, this.tint});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    return Material(
+      color: cs.surfaceContainerLowest,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 0,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: context.x.outlineVariant),
+            boxShadow: context.x.elev2,
+          ),
+          child: Icon(icon, size: 20, color: tint ?? cs.onSurfaceVariant),
+        ),
+      ),
+    );
   }
 }
 

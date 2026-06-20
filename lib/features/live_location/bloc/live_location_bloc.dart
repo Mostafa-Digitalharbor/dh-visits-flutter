@@ -38,6 +38,16 @@ class LiveLocationBloc extends Bloc<LiveLocationEvent, LiveLocationState>
     LiveLocationStartRequested event,
     Emitter<LiveLocationState> emit,
   ) async {
+    // On a vanilla Odoo there's nowhere to store the live ping. Surface the
+    // capability as unavailable instead of starting a timer that would fail
+    // on every tick.
+    if (!repository.isSupported) {
+      emit(state.copyWith(
+        enabled: false,
+        error: ApiException(code: ApiErrorCode.notSupported),
+      ));
+      return;
+    }
     final ok = await locationService.ensurePermission();
     if (!ok) {
       emit(state.copyWith(

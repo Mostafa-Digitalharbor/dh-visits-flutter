@@ -441,15 +441,20 @@ class _BottomPanel extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(
                 children: [
-                  Icon(Icons.person_off_outlined,
+                  Icon(
+                      state.error != null
+                          ? Icons.info_outline_rounded
+                          : Icons.person_off_outlined,
                       size: 18,
                       color: context.colors.onSurfaceVariant),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      state.status == NearbyStatus.success
-                          ? context.s.nearbyEmpty
-                          : context.s.commonLoading,
+                      state.error != null
+                          ? state.error!.localize(context)
+                          : state.status == NearbyStatus.success
+                              ? context.s.nearbyEmpty
+                              : context.s.commonLoading,
                       style: TextStyle(
                           color: context.colors.onSurfaceVariant),
                     ),

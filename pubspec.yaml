@@ -46,6 +46,7 @@ dependencies:
 
   # UI
   shimmer: ^3.0.0
+  material_symbols_icons: ^4.2785.1   # Material Symbols Rounded — design icon set
 
   # Utilities
   intl: ^0.20.1

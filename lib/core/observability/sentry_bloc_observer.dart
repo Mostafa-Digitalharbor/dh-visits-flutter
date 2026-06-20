@@ -45,6 +45,7 @@ class SentryBlocObserver extends BlocObserver {
       case ApiErrorCode.locationPermission:
       case ApiErrorCode.locationRequired:
       case ApiErrorCode.notFound:
+      case ApiErrorCode.notSupported:
         return true;
       case ApiErrorCode.server:
       case ApiErrorCode.customerLoadFailed:

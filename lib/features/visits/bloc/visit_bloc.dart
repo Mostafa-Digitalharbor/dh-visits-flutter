@@ -48,6 +48,11 @@ class VisitBloc extends Bloc<VisitEvent, VisitState> {
         customerId: event.customer.id,
         latitude: pos.latitude,
         longitude: pos.longitude,
+        customerName: event.customer.name,
+        customerLat: event.customer.latitude,
+        customerLng: event.customer.longitude,
+        customerAddress: event.customer.address,
+        customerPhone: event.customer.phone ?? event.customer.mobile,
       );
       // Check-in response only carries visit_id/state/check_in_time, so we
       // enrich it locally with the customer the user picked.

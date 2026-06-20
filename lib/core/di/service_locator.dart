@@ -48,9 +48,10 @@ Future<void> setupServiceLocator() async {
       api: sl(), session: sl(), cookieJar: sl(), serverConfig: sl()));
   sl.registerSingleton<CustomersRepository>(CustomersRepository(api: sl()));
   sl.registerSingleton<EmployeesRepository>(EmployeesRepository(api: sl()));
-  sl.registerSingleton<VisitsRepository>(VisitsRepository(api: sl()));
+  sl.registerSingleton<VisitsRepository>(
+      VisitsRepository(api: sl(), session: sl()));
   sl.registerSingleton<LiveLocationRepository>(
-      LiveLocationRepository(api: sl()));
+      LiveLocationRepository(api: sl(), session: sl()));
   sl.registerSingleton<NearbyRepository>(NearbyRepository(api: sl()));
 
   final queue = PendingActionsQueue(

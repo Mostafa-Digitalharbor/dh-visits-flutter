@@ -1,7 +1,7 @@
 class Endpoints {
   Endpoints._();
 
-  // Auth (Odoo built-in JSON-RPC)
+  // Auth (Odoo built-in JSON-RPC) — works on any vanilla Odoo.
   static const String authenticate = '/web/session/authenticate';
   static const String destroySession = '/web/session/destroy';
   static const String sessionInfo = '/web/session/get_session_info';
@@ -11,15 +11,8 @@ class Endpoints {
   /// auto-detect the database during server setup.
   static const String databaseList = '/web/database/list';
 
-  // Custom REST endpoints (provided by Odoo developer)
-  static const String customers = '/api/customers';
-  static String customerById(int id) => '/api/customers/$id';
-  static String nearbyEmployees(int customerId) =>
-      '/api/customers/$customerId/nearby-employees';
-
-  static const String checkIn = '/api/visits/check-in';
-  static const String checkOut = '/api/visits/check-out';
-  static const String visits = '/api/visits';
-
-  static const String updateEmployeeLocation = '/api/employee/location';
+  /// Odoo's generic ORM-over-JSON-RPC endpoint. Everything the app does
+  /// (read customers, create/read visits, etc.) goes through `call_kw` on
+  /// standard models — no custom REST controllers required on the server.
+  static const String callKw = '/web/dataset/call_kw';
 }

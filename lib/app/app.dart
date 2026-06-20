@@ -118,6 +118,22 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
             darkTheme: AppTheme.dark(),
             themeMode: settings.themeMode,
             routerConfig: router,
+            // App-wide responsiveness guard: bound the OS text-scale so the
+            // design's fixed-height components (app bar, cards, chips, nav)
+            // stay legible without overflowing on very large / small font
+            // accessibility settings.
+            builder: (context, child) {
+              final mq = MediaQuery.of(context);
+              return MediaQuery(
+                data: mq.copyWith(
+                  textScaler: mq.textScaler.clamp(
+                    minScaleFactor: 0.9,
+                    maxScaleFactor: 1.25,
+                  ),
+                ),
+                child: child!,
+              );
+            },
             locale: settings.locale,
             supportedLocales: AppLocalizations.supportedLocales,
             localizationsDelegates: const [

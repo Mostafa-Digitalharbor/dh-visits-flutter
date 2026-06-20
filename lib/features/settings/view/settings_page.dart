@@ -1,15 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
+import '../../../app/theme.dart';
 import '../../../core/settings/settings_cubit.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../auth/bloc/auth_bloc.dart';
 
-/// Lean settings page — theme, language, logout. Accessed via the AppBar
-/// icon (no longer a bottom-nav tab).
+/// Settings — profile card + grouped cards (appearance, language) + logout.
+/// Matches design screen 07.
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(context.s.settingsTitle)),
+      body: const SettingsView(),
+    );
+  }
+}
+
+/// The settings content without a Scaffold/AppBar — usable both as a pushed
+/// route ([SettingsPage]) and as an employee bottom-nav tab body.
+class SettingsView extends StatelessWidget {
+  const SettingsView({super.key});
 
   Future<void> _onLogoutTap(BuildContext context) async {
     final confirmed = await ConfirmDialog.show(
@@ -26,94 +42,95 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthBloc>().state.user;
-    return Scaffold(
-      appBar: AppBar(title: Text(context.s.settingsTitle)),
-      body: BlocBuilder<SettingsCubit, SettingsState>(
+    return BlocBuilder<SettingsCubit, SettingsState>(
         builder: (context, state) {
           return ListView(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: [
-              if (user != null) _ProfileTile(name: user.displayName, isManager: user.canEditVisits),
-              const SizedBox(height: 8),
-              _SectionLabel(label: context.s.themeMode),
-              _ThemeOption(
-                label: context.s.themeLight,
-                icon: Icons.light_mode_outlined,
-                value: ThemeMode.light,
-                groupValue: state.themeMode,
+              if (user != null)
+                _ProfileCard(name: user.displayName, isManager: user.canEditVisits),
+              const SizedBox(height: 18),
+              _GroupLabel(context.s.themeMode),
+              _GroupCard(children: [
+                _OptionRow(
+                  icon: Symbols.light_mode,
+                  label: context.s.themeLight,
+                  selected: state.themeMode == ThemeMode.light,
+                  onTap: () => context.read<SettingsCubit>().setThemeMode(ThemeMode.light),
+                ),
+                const _RowDivider(),
+                _OptionRow(
+                  icon: Symbols.dark_mode,
+                  label: context.s.themeDark,
+                  selected: state.themeMode == ThemeMode.dark,
+                  onTap: () => context.read<SettingsCubit>().setThemeMode(ThemeMode.dark),
+                ),
+                const _RowDivider(),
+                _OptionRow(
+                  icon: Symbols.brightness_auto,
+                  label: context.s.themeSystem,
+                  selected: state.themeMode == ThemeMode.system,
+                  onTap: () => context.read<SettingsCubit>().setThemeMode(ThemeMode.system),
+                ),
+              ]),
+              const SizedBox(height: 18),
+              _GroupLabel(context.s.language),
+              _GroupCard(children: [
+                _OptionRow(
+                  icon: Symbols.translate,
+                  label: context.s.languageArabic,
+                  selected: state.locale.languageCode == 'ar',
+                  onTap: () => context.read<SettingsCubit>().setLocale(const Locale('ar')),
+                ),
+                const _RowDivider(),
+                _OptionRow(
+                  icon: Symbols.translate,
+                  label: context.s.languageEnglish,
+                  selected: state.locale.languageCode == 'en',
+                  onTap: () => context.read<SettingsCubit>().setLocale(const Locale('en')),
+                ),
+              ]),
+              const SizedBox(height: 24),
+              _LogoutButton(onTap: () => _onLogoutTap(context)),
+              const SizedBox(height: 18),
+              Center(
+                child: Text(
+                  'Customer Visits · Digital Harbor',
+                  style: AppType.bodySm.copyWith(color: context.x.textTertiary),
+                ),
               ),
-              _ThemeOption(
-                label: context.s.themeDark,
-                icon: Icons.dark_mode_outlined,
-                value: ThemeMode.dark,
-                groupValue: state.themeMode,
-              ),
-              _ThemeOption(
-                label: context.s.themeSystem,
-                icon: Icons.settings_brightness_outlined,
-                value: ThemeMode.system,
-                groupValue: state.themeMode,
-              ),
-              const Divider(),
-              _SectionLabel(label: context.s.language),
-              _LocaleOption(
-                label: context.s.languageArabic,
-                value: const Locale('ar'),
-                groupValue: state.locale,
-              ),
-              _LocaleOption(
-                label: context.s.languageEnglish,
-                value: const Locale('en'),
-                groupValue: state.locale,
-              ),
-              const Divider(),
-              _LogoutTile(onTap: () => _onLogoutTap(context)),
-              const SizedBox(height: 32),
             ],
           );
         },
-      ),
     );
   }
 }
 
-class _ProfileTile extends StatelessWidget {
+class _ProfileCard extends StatelessWidget {
   final String name;
   final bool isManager;
-  const _ProfileTile({required this.name, required this.isManager});
+  const _ProfileCard({required this.name, required this.isManager});
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final cs = context.colors;
+    final x = context.x;
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+    return AppCard(
       child: Row(
         children: [
           Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  colors.primary,
-                  Color.lerp(colors.primary, colors.tertiary, 0.55) ??
-                      colors.primary,
-                ],
-              ),
-            ),
+            width: 64,
+            height: 64,
             alignment: Alignment.center,
-            child: Text(
-              initial,
-              style: TextStyle(
-                color: colors.onPrimary,
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-              ),
+            decoration: BoxDecoration(
+              gradient: x.avatarGradient,
+              shape: BoxShape.circle,
+              boxShadow: x.elev1,
             ),
+            child: Text(initial,
+                style: const TextStyle(
+                    color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -121,13 +138,26 @@ class _ProfileTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(name,
-                    style: context.text.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    )),
-                Text(
-                  isManager ? context.s.roleManager : context.s.roleUser,
-                  style: context.text.bodySmall?.copyWith(
-                    color: colors.onSurfaceVariant,
+                    style: AppType.titleLg.copyWith(fontWeight: FontWeight.w800, color: cs.onSurface)),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(isManager ? Symbols.shield_person : Symbols.badge,
+                          fill: 1, size: 15, color: cs.onPrimaryContainer),
+                      const SizedBox(width: 5),
+                      Text(isManager ? context.s.roleManager : context.s.roleUser,
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: cs.onPrimaryContainer)),
+                    ],
                   ),
                 ),
               ],
@@ -139,96 +169,91 @@ class _ProfileTile extends StatelessWidget {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
+class _GroupLabel extends StatelessWidget {
   final String label;
-  const _SectionLabel({required this.label});
+  const _GroupLabel(this.label);
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+      padding: const EdgeInsetsDirectional.only(start: 6, bottom: 8),
       child: Text(
         label.toUpperCase(),
-        style: context.text.labelSmall?.copyWith(
-          color: context.colors.primary,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.0,
+        style: AppType.eyebrow.copyWith(color: context.colors.primary, letterSpacing: 1.0),
+      ),
+    );
+  }
+}
+
+class _GroupCard extends StatelessWidget {
+  final List<Widget> children;
+  const _GroupCard({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(children: children),
+    );
+  }
+}
+
+class _RowDivider extends StatelessWidget {
+  const _RowDivider();
+  @override
+  Widget build(BuildContext context) =>
+      Divider(height: 1, thickness: 1, indent: 16, endIndent: 16, color: context.x.divider);
+}
+
+class _OptionRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _OptionRow(
+      {required this.icon, required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    return ListTile(
+      onTap: onTap,
+      leading: Icon(icon, fill: selected ? 1 : 0, color: cs.onSurfaceVariant),
+      title: Text(label, style: AppType.titleSm.copyWith(color: cs.onSurface)),
+      trailing: selected
+          ? Icon(Symbols.check_circle, fill: 1, color: cs.primary)
+          : Icon(Symbols.radio_button_unchecked, color: context.x.textDisabled),
+    );
+  }
+}
+
+class _LogoutButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _LogoutButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    return Material(
+      color: cs.errorContainer,
+      borderRadius: BorderRadius.circular(Radii.md),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(Radii.md),
+        child: Container(
+          height: 54,
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Symbols.logout, fill: 1, size: 20, color: cs.error),
+              const SizedBox(width: 8),
+              Text(context.s.commonLogout,
+                  style: AppType.button.copyWith(fontWeight: FontWeight.w800, color: cs.error)),
+            ],
+          ),
         ),
       ),
-    );
-  }
-}
-
-class _ThemeOption extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final ThemeMode value;
-  final ThemeMode groupValue;
-
-  const _ThemeOption({
-    required this.label,
-    required this.icon,
-    required this.value,
-    required this.groupValue,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = value == groupValue;
-    return ListTile(
-      shape: const RoundedRectangleBorder(),
-      leading: Icon(icon, color: context.colors.onSurfaceVariant),
-      title: Text(label),
-      trailing: selected
-          ? Icon(Icons.check_circle, color: context.colors.primary)
-          : null,
-      onTap: () => context.read<SettingsCubit>().setThemeMode(value),
-    );
-  }
-}
-
-class _LocaleOption extends StatelessWidget {
-  final String label;
-  final Locale value;
-  final Locale groupValue;
-
-  const _LocaleOption({
-    required this.label,
-    required this.value,
-    required this.groupValue,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = value.languageCode == groupValue.languageCode;
-    return ListTile(
-      shape: const RoundedRectangleBorder(),
-      leading: Icon(Icons.translate, color: context.colors.onSurfaceVariant),
-      title: Text(label),
-      trailing: selected
-          ? Icon(Icons.check_circle, color: context.colors.primary)
-          : null,
-      onTap: () => context.read<SettingsCubit>().setLocale(value),
-    );
-  }
-}
-
-class _LogoutTile extends StatelessWidget {
-  final VoidCallback onTap;
-  const _LogoutTile({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = context.colors.error;
-    return ListTile(
-      shape: const RoundedRectangleBorder(),
-      leading: Icon(Icons.logout_rounded, color: color),
-      title: Text(
-        context.s.commonLogout,
-        style: TextStyle(color: color, fontWeight: FontWeight.w600),
-      ),
-      trailing: Icon(Icons.chevron_right, color: color),
-      onTap: onTap,
     );
   }
 }

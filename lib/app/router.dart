@@ -1,17 +1,20 @@
 import 'dart:async';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/config/server_config_cubit.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../features/auth/bloc/auth_bloc.dart';
 import '../features/auth/view/login_page.dart';
 import '../features/auth/view/splash_page.dart';
 import '../features/customers/data/models/customer.dart';
 import '../features/customers/view/customer_detail_page.dart';
+import '../features/customers/view/customers_list_page.dart';
 import '../features/employees/data/models/employee.dart';
 import '../features/home/view/home_shell.dart';
 import '../features/nearby/view/nearby_map_page.dart';
+import '../features/review/view/review_page.dart';
 import '../features/server_config/view/server_setup_page.dart';
 import '../features/settings/view/settings_page.dart';
 import '../features/visits/data/models/visit.dart';
@@ -75,6 +78,23 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
         path: '/settings',
         pageBuilder: (_, state) =>
             slideTransition(state, const SettingsPage()),
+      ),
+      GoRoute(
+        path: '/review',
+        pageBuilder: (_, state) =>
+            slideTransition(state, const ReviewPage()),
+      ),
+      GoRoute(
+        path: '/customers',
+        pageBuilder: (_, state) => slideTransition(
+          state,
+          Builder(
+            builder: (context) => Scaffold(
+              appBar: AppBar(title: Text(AppLocalizations.of(context).customersTitle)),
+              body: const CustomersListPage(),
+            ),
+          ),
+        ),
       ),
       GoRoute(
         path: '/customers/:id',

@@ -1,7 +1,8 @@
 import '../../../core/api/api_client.dart';
 import 'models/employee.dart';
 
-/// Reads `res.users` for the Create-Visit / re-assign picker. We mirror
+/// Reads standard `res.users` (over generic JSON-RPC) for the Create-Visit /
+/// re-assign picker. We mirror
 /// Odoo's own `salesperson_id` field — any **internal** active user can
 /// be a salesperson, including admins/managers themselves. Filtering
 /// down to a single role on the mobile side was hiding real
@@ -24,6 +25,9 @@ class EmployeesRepository {
     if (search != null && search.isNotEmpty) {
       domain.add(['name', 'ilike', search]);
     }
+    // `employee_id` (link to hr.employee) is intentionally NOT requested:
+    // the HR module may not be installed on a vanilla Odoo. We only need the
+    // `res.users` id to assign as the salesperson.
     final result = await api.jsonRpc(
       '/web/dataset/call_kw',
       params: {
@@ -31,7 +35,7 @@ class EmployeesRepository {
         'method': 'search_read',
         'args': [domain],
         'kwargs': {
-          'fields': ['id', 'login', 'name', 'employee_id'],
+          'fields': ['id', 'login', 'name'],
           'limit': limit,
           'order': 'name asc',
         },

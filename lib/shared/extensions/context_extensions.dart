@@ -90,6 +90,8 @@ extension ApiExceptionL10n on ApiException {
         return s.errLocationPermission;
       case ApiErrorCode.customerLoadFailed:
         return s.errCustomerLoadFailed;
+      case ApiErrorCode.notSupported:
+        return s.errFeatureNotAvailable;
       case ApiErrorCode.unknown:
         return serverMessage ?? s.errNetworkUnknown;
     }

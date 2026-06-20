@@ -4,7 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
+import '../../../app/theme.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../auth/bloc/auth_bloc.dart';
@@ -42,6 +44,8 @@ class DashboardPage extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             children: [
+              _DashboardGreeting(visits: visits),
+              const SizedBox(height: 16),
               _KpiGrid(visits: visits),
               const SizedBox(height: 16),
               _ActiveEmployeesCard(visits: visits),
@@ -53,6 +57,48 @@ class DashboardPage extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Brand-gradient greeting header at the top of the manager dashboard.
+class _DashboardGreeting extends StatelessWidget {
+  final List<Visit> visits;
+  const _DashboardGreeting({required this.visits});
+
+  @override
+  Widget build(BuildContext context) {
+    final user = context.read<AuthBloc>().state.user;
+    final today = DateTime.now();
+    bool isToday(DateTime? d) =>
+        d != null && d.year == today.year && d.month == today.month && d.day == today.day;
+    final todays = visits.where((v) => isToday(v.effectiveDate)).toList();
+    final done = todays.where((v) => v.state == VisitStateType.checkedOut).length;
+    final total = todays.isEmpty ? visits.length : todays.length;
+    // Sum of completed visit durations → field time (hours, 1 decimal).
+    final mins = visits
+        .where((v) => v.visitDuration != null)
+        .fold<int>(0, (s, v) => s + v.visitDuration!.inMinutes);
+    final hours = (mins / 60).toStringAsFixed(mins % 60 == 0 ? 0 : 1);
+
+    return GreetingHeader(
+      name: user?.displayName ?? context.s.appTitle,
+      roleLabel: context.s.roleManager,
+      roleIcon: Symbols.shield_person,
+      done: done,
+      total: total,
+      stats: [
+        GreetingStat(
+          icon: Symbols.event_available,
+          value: '${todays.length}',
+          label: context.s.dashboardKpiToday,
+        ),
+        GreetingStat(
+          icon: Symbols.schedule,
+          value: '$hours س',
+          label: context.s.dashboardFieldTime,
+        ),
+      ],
     );
   }
 }
@@ -86,7 +132,7 @@ class _KpiGrid extends StatelessWidget {
       crossAxisSpacing: 12,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.55,
+      childAspectRatio: 1.45,
       children: [
         _KpiTile(
           label: context.s.dashboardKpiOverdue,
@@ -109,19 +155,12 @@ class _KpiGrid extends StatelessWidget {
         _KpiTile(
           label: context.s.dashboardKpiPending,
           value: pendingReview,
-          color: Colors.amber.shade700,
-          icon: Icons.rate_review_rounded,
+          color: context.x.warning,
+          icon: Symbols.pending,
           onTap: pendingReview > 0
               ? () {
                   HapticFeedback.selectionClick();
-                  context
-                      .read<VisitsListBloc>()
-                      .add(const VisitsListFilterChanged(VisitsFilter.all));
-                  context.read<VisitsListBloc>().add(
-                        VisitsListStatusFilterChanged(
-                            VisitStatusFilter.pendingReview),
-                      );
-                  context.go('/');
+                  context.push('/review');
                 }
               : null,
         ),
@@ -176,15 +215,15 @@ class _KpiTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      borderRadius: BorderRadius.circular(14),
-      color: color.withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(Radii.lg),
+      color: color.withValues(alpha: 0.12),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(Radii.lg),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(Radii.lg),
             border: Border.all(color: color.withValues(alpha: 0.30)),
           ),
           child: Column(
@@ -192,28 +231,25 @@ class _KpiTile extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(icon, size: 18, color: color),
-                  if (onTap != null) ...[
-                    const Spacer(),
-                    Icon(Icons.chevron_right,
-                        size: 16, color: color.withValues(alpha: 0.6)),
-                  ],
+                  Icon(
+                    context.isRtl ? Symbols.chevron_left : Symbols.chevron_right,
+                    size: 22,
+                    color: onTap != null ? color.withValues(alpha: 0.7) : Colors.transparent,
+                  ),
+                  Icon(icon, fill: 1, size: 22, color: color),
                 ],
               ),
-              Text(
+              CountUpText(
                 '$value',
-                style: context.text.headlineMedium?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w800,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+                style: AppType.number(34, color).copyWith(height: 1),
               ),
               Text(
                 label,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: context.text.labelMedium?.copyWith(
+                style: AppType.bodyMd.copyWith(
                   color: context.colors.onSurfaceVariant,
                   fontWeight: FontWeight.w600,
                 ),
@@ -275,6 +311,17 @@ class _ActiveEmployeesCard extends StatelessWidget {
         .map((v) => LatLng(v.checkInLat!, v.checkInLng!))
         .toList();
     final bounds = LatLngBounds.fromPoints(points);
+    // CameraFit.bounds divides by the bounds' span to derive a zoom; a single
+    // active visit (or several at the exact same spot) gives a zero-span box,
+    // producing an Infinity/NaN zoom that crashes the tile layer. Only fit when
+    // the points actually span an area, otherwise centre on them at a fixed zoom.
+    final latSpan = (bounds.north - bounds.south).abs();
+    final lngSpan = (bounds.east - bounds.west).abs();
+    final canFitBounds = latSpan > 1e-4 && lngSpan > 1e-4;
+    final mapCenter = LatLng(
+      (bounds.north + bounds.south) / 2,
+      (bounds.east + bounds.west) / 2,
+    );
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return AppCard(
       padding: EdgeInsets.zero,
@@ -306,10 +353,14 @@ class _ActiveEmployeesCard extends StatelessWidget {
                 // because they sit above this in the stack.
                 child: FlutterMap(
                   options: MapOptions(
-                    initialCameraFit: CameraFit.bounds(
-                      bounds: bounds,
-                      padding: const EdgeInsets.all(40),
-                    ),
+                    initialCenter: mapCenter,
+                    initialZoom: 15,
+                    initialCameraFit: canFitBounds
+                        ? CameraFit.bounds(
+                            bounds: bounds,
+                            padding: const EdgeInsets.all(40),
+                          )
+                        : null,
                     interactionOptions: const InteractionOptions(
                       flags: InteractiveFlag.none,
                     ),

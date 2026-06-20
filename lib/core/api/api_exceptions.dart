@@ -10,6 +10,11 @@ enum ApiErrorCode {
   server,
   locationPermission,
   customerLoadFailed,
+
+  /// The feature isn't supported by the connected Odoo server. Used for
+  /// capabilities (live employee location / nearby map) that have no
+  /// storage in a vanilla Odoo without the custom visits module.
+  notSupported,
   unknown,
 }
 

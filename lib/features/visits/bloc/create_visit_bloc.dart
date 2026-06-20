@@ -76,6 +76,12 @@ class CreateVisitBloc extends Bloc<CreateVisitEvent, CreateVisitState> {
         salespersonUserId: state.employee!.userId,
         visitDate: state.date!,
         visitTypeId: state.visitTypeId,
+        visitTypeName: state.visitTypeName,
+        customerName: state.customer!.name,
+        customerLat: state.customer!.latitude,
+        customerLng: state.customer!.longitude,
+        customerAddress: state.customer!.address,
+        customerPhone: state.customer!.phone ?? state.customer!.mobile,
         description: state.notes,
         state: state.lifecycleState,
       );

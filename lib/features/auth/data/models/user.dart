@@ -10,9 +10,15 @@ class AuthUser extends Equatable {
   /// Odoo built-in flag — true for the database administrator.
   final bool isAdmin;
 
-  /// Set by the dh_customer_visits addon: true when the user is in the
-  /// `Customer Visits / Manager` group. Defaults to `false` if the field is
-  /// not present in the login response (backend may not have shipped it yet).
+  /// Odoo built-in flag (`is_system`) — true for users in the Settings /
+  /// "Administration: Settings" access group. On a vanilla Odoo (no custom
+  /// visits module) we treat system/admin users as managers, since there's
+  /// no dedicated manager group to key off.
+  final bool isSystem;
+
+  /// True when the user should get the manager experience (Customers tab,
+  /// editable visits). On vanilla Odoo this is derived from the built-in
+  /// `is_admin` / `is_system` flags returned by `session_info`.
   final bool isManager;
 
   /// IANA timezone of the Odoo user (`res.users.tz`), e.g. `Africa/Cairo`.
@@ -29,6 +35,7 @@ class AuthUser extends Equatable {
     this.employeeId,
     this.companyId,
     this.isAdmin = false,
+    this.isSystem = false,
     this.isManager = false,
     this.tz,
   });
@@ -40,17 +47,23 @@ class AuthUser extends Equatable {
   /// Human-friendly name. Falls back to login if employee name unknown.
   String get displayName => employeeName ?? username;
 
-  factory AuthUser.fromJson(Map<String, dynamic> json) => AuthUser(
-        uid: (json['uid'] as num).toInt(),
-        username: (json['username'] ?? '').toString(),
-        employeeName:
-            (json['employee_name'] ?? json['name'])?.toString(),
-        employeeId: (json['employee_id'] as num?)?.toInt(),
-        companyId: (json['company_id'] as num?)?.toInt(),
-        isAdmin: json['is_admin'] == true,
-        isManager: json['is_manager'] == true,
-        tz: _parseTz(json['tz']),
-      );
+  factory AuthUser.fromJson(Map<String, dynamic> json) {
+    final isAdmin = json['is_admin'] == true;
+    final isSystem = json['is_system'] == true;
+    return AuthUser(
+      uid: (json['uid'] as num).toInt(),
+      username: (json['username'] ?? '').toString(),
+      employeeName: (json['employee_name'] ?? json['name'])?.toString(),
+      employeeId: (json['employee_id'] as num?)?.toInt(),
+      companyId: (json['company_id'] as num?)?.toInt(),
+      isAdmin: isAdmin,
+      isSystem: isSystem,
+      // Vanilla Odoo has no custom manager group. Treat admin/system users
+      // as managers. If a server *does* expose `is_manager`, honour it too.
+      isManager: json['is_manager'] == true || isAdmin || isSystem,
+      tz: _parseTz(json['tz']),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'uid': uid,
@@ -59,6 +72,7 @@ class AuthUser extends Equatable {
         'employee_id': employeeId,
         'company_id': companyId,
         'is_admin': isAdmin,
+        'is_system': isSystem,
         'is_manager': isManager,
         'tz': tz,
       };
@@ -70,6 +84,7 @@ class AuthUser extends Equatable {
         employeeId: employeeId,
         companyId: companyId,
         isAdmin: isAdmin,
+        isSystem: isSystem,
         isManager: isManager,
         tz: tz ?? this.tz,
       );

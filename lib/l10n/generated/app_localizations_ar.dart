@@ -133,6 +133,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get loginSubtitle => 'سجّل دخولك لبدء يومك الميداني';
 
   @override
+  String get loginWelcomeBack => 'أهلاً بعودتك';
+
+  @override
+  String get loginRoleLabel => 'الدخول بصفتك';
+
+  @override
   String get loginUsername => 'البريد / المستخدم';
 
   @override
@@ -179,6 +185,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get errCustomerLoadFailed => 'تعذر تحميل بيانات العميل';
+
+  @override
+  String get errFeatureNotAvailable => 'هذه الميزة غير متاحة على هذا السيرفر';
 
   @override
   String get errLocationSharingDisabled => 'صلاحية الموقع غير مفعّلة';
@@ -263,7 +272,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get employeesSearchHint => 'بحث عن موظف…';
 
   @override
-  String get createVisitTitle => 'زيارة جديدة';
+  String get createVisitTitle => 'إنشاء زيارة جديدة';
 
   @override
   String get createVisitCustomerLabel => 'العميل';
@@ -546,6 +555,167 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get visitsHistoryActiveBadge => 'نشطة الآن';
+
+  @override
+  String get visitsScheduledLabel => 'الموعد';
+
+  @override
+  String get dashboardGreeting => 'صباح الخير';
+
+  @override
+  String get dashboardTodayProgress => 'إنجاز اليوم';
+
+  @override
+  String get dashboardFieldTime => 'وقت الميدان';
+
+  @override
+  String get dashboardDaySchedule => 'جدول يومك';
+
+  @override
+  String get affordanceScheduled => 'اضغط لبدء الزيارة';
+
+  @override
+  String get affordanceActive => 'زيارة جارية الآن';
+
+  @override
+  String get affordanceReview => 'بانتظار مراجعة المدير';
+
+  @override
+  String get affordanceApproved => 'تم اعتمادها';
+
+  @override
+  String get affordanceRejected => 'مرفوضة — أعد الزيارة';
+
+  @override
+  String get analyticsTabTitle => 'التحليلات';
+
+  @override
+  String get analyticsOnTime => 'في الوقت المحدد';
+
+  @override
+  String get analyticsVisitsThisWeek => 'زيارة هذا الأسبوع';
+
+  @override
+  String get analyticsKm => 'كم في الميدان';
+
+  @override
+  String get analyticsAvgDuration => 'متوسط مدة الزيارة';
+
+  @override
+  String get analyticsWeeklyTitle => 'الزيارات هذا الأسبوع';
+
+  @override
+  String get analyticsWeeklyCompare => 'مقارنة بالأسبوع الماضي';
+
+  @override
+  String get analyticsByEmployee => 'حسب الموظف';
+
+  @override
+  String get reviewTitle => 'مراجعة الزيارات';
+
+  @override
+  String reviewPendingCount(int n) {
+    return '$n بانتظار موافقتك';
+  }
+
+  @override
+  String get reviewApprove => 'اعتمد';
+
+  @override
+  String get reviewReject => 'رفض';
+
+  @override
+  String get reviewEmpty => 'لا توجد زيارات بانتظار المراجعة';
+
+  @override
+  String get reviewApproved => 'تم اعتماد الزيارة';
+
+  @override
+  String get reviewRejected => 'تم رفض الزيارة';
+
+  @override
+  String get reviewOutOfRangeBanner =>
+      'خارج النطاق · سُجّلت خارج نطاق الموقع المعتمد';
+
+  @override
+  String get routeTabTitle => 'مسار اليوم';
+
+  @override
+  String get routeStops => 'محطات';
+
+  @override
+  String get routeTotalDistance => 'إجمالي المسافة';
+
+  @override
+  String get routeNextStop => 'المحطة التالية';
+
+  @override
+  String get routeStartPoint => 'نقطة البداية';
+
+  @override
+  String routeDriveMinutes(int n) {
+    return '$n د قيادة';
+  }
+
+  @override
+  String get routeStartNav => 'بدء الملاحة';
+
+  @override
+  String get routeEmpty => 'لا توجد محطات في مسار اليوم';
+
+  @override
+  String get reportTitle => 'تقرير الزيارة';
+
+  @override
+  String get reportOutcome => 'نتيجة الزيارة';
+
+  @override
+  String get reportOutcomeDone => 'تمّت بنجاح';
+
+  @override
+  String get reportOutcomePostponed => 'مؤجلة';
+
+  @override
+  String get reportOutcomeAbsent => 'العميل غير موجود';
+
+  @override
+  String get reportNotes => 'ملاحظات';
+
+  @override
+  String get reportNotesHint => 'اكتب ملخص الزيارة وأهم الملاحظات...';
+
+  @override
+  String get reportPhoto => 'صورة إثبات';
+
+  @override
+  String get reportAddPhoto => 'إضافة صورة';
+
+  @override
+  String get reportSignature => 'توقيع العميل';
+
+  @override
+  String get reportSignHere => 'وقّع هنا';
+
+  @override
+  String get reportClear => 'مسح';
+
+  @override
+  String get reportSubmit => 'إنهاء وحفظ التقرير';
+
+  @override
+  String get createVisitSectionCustomer => 'العميل';
+
+  @override
+  String get createVisitSectionEmployee => 'الموظف الميداني';
+
+  @override
+  String get createVisitSectionType => 'نوع الزيارة';
+
+  @override
+  String get createVisitSectionDate => 'موعد الزيارة';
+
+  @override
+  String get createVisitChange => 'تغيير';
 
   @override
   String get visitsHistoryCompletedBadge => 'مكتملة';

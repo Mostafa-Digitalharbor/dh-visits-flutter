@@ -134,6 +134,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginSubtitle => 'Sign in to start your field day';
 
   @override
+  String get loginWelcomeBack => 'Welcome back';
+
+  @override
+  String get loginRoleLabel => 'Sign in as';
+
+  @override
   String get loginUsername => 'Email / Username';
 
   @override
@@ -182,6 +188,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errCustomerLoadFailed => 'Failed to load customer';
+
+  @override
+  String get errFeatureNotAvailable =>
+      'This feature isn\'t available on this server';
 
   @override
   String get errLocationSharingDisabled =>
@@ -267,7 +277,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get employeesSearchHint => 'Search employees…';
 
   @override
-  String get createVisitTitle => 'New visit';
+  String get createVisitTitle => 'Create a new visit';
 
   @override
   String get createVisitCustomerLabel => 'Customer';
@@ -550,6 +560,167 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get visitsHistoryActiveBadge => 'Active now';
+
+  @override
+  String get visitsScheduledLabel => 'Scheduled';
+
+  @override
+  String get dashboardGreeting => 'Good morning';
+
+  @override
+  String get dashboardTodayProgress => 'Today\'s progress';
+
+  @override
+  String get dashboardFieldTime => 'Field time';
+
+  @override
+  String get dashboardDaySchedule => 'Your day\'s schedule';
+
+  @override
+  String get affordanceScheduled => 'Tap to start the visit';
+
+  @override
+  String get affordanceActive => 'Visit in progress';
+
+  @override
+  String get affordanceReview => 'Awaiting manager review';
+
+  @override
+  String get affordanceApproved => 'Approved';
+
+  @override
+  String get affordanceRejected => 'Rejected — redo the visit';
+
+  @override
+  String get analyticsTabTitle => 'Analytics';
+
+  @override
+  String get analyticsOnTime => 'On time';
+
+  @override
+  String get analyticsVisitsThisWeek => 'visits this week';
+
+  @override
+  String get analyticsKm => 'km in the field';
+
+  @override
+  String get analyticsAvgDuration => 'Avg. visit duration';
+
+  @override
+  String get analyticsWeeklyTitle => 'Visits this week';
+
+  @override
+  String get analyticsWeeklyCompare => 'vs. last week';
+
+  @override
+  String get analyticsByEmployee => 'By employee';
+
+  @override
+  String get reviewTitle => 'Review visits';
+
+  @override
+  String reviewPendingCount(int n) {
+    return '$n awaiting your approval';
+  }
+
+  @override
+  String get reviewApprove => 'Approve';
+
+  @override
+  String get reviewReject => 'Reject';
+
+  @override
+  String get reviewEmpty => 'No visits awaiting review';
+
+  @override
+  String get reviewApproved => 'Visit approved';
+
+  @override
+  String get reviewRejected => 'Visit rejected';
+
+  @override
+  String get reviewOutOfRangeBanner =>
+      'Out of range · recorded outside the approved location';
+
+  @override
+  String get routeTabTitle => 'Today\'s route';
+
+  @override
+  String get routeStops => 'stops';
+
+  @override
+  String get routeTotalDistance => 'Total distance';
+
+  @override
+  String get routeNextStop => 'Next stop';
+
+  @override
+  String get routeStartPoint => 'Start point';
+
+  @override
+  String routeDriveMinutes(int n) {
+    return '$n min drive';
+  }
+
+  @override
+  String get routeStartNav => 'Start navigation';
+
+  @override
+  String get routeEmpty => 'No stops on today\'s route';
+
+  @override
+  String get reportTitle => 'Visit report';
+
+  @override
+  String get reportOutcome => 'Visit outcome';
+
+  @override
+  String get reportOutcomeDone => 'Successful';
+
+  @override
+  String get reportOutcomePostponed => 'Postponed';
+
+  @override
+  String get reportOutcomeAbsent => 'Client absent';
+
+  @override
+  String get reportNotes => 'Notes';
+
+  @override
+  String get reportNotesHint => 'Write a summary of the visit and key notes...';
+
+  @override
+  String get reportPhoto => 'Proof photo';
+
+  @override
+  String get reportAddPhoto => 'Add photo';
+
+  @override
+  String get reportSignature => 'Client signature';
+
+  @override
+  String get reportSignHere => 'Sign here';
+
+  @override
+  String get reportClear => 'Clear';
+
+  @override
+  String get reportSubmit => 'Finish and save report';
+
+  @override
+  String get createVisitSectionCustomer => 'Customer';
+
+  @override
+  String get createVisitSectionEmployee => 'Field employee';
+
+  @override
+  String get createVisitSectionType => 'Visit type';
+
+  @override
+  String get createVisitSectionDate => 'Visit date';
+
+  @override
+  String get createVisitChange => 'Change';
 
   @override
   String get visitsHistoryCompletedBadge => 'Completed';

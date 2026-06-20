@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
@@ -68,6 +69,7 @@ class _VisitsListPageState extends State<VisitsListPage> {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        const _MyDayHeader(),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: TextField(
@@ -223,6 +225,38 @@ class _VisitsListPageState extends State<VisitsListPage> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Employee-only brand greeting/day header (design screen 10 · My Visits).
+/// Hidden for managers — their visits tab is "team visits" with no greeting.
+class _MyDayHeader extends StatelessWidget {
+  const _MyDayHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final user = context.watch<AuthBloc>().state.user;
+    if (user == null || user.canEditVisits) return const SizedBox.shrink();
+    return BlocBuilder<VisitsListBloc, VisitsListState>(
+      builder: (context, state) {
+        final today = DateTime.now();
+        bool isToday(DateTime? d) =>
+            d != null && d.year == today.year && d.month == today.month && d.day == today.day;
+        final todays = state.items.where((v) => isToday(v.effectiveDate)).toList();
+        final done = todays.where((v) => v.state == VisitStateType.checkedOut).length;
+        final total = todays.isEmpty ? state.items.length : todays.length;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: GreetingHeader(
+            name: user.displayName,
+            roleLabel: context.s.roleUser,
+            roleIcon: Symbols.badge,
+            done: done,
+            total: total,
+          ),
+        );
+      },
     );
   }
 }
