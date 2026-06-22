@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
+import '../../../app/theme.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../bloc/customers_bloc.dart';
@@ -47,8 +49,18 @@ class _CustomersListPageState extends State<CustomersListPage> {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        BlocBuilder<CustomersBloc, CustomersState>(
+          buildWhen: (p, n) => p.items != n.items,
+          builder: (context, state) {
+            final total = state.items.length;
+            final active = state.items
+                .where((c) => c.lastVisit != null && c.lastVisit!.checkOutTime == null)
+                .length;
+            return _CustomerStatsRow(total: total, active: active);
+          },
+        ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           child: TextField(
             onChanged: _onSearchChanged,
             decoration: InputDecoration(
@@ -107,6 +119,115 @@ class _CustomersListPageState extends State<CustomersListPage> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Two summary tiles above the customer list (design screen 08): total
+/// customers and active customers.
+class _CustomerStatsRow extends StatelessWidget {
+  final int total;
+  final int active;
+  const _CustomerStatsRow({required this.total, required this.active});
+
+  @override
+  Widget build(BuildContext context) {
+    final x = context.x;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: _StatTile(
+              icon: Symbols.groups,
+              value: total,
+              label: context.s.customersStatTotal,
+              tone: context.colors.primary,
+              container: context.colors.primaryContainer,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _StatTile(
+              icon: Symbols.trending_up,
+              value: active,
+              label: context.s.customersStatActive,
+              tone: x.success,
+              container: x.successContainer,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  final IconData icon;
+  final int value;
+  final String label;
+  final Color tone;
+  final Color container;
+  const _StatTile({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.tone,
+    required this.container,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(Radii.lg),
+        border: Border.all(color: context.x.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: container,
+              borderRadius: BorderRadius.circular(Radii.sm),
+            ),
+            child: Icon(icon, size: 20, fill: 1, color: tone),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$value',
+                  style: TextStyle(
+                    fontSize: 22,
+                    height: 1.1,
+                    fontWeight: FontWeight.w800,
+                    color: cs.onSurface,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

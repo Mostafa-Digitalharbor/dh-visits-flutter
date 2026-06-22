@@ -148,6 +148,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get loginSubmit => 'تسجيل الدخول';
 
   @override
+  String get loginRememberMe => 'تذكّرني';
+
+  @override
+  String get loginForgotPassword => 'نسيت كلمة السر؟';
+
+  @override
+  String get loginSecureFooter => 'دخول آمن · Digital Harbor';
+
+  @override
   String get errInvalidCredentials => 'بيانات الدخول غير صحيحة';
 
   @override
@@ -202,6 +211,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get customersEmpty => 'لا توجد عملاء';
 
   @override
+  String get customersStatTotal => 'إجمالي العملاء';
+
+  @override
+  String get customersStatActive => 'عميل نشط';
+
+  @override
   String get customerDetailTitle => 'تفاصيل العميل';
 
   @override
@@ -252,6 +267,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get visitLiveIndicator => 'مباشر';
+
+  @override
+  String get mapLiveTracking => 'تتبّع مباشر';
 
   @override
   String get visitNotesLabel => 'ملاحظات (اختياري)';
@@ -554,6 +572,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get roleUser => 'موظف ميداني';
 
   @override
+  String get roleManagerTitle => 'مدير الفريق';
+
+  @override
+  String get roleEmployeeTitle => 'مندوب ميداني';
+
+  @override
   String get visitsHistoryActiveBadge => 'نشطة الآن';
 
   @override
@@ -764,6 +788,73 @@ class AppLocalizationsAr extends AppLocalizations {
   String get visitRangeOutOfRange => 'خارج النطاق';
 
   @override
+  String get statusScheduled => 'مجدولة';
+
+  @override
+  String get statusActive => 'نشطة الآن';
+
+  @override
+  String get statusReview => 'بانتظار المراجعة';
+
+  @override
+  String get statusApproved => 'معتمدة';
+
+  @override
+  String get statusRejected => 'مرفوضة';
+
+  @override
+  String get visitDetailScheduledTimeLabel => 'موعد الزيارة';
+
+  @override
+  String get visitDetailInRange => 'أنت داخل نطاق العميل';
+
+  @override
+  String get visitDetailOutRange => 'أنت خارج نطاق العميل';
+
+  @override
+  String visitDetailRangeMeta(String distance, String radius) {
+    return 'يبعد $distance م · نطاق التسجيل $radius م';
+  }
+
+  @override
+  String get visitDetailOutRangeHint => 'اقترب أكثر من الموقع لبدء الزيارة';
+
+  @override
+  String get visitDetailCheckInTitle => 'تسجيل بدء الزيارة';
+
+  @override
+  String get visitDetailCheckInInRangeSub => 'أنت داخل النطاق';
+
+  @override
+  String get visitDetailCheckInLocatingSub => 'جارٍ تحديد موقعك…';
+
+  @override
+  String get visitDetailCheckInOverride => 'تسجيل خارج النطاق';
+
+  @override
+  String get visitDetailElapsedLabel => 'الوقت المنقضي';
+
+  @override
+  String visitDetailStartedAt(String time) {
+    return 'بدء الزيارة $time';
+  }
+
+  @override
+  String get visitDetailCheckOutTitle => 'تسجيل إنهاء الزيارة';
+
+  @override
+  String get visitDetailCheckOutSub => 'سيتم التقاط موقعك عند الإنهاء';
+
+  @override
+  String get visitDetailOnTime => 'تمّت في موعدها';
+
+  @override
+  String get visitDetailDurationLabel => 'مدة الزيارة';
+
+  @override
+  String get timelineCreated => 'تم إنشاء الزيارة';
+
+  @override
   String get visitShowLocation => 'عرض موقع العميل';
 
   @override
@@ -894,6 +985,33 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get settingsVersion => 'الإصدار';
+
+  @override
+  String get settingsEditProfile => 'تعديل الملف الشخصي';
+
+  @override
+  String get settingsNotifications => 'الإشعارات';
+
+  @override
+  String get settingsNotificationsSub => 'تنبيهات الزيارات والتذكيرات';
+
+  @override
+  String get settingsLastSync => 'آخر مزامنة';
+
+  @override
+  String get settingsSyncNow => 'مزامنة الآن';
+
+  @override
+  String get settingsSynced => 'تمت المزامنة';
+
+  @override
+  String get settingsSyncedJustNow => 'منذ لحظات';
+
+  @override
+  String get settingsHelp => 'المساعدة والدعم';
+
+  @override
+  String get settingsComingSoon => 'قريبًا';
 
   @override
   String get confirmLogoutTitle => 'تسجيل الخروج';

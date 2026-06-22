@@ -265,8 +265,9 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
     final cs = context.colors;
     final x = context.x;
     final user = context.watch<AuthBloc>().state.user;
-    final eyebrow =
-        (user?.canEditVisits ?? false) ? context.s.roleManager : context.s.roleUser;
+    final eyebrow = (user?.canEditVisits ?? false)
+        ? context.s.roleManagerTitle
+        : context.s.roleEmployeeTitle;
 
     return Material(
       color: cs.surfaceContainerLowest,

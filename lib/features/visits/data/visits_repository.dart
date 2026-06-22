@@ -427,6 +427,13 @@ class VisitsRepository {
     meta['state'] = 'under_review';
     final newNotes =
         (notes != null && notes.trim().isNotEmpty) ? notes.trim() : current.notes;
+    // Keep stop >= start (Odoo constraint): realign the event window to the
+    // actual check-in → check-out span so finishing before the booked slot
+    // isn't rejected.
+    final ciTime = meta['ci'] is Map ? (meta['ci'] as Map)['t'] : null;
+    final ciDt = ciTime is String ? DateTime.tryParse(ciTime) : null;
+    final startStr =
+        ciDt != null ? _odooDateTime.format(ciDt.toUtc()) : _odooDateTime.format(now);
     await api.jsonRpc(
       Endpoints.callKw,
       params: {
@@ -436,6 +443,7 @@ class VisitsRepository {
           [visitId],
           {
             'description': _encodeDescription(newNotes, meta),
+            'start': startStr,
             'stop': _odooDateTime.format(now),
           },
         ],
@@ -580,7 +588,16 @@ class VisitsRepository {
       final co = coBlock();
       if (partial.containsKey('check_out_date_time')) {
         co['t'] = _toIsoUtc(partial['check_out_date_time']);
-        vals['stop'] = partial['check_out_date_time'];
+        final stopStr = partial['check_out_date_time'].toString();
+        vals['stop'] = stopStr;
+        // Odoo's calendar.event enforces stop >= start. The scheduled start
+        // can be later than the actual check-out (e.g. finishing before the
+        // booked slot), which would be rejected — so realign start to the
+        // real check-in time (the true visit window). Falls back to the stop
+        // time when no check-in timestamp is known.
+        final ciTime = ciBlock()['t'];
+        final ciDt = ciTime is String ? DateTime.tryParse(ciTime) : null;
+        vals['start'] = ciDt != null ? _odooDateTime.format(ciDt.toUtc()) : stopStr;
       }
       if (partial.containsKey('check_out_lat')) co['lat'] = partial['check_out_lat'];
       if (partial.containsKey('check_out_lng')) co['lng'] = partial['check_out_lng'];

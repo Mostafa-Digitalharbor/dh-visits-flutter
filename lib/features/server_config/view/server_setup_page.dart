@@ -2,16 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/config/server_config.dart';
 import '../../../core/config/server_config_cubit.dart';
-import '../../../core/settings/settings_cubit.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../auth/bloc/auth_bloc.dart';
+import '../../auth/view/auth_chrome.dart';
 
 /// First-run / "change server" screen. Collects the company's backend URL
-/// before letting the user reach login.
+/// before letting the user reach login. Shares the login screen's visual
+/// chrome (brand hero + overlapping sheet); only the fields differ.
 class ServerSetupPage extends StatefulWidget {
   const ServerSetupPage({super.key});
 
@@ -102,110 +104,80 @@ class _ServerSetupPageState extends State<ServerSetupPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
+    final cs = context.colors;
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          const SliverToBoxAdapter(child: _Header()),
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: Container(
-              decoration: BoxDecoration(
-                color: colors.surface,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(28),
-                ),
-              ),
-              transform: Matrix4.translationValues(0, -24, 0),
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AnimatedListItem(
-                          index: 0,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                context.s.serverSetupTitle,
-                                style: context.text.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                context.s.serverSetupSubtitle,
-                                style: context.text.bodyMedium?.copyWith(
-                                  color: colors.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 28),
-                        AnimatedListItem(
-                          index: 1,
-                          child: AppTextField(
-                            controller: _urlCtrl,
-                            label: context.s.serverSetupUrlLabel,
-                            prefixIcon: Icons.dns_outlined,
-                            keyboardType: TextInputType.url,
+      backgroundColor: cs.surface,
+      body: SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: MediaQuery.sizeOf(context).height),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const AuthHero(),
+              AuthSheet(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AuthSheetTitle(
+                        title: context.s.serverSetupTitle,
+                        subtitle: context.s.serverSetupSubtitle,
+                      ),
+                      const SizedBox(height: 18),
+                      AuthField(
+                        controller: _urlCtrl,
+                        hint: context.s.serverSetupUrlHint,
+                        icon: Symbols.dns,
+                        keyboardType: TextInputType.url,
+                        textInputAction:
+                            _needsDatabase ? TextInputAction.next : TextInputAction.done,
+                        validator: _urlValidator,
+                        onSubmitted: _needsDatabase ? null : (_) => _submit(),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                        ],
+                      ),
+                      if (_needsDatabase) ...[
+                        const SizedBox(height: 12),
+                        ScaleFadeIn(
+                          child: AuthField(
+                            controller: _dbCtrl,
+                            hint: context.s.serverSetupDatabaseHint,
+                            icon: Symbols.database,
                             textInputAction: TextInputAction.done,
-                            validator: _urlValidator,
                             onSubmitted: (_) => _submit(),
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? context.s.commonRequired
+                                : null,
                             inputFormatters: [
                               FilteringTextInputFormatter.deny(RegExp(r'\s')),
                             ],
                           ),
                         ),
-                        if (_needsDatabase) ...[
-                          const SizedBox(height: 14),
-                          ScaleFadeIn(
-                            child: AppTextField(
-                              controller: _dbCtrl,
-                              label: context.s.serverSetupDatabaseLabel,
-                              prefixIcon: Icons.storage_outlined,
-                              textInputAction: TextInputAction.done,
-                              onSubmitted: (_) => _submit(),
-                              validator: (v) =>
-                                  (v == null || v.trim().isEmpty)
-                                      ? context.s.commonRequired
-                                      : null,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.deny(RegExp(r'\s')),
-                              ],
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 10),
-                        AnimatedListItem(
-                          index: 2,
-                          child: _HelpHint(text: context.s.serverSetupHelp),
-                        ),
-                        const SizedBox(height: 28),
-                        AnimatedListItem(
-                          index: 3,
-                          child: AppButton(
-                            label: context.s.serverSetupContinue,
-                            loading: _saving,
-                            icon: Icons.arrow_forward_rounded,
-                            onPressed: _submit,
-                          ),
-                        ),
                       ],
-                    ),
+                      const SizedBox(height: 12),
+                      _HelpHint(text: context.s.serverSetupHelp),
+                      const SizedBox(height: 18),
+                      AuthPrimaryButton(
+                        loading: _saving,
+                        onPressed: _submit,
+                        icon: Symbols.arrow_back,
+                        label: context.s.serverSetupContinue,
+                      ),
+                      const SizedBox(height: 18),
+                      AuthSecureFooter(
+                        text: context.s.loginSecureFooter,
+                        icon: Symbols.lock,
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -217,135 +189,25 @@ class _HelpHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(
-          Icons.info_outline_rounded,
-          size: 16,
-          color: context.colors.onSurfaceVariant,
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            text,
-            style: context.text.bodySmall?.copyWith(
-              color: context.colors.onSurfaceVariant,
+    final cs = context.colors;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Symbols.info, size: 16, fill: 1, color: cs.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: context.text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _Header extends StatelessWidget {
-  const _Header();
-
-  ThemeMode _nextThemeMode(ThemeMode current, Brightness platformBrightness) {
-    final effective = current == ThemeMode.system
-        ? (platformBrightness == Brightness.dark
-            ? ThemeMode.dark
-            : ThemeMode.light)
-        : current;
-    return effective == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fg = isDark ? colors.onSurface : colors.onPrimary;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 56),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? [colors.surface, colors.surfaceContainerHigh]
-              : [
-                  colors.primary,
-                  Color.lerp(colors.primary, colors.tertiary, 0.6) ??
-                      colors.primary,
-                ],
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            BlocBuilder<SettingsCubit, SettingsState>(
-              builder: (context, state) {
-                final isArabic = state.locale.languageCode == 'ar';
-                return Align(
-                  alignment: AlignmentDirectional.topEnd,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: context.s.language,
-                        icon: Icon(Icons.translate, color: fg),
-                        onPressed: () =>
-                            context.read<SettingsCubit>().setLocale(
-                                  Locale(isArabic ? 'en' : 'ar'),
-                                ),
-                      ),
-                      IconButton(
-                        tooltip: context.s.themeMode,
-                        icon: Icon(
-                          isDark
-                              ? Icons.light_mode_outlined
-                              : Icons.dark_mode_outlined,
-                          color: fg,
-                        ),
-                        onPressed: () =>
-                            context.read<SettingsCubit>().setThemeMode(
-                                  _nextThemeMode(
-                                    state.themeMode,
-                                    MediaQuery.platformBrightnessOf(context),
-                                  ),
-                                ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            Container(
-              width: 84,
-              height: 84,
-              padding: const EdgeInsets.all(10),
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white,
-              ),
-              child: ClipOval(
-                child: Image.asset(
-                  'assets/images/logo.jpg',
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              context.s.appTitle,
-              style: context.text.headlineSmall?.copyWith(
-                color: fg,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              context.s.appTagline,
-              style: context.text.bodyMedium?.copyWith(
-                color: fg.withValues(alpha: 0.85),
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }

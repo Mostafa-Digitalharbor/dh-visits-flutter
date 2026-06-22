@@ -1,9 +1,12 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:latlong2/latlong.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
@@ -14,6 +17,7 @@ import '../../../core/di/service_locator.dart';
 import '../../../core/location/location_service.dart';
 import '../../../core/network/pending_actions_queue.dart';
 import '../../../core/utils/communications.dart';
+import '../../../core/utils/distance.dart';
 import '../../../core/utils/user_time.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
@@ -58,6 +62,11 @@ class _VisitDetailPageState extends State<VisitDetailPage> {
   bool _editingNotes = false;
   DateTime? _editedVisitDate;
 
+  /// Live distance (metres) from the field rep to the customer office,
+  /// fetched once when an employee opens a not-yet-started visit. Drives the
+  /// range strip + check-in button (design screen 11). Null = not known yet.
+  double? _myDistanceMeters;
+
   /// Admin can swap the visit's customer (`partner_id`) without leaving
   /// this screen. We hold the chosen Customer until save.
   Customer? _editedCustomer;
@@ -86,6 +95,32 @@ class _VisitDetailPageState extends State<VisitDetailPage> {
     _notesCtrl = TextEditingController();
     if (_visit == null) {
       _refreshFromServer();
+    } else {
+      _maybeFetchRange();
+    }
+  }
+
+  /// For an employee opening a scheduled (not-yet-started) visit, capture the
+  /// device's current position once and compute the distance to the customer
+  /// office so the range strip + check-in button can reflect it.
+  Future<void> _maybeFetchRange() async {
+    final v = _visit;
+    if (v == null || _isManager) return;
+    if (v.state == VisitStateType.checkedIn ||
+        v.state == VisitStateType.checkedOut) {
+      return;
+    }
+    if (v.checkInTime != null || !v.hasCustomerLocation) return;
+    try {
+      final ok = await sl<LocationService>().ensurePermission();
+      if (!ok) return;
+      final pos = await sl<LocationService>().getCurrent();
+      final d = haversineMeters(
+          pos.latitude, pos.longitude, v.customerLatitude!, v.customerLongitude!);
+      if (mounted) setState(() => _myDistanceMeters = d);
+    } catch (_) {
+      // Location unavailable/denied — leave the distance unknown; the strip
+      // falls back to a neutral "locating" state.
     }
   }
 
@@ -111,7 +146,10 @@ class _VisitDetailPageState extends State<VisitDetailPage> {
         (v) => v.id == widget.visitId,
         orElse: () => _visit ?? Visit(id: widget.visitId),
       );
-      if (mounted) setState(() => _visit = fresh);
+      if (mounted) {
+        setState(() => _visit = fresh);
+        _maybeFetchRange();
+      }
     } on ApiException catch (e) {
       if (mounted) context.showSnack(e.localize(context));
     } finally {
@@ -408,44 +446,45 @@ class _VisitDetailPageState extends State<VisitDetailPage> {
             height: mapHeight,
             child: _MapHeader(visit: visit),
           ),
-          // ── Scrollable content sheet overlapping the map ─────────────────
-          Positioned.fill(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  const SizedBox(height: mapHeight - sheetOverlap),
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: cs.surface,
-                      borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(Radii.xl)),
-                    ),
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 40,
-                            height: 4,
-                            margin: const EdgeInsets.only(bottom: 14),
-                            decoration: BoxDecoration(
-                              color: context.x.outlineVariant,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                          ),
+          // ── Content sheet (fixed below the map so the map stays pan/zoom
+          //    interactive; the sheet's own content scrolls) ────────────────
+          Positioned(
+            top: mapHeight - sheetOverlap,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              width: double.infinity,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: cs.surface,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(Radii.xl)),
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 14),
+                        decoration: BoxDecoration(
+                          color: context.x.outlineVariant,
+                          borderRadius: BorderRadius.circular(999),
                         ),
-                        if (_loading)
-                          const _DetailSkeleton()
-                        else if (canEdit)
-                          _buildAdminBody(visit, allowEdits: adminCanEdit)
-                        else
-                          _buildUserBody(visit),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                    if (_loading)
+                      const _DetailSkeleton()
+                    else if (canEdit)
+                      _buildAdminBody(visit, allowEdits: adminCanEdit)
+                    else
+                      _buildUserBody(visit),
+                  ],
+                ),
               ),
             ),
           ),
@@ -504,65 +543,75 @@ class _VisitDetailPageState extends State<VisitDetailPage> {
   /// User-facing screen — unchanged from before. Shows the basic visit
   /// info, timeline (when relevant), notes (editable mid-visit only),
   /// and the start/end buttons depending on state.
+  /// Field-rep visit screen (design screens 11 scheduled / 12 active):
+  /// identity → address → state block (schedule + range + check-in CTA, or the
+  /// live elapsed card + check-out CTA) → timeline → meta tiles.
   Widget _buildUserBody(Visit visit) {
     final isActive = visit.state == VisitStateType.checkedIn;
     final isCompleted = visit.state == VisitStateType.checkedOut;
-    final canCheckIn =
-        !isActive && !isCompleted && visit.checkInTime == null;
-    final notesEditableByUser = isActive;
+    final canCheckIn = !isActive && !isCompleted && visit.checkInTime == null;
+    final hasAddress = (visit.customerAddress?.trim().isNotEmpty ?? false) ||
+        (visit.customerPhone?.trim().isNotEmpty ?? false);
+
+    final radius = AppConstants.checkInRangeMeters;
+    final distance = _myDistanceMeters;
+    final inRange = distance == null ? null : distance <= radius;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _CustomerBlock(visit: visit),
-        const SizedBox(height: 14),
-        _MetaBlock(
-          visit: visit,
-          canEdit: false,
-          editedDate: null,
-          editedCustomer: null,
-          editedEmployee: null,
-          editedLifecycle: null,
-          editedVisitType: null,
-          onEditDate: null,
-          onEditCustomer: null,
-          onEditEmployee: null,
-          onEditLifecycle: null,
-          onEditVisitType: null,
-        ),
-        if (visit.checkInTime != null) ...[
+        _EmpIdentityCard(visit: visit),
+        if (hasAddress) ...[
           const SizedBox(height: 14),
-          _TimelineBlock(visit: visit),
+          _EmpAddressRow(visit: visit),
         ],
-        const SizedBox(height: 14),
-        _NotesBlock(
-          visit: visit,
-          controller: _notesCtrl,
-          editable: notesEditableByUser,
-          editing: _editingNotes,
-          onEditToggle: notesEditableByUser
-              ? () => setState(() => _editingNotes = !_editingNotes)
-              : null,
-        ),
-        const SizedBox(height: 8),
-        if (!notesEditableByUser)
-          _HintRow(text: context.s.visitDetailReadOnlyHint),
-        if (notesEditableByUser)
-          _HintRow(text: context.s.visitDetailNotesEditableHint),
-        const SizedBox(height: 24),
-        if (canCheckIn)
-          AppButton(
-            label: context.s.customerActionCheckIn,
-            icon: Icons.login_rounded,
-            loading: _busy,
+
+        // ── State block ──────────────────────────────────────────────────
+        if (canCheckIn) ...[
+          const SizedBox(height: 14),
+          _EmpScheduleTile(visit: visit),
+          const SizedBox(height: 14),
+          _EmpRangeStrip(distance: distance, radius: radius, inRange: inRange),
+          const SizedBox(height: 14),
+          _EmpCheckInButton(
+            inRange: inRange,
+            busy: _busy,
             onPressed: _checkIn,
           ),
-        if (isActive)
-          AppButton.destructive(
-            label: context.s.visitActionCheckOut,
-            icon: Icons.logout_rounded,
-            loading: _busy,
-            onPressed: _checkOut,
+        ] else if (isActive) ...[
+          const SizedBox(height: 14),
+          _EmpLiveElapsedCard(visit: visit, toUserTime: context.toUserTime),
+          const SizedBox(height: 14),
+          _EmpCheckOutButton(visit: visit, busy: _busy, onPressed: _checkOut),
+        ] else if (isCompleted) ...[
+          const SizedBox(height: 14),
+          _EmpDurationTiles(visit: visit),
+          if (visit.lifecycleState == VisitLifecycleState.underReview) ...[
+            const SizedBox(height: 14),
+            _EmpReviewBanner(visit: visit),
+          ],
+          const SizedBox(height: 14),
+          _EmpReportCard(visit: visit),
+        ],
+
+        // ── Timeline ─────────────────────────────────────────────────────
+        const SizedBox(height: 14),
+        _EmpTimeline(visit: visit, toUserTime: context.toUserTime),
+
+        // ── Editable notes (only while the visit is active) ──────────────
+        if (isActive) ...[
+          const SizedBox(height: 14),
+          _NotesBlock(
+            visit: visit,
+            controller: _notesCtrl,
+            editable: true,
+            editing: _editingNotes,
+            onEditToggle: () => setState(() => _editingNotes = !_editingNotes),
           ),
+        ],
+        const SizedBox(height: 14),
+        _EmpMetaTiles(visit: visit),
+        const SizedBox(height: 8),
       ],
     );
   }
@@ -822,12 +871,71 @@ class _VisitDetailPageState extends State<VisitDetailPage> {
 /// Map header behind the detail sheet (design 05/11/12). Shows the customer
 /// office, the geofence ring, and check-in/out pins on a static map; falls
 /// back to a brand-gradient panel when no coordinates are available.
-class _MapHeader extends StatelessWidget {
+class _MapHeader extends StatefulWidget {
   final Visit visit;
   const _MapHeader({required this.visit});
 
   @override
+  State<_MapHeader> createState() => _MapHeaderState();
+}
+
+class _MapHeaderState extends State<_MapHeader> with SingleTickerProviderStateMixin {
+  // One 2s controller drives both pulse rings + the breathing GPS core
+  // (design 05-map-and-geofence.md §3). Created eagerly in initState — a lazy
+  // `late` field would otherwise be initialised inside dispose() (on the
+  // no-coordinates fallback path that never reads it during build), which calls
+  // createTicker on a deactivated element and throws.
+  late final AnimationController _pulse;
+  final MapController _mapController = MapController();
+
+  /// The field rep's current GPS position once they tap the "my location"
+  /// FAB — drives the blue locating dot + recenters the camera.
+  LatLng? _myLocation;
+  bool _locating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(vsync: this, duration: const Duration(seconds: 2))
+      ..repeat();
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  /// Center the map on the user's current location and drop a blue dot.
+  Future<void> _locateMe() async {
+    if (_locating) return;
+    setState(() => _locating = true);
+    try {
+      final ok = await sl<LocationService>().ensurePermission();
+      if (!ok) {
+        if (mounted) {
+          context.showSnack(context.s.errLocationPermission, kind: SnackKind.error);
+        }
+        return;
+      }
+      final pos = await sl<LocationService>().getCurrent();
+      final me = LatLng(pos.latitude, pos.longitude);
+      if (!mounted) return;
+      setState(() => _myLocation = me);
+      _mapController.move(me, 16);
+    } catch (_) {
+      if (mounted) {
+        context.showSnack(context.s.errLocationPermission, kind: SnackKind.error);
+      }
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final visit = widget.visit;
     final cs = context.colors;
     final x = context.x;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -845,15 +953,33 @@ class _MapHeader extends StatelessWidget {
       );
     }
 
+    // The live GPS dot sits on the check-in location (the field rep's captured
+    // position); the pulse rings + live-tracking pill only show while active.
+    final isLive = visit.state == VisitStateType.checkedIn;
+    final gpsPoint =
+        visit.hasCheckInLocation ? LatLng(visit.checkInLat!, visit.checkInLng!) : null;
+    // Brand cyan accent (cs.tertiary in this app's scheme).
+    final accent = cs.tertiary;
+
     return Stack(
       fit: StackFit.expand,
       children: [
         FlutterMap(
+          mapController: _mapController,
           options: MapOptions(
             initialCenter: center,
             initialZoom: 15.5,
-            interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
-            backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFE5E5E5),
+            // Pan + zoom enabled (drag, pinch, double-tap, scroll-wheel);
+            // rotation stays off to avoid accidental tilts.
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.drag |
+                  InteractiveFlag.flingAnimation |
+                  InteractiveFlag.pinchZoom |
+                  InteractiveFlag.pinchMove |
+                  InteractiveFlag.doubleTapZoom |
+                  InteractiveFlag.scrollWheelZoom,
+            ),
+            backgroundColor: isDark ? const Color(0xFF0E0F15) : const Color(0xFFE5E5E5),
           ),
           children: [
             TileLayer(
@@ -861,31 +987,44 @@ class _MapHeader extends StatelessWidget {
               userAgentPackageName: 'com.digitalharbor.location_gps',
               maxNativeZoom: 19,
             ),
+            // Geofence — dashed-look translucent green circle (design §3).
             if (visit.hasCustomerLocation)
               CircleLayer(circles: [
                 CircleMarker(
                   point: center,
                   radius: AppConstants.checkInRangeMeters,
                   useRadiusInMeter: true,
-                  color: cs.primary.withValues(alpha: 0.12),
-                  borderColor: cs.primary.withValues(alpha: 0.55),
-                  borderStrokeWidth: 1.5,
+                  color: x.success.withValues(alpha: 0.16),
+                  borderColor: x.success.withValues(alpha: 0.75),
+                  borderStrokeWidth: 2,
                 ),
               ]),
             MarkerLayer(markers: [
+              // Two expanding pulse rings around the live GPS dot.
+              if (gpsPoint != null)
+                Marker(
+                  point: gpsPoint,
+                  width: 100,
+                  height: 100,
+                  child: _PulseRings(controller: _pulse, color: accent),
+                ),
+              // Customer pin — gradient teardrop, anchored so the tip sits on
+              // the point.
               if (visit.hasCustomerLocation)
                 Marker(
                   point: center,
                   width: 44,
-                  height: 44,
-                  child: _Pin(icon: Symbols.business, gradient: x.avatarGradient),
+                  height: 54,
+                  alignment: Alignment.topCenter,
+                  child: _CustomerTeardrop(gradient: x.avatarGradient),
                 ),
-              if (visit.hasCheckInLocation)
+              // Crisp GPS core dot (breathing 1→1.18).
+              if (gpsPoint != null)
                 Marker(
-                  point: LatLng(visit.checkInLat!, visit.checkInLng!),
-                  width: 34,
-                  height: 34,
-                  child: _Pin(icon: Symbols.login, color: x.success),
+                  point: gpsPoint,
+                  width: 26,
+                  height: 26,
+                  child: _GpsCore(controller: _pulse, color: accent),
                 ),
               if (visit.hasCheckOutLocation)
                 Marker(
@@ -894,12 +1033,20 @@ class _MapHeader extends StatelessWidget {
                   height: 34,
                   child: _Pin(icon: Symbols.logout, color: cs.error),
                 ),
+              // "My location" blue dot (after tapping the locate FAB).
+              if (_myLocation != null)
+                Marker(
+                  point: _myLocation!,
+                  width: 22,
+                  height: 22,
+                  child: const _MyLocationDot(),
+                ),
             ]),
           ],
         ),
-        // Dark tint for dark theme readability.
+        // Dark tint — only darkens the underlying tiles for readability.
         if (isDark)
-          IgnorePointer(child: Container(color: Colors.black.withValues(alpha: 0.26))),
+          IgnorePointer(child: Container(color: Colors.black.withValues(alpha: 0.22))),
         // Bottom veil so the sheet edge blends into the map.
         IgnorePointer(
           child: Container(
@@ -912,7 +1059,226 @@ class _MapHeader extends StatelessWidget {
             ),
           ),
         ),
+        // Live-tracking pill (top inline-start), only while active.
+        if (isLive)
+          PositionedDirectional(
+            top: 54,
+            start: 16,
+            child: _LiveTrackingPill(label: context.s.mapLiveTracking),
+          ),
+        // "My location" FAB (bottom inline-end) — recenters on the user's GPS.
+        PositionedDirectional(
+          end: 16,
+          bottom: 42,
+          child: _DirectionsFab(busy: _locating, onTap: _locateMe),
+        ),
       ],
+    );
+  }
+}
+
+/// Gradient teardrop customer pin (design 05-map §1 layer 6).
+class _CustomerTeardrop extends StatelessWidget {
+  final Gradient gradient;
+  const _CustomerTeardrop({required this.gradient});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            gradient: gradient,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 3),
+            boxShadow: const [
+              BoxShadow(color: Color(0x730B1240), blurRadius: 14, offset: Offset(0, 6)),
+            ],
+          ),
+          child: const Icon(Symbols.business, size: 22, fill: 1, color: Colors.white),
+        ),
+        Transform.translate(
+          offset: const Offset(0, -1),
+          child: Container(width: 2, height: 10, color: Colors.white),
+        ),
+      ],
+    );
+  }
+}
+
+/// The crisp GPS core dot, breathing 1→1.18→1 (design 05-map §1 layer 7).
+class _GpsCore extends StatelessWidget {
+  final AnimationController controller;
+  final Color color;
+  const _GpsCore({required this.controller, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (_, __) {
+        final breathe = 1 + 0.18 * math.sin(controller.value * 2 * math.pi).abs();
+        return Center(
+          child: Transform.scale(
+            scale: breathe,
+            child: Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 3),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x59000000), blurRadius: 8, offset: Offset(0, 2)),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Two expanding pulse rings around the GPS dot (design 05-map §3).
+class _PulseRings extends StatelessWidget {
+  final AnimationController controller;
+  final Color color;
+  const _PulseRings({required this.controller, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (_, __) => CustomPaint(
+        size: const Size(100, 100),
+        painter: _PulsePainter(t: controller.value, color: color),
+      ),
+    );
+  }
+}
+
+class _PulsePainter extends CustomPainter {
+  final double t;
+  final Color color;
+  _PulsePainter({required this.t, required this.color});
+
+  static const double _ringBase = 11;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centre = Offset(size.width / 2, size.height / 2);
+    _ring(canvas, centre, t: t, fromScale: .55, toScale: 2.4, fromOpacity: .55, fadeBy: .70);
+    _ring(canvas, centre,
+        t: (t + .30) % 1.0, fromScale: .55, toScale: 3.1, fromOpacity: .35, fadeBy: .80);
+  }
+
+  void _ring(Canvas canvas, Offset centre,
+      {required double t,
+      required double fromScale,
+      required double toScale,
+      required double fromOpacity,
+      required double fadeBy}) {
+    final eased = 1 - math.pow(1 - t, 2).toDouble();
+    final scale = fromScale + (toScale - fromScale) * eased;
+    final opacity = t >= fadeBy ? 0.0 : fromOpacity * (1 - t / fadeBy);
+    if (opacity <= 0) return;
+    canvas.drawCircle(centre, _ringBase * scale, Paint()..color = color.withValues(alpha: opacity));
+  }
+
+  @override
+  bool shouldRepaint(_PulsePainter old) => old.t != t || old.color != color;
+}
+
+/// Frosted "live tracking" pill (design 05-map §1 layer 8).
+class _LiveTrackingPill extends StatelessWidget {
+  final String label;
+  const _LiveTrackingPill({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 30,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: const Color(0x8C0A0B0F),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(color: Color(0xFF4ADE80), shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 7),
+          Text(label,
+              style: const TextStyle(
+                  color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Directions FAB (design 05-map §1 layer 9).
+/// Floating "my location" button — recenters the map on the user's GPS.
+class _DirectionsFab extends StatelessWidget {
+  final VoidCallback onTap;
+  final bool busy;
+  const _DirectionsFab({required this.onTap, this.busy = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final x = context.x;
+    return Material(
+      color: cs.surfaceContainerLowest,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: busy ? null : onTap,
+        child: Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: x.elev2,
+            color: cs.surfaceContainerLowest,
+          ),
+          child: busy
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2.4, color: cs.primary),
+                )
+              : Icon(Symbols.my_location, fill: 1, size: 24, color: cs.primary),
+        ),
+      ),
+    );
+  }
+}
+
+/// Blue "my location" dot dropped after tapping the locate FAB.
+class _MyLocationDot extends StatelessWidget {
+  const _MyLocationDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF2563EB),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 3),
+        boxShadow: const [
+          BoxShadow(color: Color(0x552563EB), blurRadius: 8, offset: Offset(0, 2)),
+        ],
+      ),
     );
   }
 }
@@ -920,15 +1286,13 @@ class _MapHeader extends StatelessWidget {
 class _Pin extends StatelessWidget {
   final IconData icon;
   final Color? color;
-  final Gradient? gradient;
-  const _Pin({required this.icon, this.color, this.gradient});
+  const _Pin({required this.icon, this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: color,
-        gradient: gradient,
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white, width: 2.5),
         boxShadow: [
@@ -967,6 +1331,1018 @@ class _FloatingChip extends StatelessWidget {
           ),
           child: Icon(icon, size: 20, color: tint ?? cs.onSurfaceVariant),
         ),
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  Employee (field-rep) detail widgets — design screens 11/12.
+// ════════════════════════════════════════════════════════════════════════
+
+/// Resolves a visit onto the design's 5 visual statuses (label + tone + icon).
+({String label, Color tone, IconData? icon, bool dot}) _empStatusMeta(
+    BuildContext context, Visit v) {
+  final cs = context.colors;
+  final x = context.x;
+  if (v.state == VisitStateType.checkedIn) {
+    return (label: context.s.statusActive, tone: x.success, icon: null, dot: true);
+  }
+  switch (v.lifecycleState) {
+    case VisitLifecycleState.done:
+      return (label: context.s.visitStateDone, tone: x.info, icon: Symbols.verified, dot: false);
+    case VisitLifecycleState.underReview:
+      return (label: context.s.statusReview, tone: x.warning, icon: Symbols.pending, dot: false);
+    case VisitLifecycleState.cancel:
+      return (label: context.s.statusRejected, tone: cs.error, icon: Symbols.cancel, dot: false);
+    case VisitLifecycleState.draft:
+    case VisitLifecycleState.submit:
+    case VisitLifecycleState.unknown:
+      if (v.state == VisitStateType.checkedOut) {
+        return (label: context.s.statusReview, tone: x.warning, icon: Symbols.pending, dot: false);
+      }
+      return (label: context.s.statusScheduled, tone: cs.primary, icon: Symbols.schedule, dot: false);
+  }
+}
+
+Widget _statusBadge(BuildContext context, Visit v) {
+  final m = _empStatusMeta(context, v);
+  return Container(
+    height: 26,
+    padding: const EdgeInsets.symmetric(horizontal: 11),
+    decoration: BoxDecoration(
+      color: m.tone.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (m.dot)
+          Container(
+            width: 8,
+            height: 8,
+            margin: const EdgeInsetsDirectional.only(end: 6),
+            decoration: BoxDecoration(color: m.tone, shape: BoxShape.circle),
+          ),
+        if (m.icon != null)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 5),
+            child: Icon(m.icon, fill: 1, size: 15, color: m.tone),
+          ),
+        Text(m.label,
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: m.tone)),
+      ],
+    ),
+  );
+}
+
+/// Identity card: 56px gradient tile + customer name + VIS·type meta + badge.
+class _EmpIdentityCard extends StatelessWidget {
+  final Visit visit;
+  const _EmpIdentityCard({required this.visit});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final x = context.x;
+    return AppCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: x.avatarGradient,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: x.elev1,
+            ),
+            child: const Icon(Symbols.business, fill: 1, size: 26, color: Colors.white),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  visit.customerName ?? visit.name ?? '#${visit.id}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 18,
+                    height: 1.2,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                    color: cs.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Text(
+                          // The backend reuses the customer name as the event
+                          // name, so derive a stable visit reference from the id.
+                          'VIS/${visit.id.toString().padLeft(5, '0')}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600, color: x.textTertiary),
+                        ),
+                      ),
+                    ),
+                    if (visit.visitTypeName != null) ...[
+                      const SizedBox(width: 7),
+                      Container(
+                          width: 3,
+                          height: 3,
+                          decoration: BoxDecoration(color: cs.outline, shape: BoxShape.circle)),
+                      const SizedBox(width: 7),
+                      Flexible(
+                        child: Text(
+                          visit.visitTypeName!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w700, color: x.accentHover),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          _statusBadge(context, visit),
+        ],
+      ),
+    );
+  }
+}
+
+/// Address row: location icon + address text + a circular call button.
+class _EmpAddressRow extends StatelessWidget {
+  final Visit visit;
+  const _EmpAddressRow({required this.visit});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final x = context.x;
+    final address = visit.customerAddress?.trim();
+    final phone = visit.customerPhone?.trim();
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Icon(Symbols.location_on, fill: 1, size: 20, color: cs.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              (address != null && address.isNotEmpty)
+                  ? address
+                  : '${visit.customerLatitude?.toStringAsFixed(4) ?? ''}, '
+                      '${visit.customerLongitude?.toStringAsFixed(4) ?? ''}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface),
+            ),
+          ),
+          if (phone != null && phone.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: () => Communications.dial(phone),
+              borderRadius: BorderRadius.circular(999),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainer,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: x.outlineVariant),
+                ),
+                child: Icon(Symbols.call, size: 19, color: cs.onSurfaceVariant),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// "موعد الزيارة" tile — scheduled time.
+class _EmpScheduleTile extends StatelessWidget {
+  final Visit visit;
+  const _EmpScheduleTile({required this.visit});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final x = context.x;
+    final time = visit.visitDate != null ? DateFormat('HH:mm').format(visit.visitDate!) : '—';
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      child: Row(
+        children: [
+          Icon(Symbols.schedule, fill: 1, size: 20, color: x.textTertiary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(context.s.visitDetailScheduledTimeLabel,
+                style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant)),
+          ),
+          Text(
+            time,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: cs.onSurface,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Range strip — green when in range, amber when out, neutral while locating.
+class _EmpRangeStrip extends StatelessWidget {
+  final double? distance;
+  final double radius;
+  final bool? inRange;
+  const _EmpRangeStrip({required this.distance, required this.radius, required this.inRange});
+
+  @override
+  Widget build(BuildContext context) {
+    final x = context.x;
+    final cs = context.colors;
+    // Locating (no fix yet) → neutral surface tone.
+    if (inRange == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainer,
+          borderRadius: BorderRadius.circular(Radii.md),
+        ),
+        child: Row(
+          children: [
+            Icon(Symbols.my_location, fill: 1, size: 20, color: x.textTertiary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(context.s.visitDetailCheckInLocatingSub,
+                  style: TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant)),
+            ),
+          ],
+        ),
+      );
+    }
+    final ok = inRange!;
+    final tone = ok ? x.success : x.warning;
+    final container = ok ? x.successContainer : x.warningContainer;
+    final onContainer = ok ? x.onSuccessContainer : x.onWarningContainer;
+    final dist = distance!.round();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: container,
+        borderRadius: BorderRadius.circular(Radii.md),
+        border: Border.all(color: tone.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(ok ? Symbols.my_location : Symbols.gpp_maybe, fill: 1, size: 20, color: tone),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  ok ? context.s.visitDetailInRange : context.s.visitDetailOutRange,
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: onContainer),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  context.s.visitDetailRangeMeta('$dist', '${radius.round()}'),
+                  style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600, color: onContainer.withValues(alpha: 0.85)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Big check-in CTA — navy when in range / locating, outlined override when out.
+class _EmpCheckInButton extends StatelessWidget {
+  final bool? inRange;
+  final bool busy;
+  final VoidCallback onPressed;
+  const _EmpCheckInButton({required this.inRange, required this.busy, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final x = context.x;
+    final outOfRange = inRange == false;
+    final sub = inRange == null
+        ? context.s.visitDetailCheckInLocatingSub
+        : context.s.visitDetailCheckInInRangeSub;
+
+    if (outOfRange) {
+      // Outlined override — checks in but the backend flags it.
+      return _BigFieldButton(
+        title: context.s.visitDetailCheckInOverride,
+        subtitle: null,
+        icon: Symbols.where_to_vote,
+        busy: busy,
+        onPressed: onPressed,
+        background: Colors.transparent,
+        foreground: cs.onSurfaceVariant,
+        border: x.outlineVariant,
+      );
+    }
+    return _BigFieldButton(
+      title: context.s.visitDetailCheckInTitle,
+      subtitle: sub,
+      icon: Symbols.login,
+      busy: busy,
+      onPressed: onPressed,
+      background: cs.primary,
+      foreground: cs.onPrimary,
+      glow: x.glowBrand,
+    );
+  }
+}
+
+/// Big check-out CTA — red, with the captured-location sub-label.
+class _EmpCheckOutButton extends StatelessWidget {
+  final Visit visit;
+  final bool busy;
+  final VoidCallback onPressed;
+  const _EmpCheckOutButton({required this.visit, required this.busy, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    return _BigFieldButton(
+      title: context.s.visitDetailCheckOutTitle,
+      subtitle: context.s.visitDetailCheckOutSub,
+      icon: Symbols.logout,
+      busy: busy,
+      onPressed: onPressed,
+      background: cs.error,
+      foreground: cs.onError,
+      glow: const [BoxShadow(color: Color(0x33C8364B), blurRadius: 20, offset: Offset(0, 8))],
+    );
+  }
+}
+
+/// Shared big field CTA (min-h 64, radius lg, icon chip + title + sub-label).
+class _BigFieldButton extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final IconData icon;
+  final bool busy;
+  final VoidCallback onPressed;
+  final Color background;
+  final Color foreground;
+  final Color? border;
+  final List<BoxShadow>? glow;
+  const _BigFieldButton({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.busy,
+    required this.onPressed,
+    required this.background,
+    required this.foreground,
+    this.border,
+    this.glow,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(Radii.lg),
+        boxShadow: glow,
+      ),
+      child: Material(
+        color: background,
+        borderRadius: BorderRadius.circular(Radii.lg),
+        child: InkWell(
+          onTap: busy ? null : onPressed,
+          borderRadius: BorderRadius.circular(Radii.lg),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 64),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(Radii.lg),
+              border: border != null ? Border.all(color: border!, width: 1.5) : null,
+            ),
+            child: busy
+                ? Center(
+                    child: SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.4, color: foreground),
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, fill: 1, size: 26, color: foreground),
+                      const SizedBox(width: 12),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(title,
+                              style: TextStyle(
+                                  fontSize: 15.5, fontWeight: FontWeight.w800, color: foreground)),
+                          if (subtitle != null) ...[
+                            const SizedBox(height: 2),
+                            Text(subtitle!,
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: foreground.withValues(alpha: 0.85))),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Live elapsed card — ticking HH:MM:SS while the visit is active.
+class _EmpLiveElapsedCard extends StatefulWidget {
+  final Visit visit;
+  final DateTime Function(DateTime) toUserTime;
+  const _EmpLiveElapsedCard({required this.visit, required this.toUserTime});
+
+  @override
+  State<_EmpLiveElapsedCard> createState() => _EmpLiveElapsedCardState();
+}
+
+class _EmpLiveElapsedCardState extends State<_EmpLiveElapsedCard> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final x = context.x;
+    final start = widget.visit.checkInTime;
+    final elapsed = start != null ? DateTime.now().toUtc().difference(start.toUtc()) : Duration.zero;
+    final h = elapsed.inHours.toString().padLeft(2, '0');
+    final m = elapsed.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = elapsed.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final arrival = start != null ? DateFormat('HH:mm').format(widget.toUserTime(start)) : '—';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(Radii.xl),
+        border: Border.all(color: x.success.withValues(alpha: 0.32)),
+        boxShadow: [...x.glowSuccess, ...x.elev1],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(color: x.success, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 7),
+              Text(context.s.visitDetailElapsedLabel,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: x.success)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '$h:$m:$s',
+            style: TextStyle(
+              fontSize: 46,
+              height: 1.1,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.4,
+              color: x.success,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            context.s.visitDetailStartedAt(arrival),
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Amber "sent for review" banner shown once a field visit is checked out.
+/// Two summary tiles on a finished visit (design screen 06): the on-time /
+/// flagged status + the visit duration.
+class _EmpDurationTiles extends StatelessWidget {
+  final Visit visit;
+  const _EmpDurationTiles({required this.visit});
+
+  String _duration() {
+    var d = visit.visitDuration;
+    if (d == null && visit.checkInTime != null && visit.checkOutTime != null) {
+      d = visit.checkOutTime!.difference(visit.checkInTime!);
+    }
+    d ??= Duration.zero;
+    final h = d.inHours.toString().padLeft(2, '0');
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$h:$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final x = context.x;
+    final flagged = visit.checkInState == VisitRangeState.notInRange ||
+        visit.checkOutState == VisitRangeState.notInRange;
+    final tone = flagged ? x.warning : x.success;
+    final container = flagged ? x.warningContainer : x.successContainer;
+    final onContainer = flagged ? x.onWarningContainer : x.onSuccessContainer;
+
+    // Design order (RTL): duration tile on the inline-start (right), status
+    // tile on the inline-end (left).
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Duration tile (surface card).
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(Radii.lg),
+                border: Border.all(color: x.outlineVariant),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(context.s.visitDetailDurationLabel,
+                      style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600, color: x.textTertiary)),
+                  const SizedBox(height: 6),
+                  Text(
+                    _duration(),
+                    style: TextStyle(
+                      fontSize: 24,
+                      height: 1.1,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                      color: cs.onSurface,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Status tile (filled tone container).
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+              decoration: BoxDecoration(
+                color: container,
+                borderRadius: BorderRadius.circular(Radii.lg),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(flagged ? Symbols.gpp_maybe : Symbols.verified,
+                      fill: 1, size: 26, color: tone),
+                  const SizedBox(height: 8),
+                  Text(
+                    flagged ? context.s.visitRangeOutOfRange : context.s.visitDetailOnTime,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w800, color: onContainer),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmpReviewBanner extends StatelessWidget {
+  final Visit visit;
+  const _EmpReviewBanner({required this.visit});
+
+  @override
+  Widget build(BuildContext context) {
+    final x = context.x;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: x.warningContainer,
+        borderRadius: BorderRadius.circular(Radii.md),
+        border: Border.all(color: x.warning.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(Symbols.hourglass_top, fill: 1, size: 20, color: x.warning),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              context.s.affordanceReview,
+              style: TextStyle(
+                  fontSize: 13.5, fontWeight: FontWeight.w700, color: x.onWarningContainer),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Report summary card shown on a finished visit (design screen 06 §7):
+/// `fact_check` header + the outcome chip + the field rep's notes. The check-out
+/// stores the report as `outcome — notes` in the description, so we split it
+/// back out here.
+class _EmpReportCard extends StatelessWidget {
+  final Visit visit;
+  const _EmpReportCard({required this.visit});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final x = context.x;
+    final raw = (visit.description ?? '').trim();
+
+    final doneL = context.s.reportOutcomeDone;
+    final postL = context.s.reportOutcomePostponed;
+    final absL = context.s.reportOutcomeAbsent;
+
+    String? outcome;
+    String notes = raw;
+    for (final l in [doneL, postL, absL]) {
+      if (raw == l) {
+        outcome = l;
+        notes = '';
+        break;
+      }
+      if (raw.startsWith(l)) {
+        outcome = l;
+        notes = raw.substring(l.length).replaceFirst(RegExp(r'^[\s—–-]+'), '').trim();
+        break;
+      }
+    }
+
+    final (Color tone, IconData icon) = outcome == doneL
+        ? (x.success, Symbols.task_alt)
+        : outcome == postL
+            ? (x.warning, Symbols.event_repeat)
+            : outcome == absL
+                ? (cs.error, Symbols.person_off)
+                : (cs.primary, Symbols.fact_check);
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Symbols.fact_check, fill: 1, size: 18, color: cs.primary),
+              const SizedBox(width: 8),
+              Text(context.s.reportTitle,
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: cs.onSurface)),
+            ],
+          ),
+          if (outcome != null) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                decoration: BoxDecoration(
+                  color: tone.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, fill: 1, size: 16, color: tone),
+                    const SizedBox(width: 6),
+                    Text(outcome,
+                        style: TextStyle(
+                            fontSize: 12.5, fontWeight: FontWeight.w700, color: tone)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (notes.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(notes,
+                style: TextStyle(
+                    fontSize: 14, height: 1.5, color: cs.onSurfaceVariant)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Timeline card "التوقيتات والمواقع": created → check-in → check-out.
+class _EmpTimeline extends StatelessWidget {
+  final Visit visit;
+  final DateTime Function(DateTime) toUserTime;
+  const _EmpTimeline({required this.visit, required this.toUserTime});
+
+  @override
+  Widget build(BuildContext context) {
+    final x = context.x;
+    final cs = context.colors;
+    final fmt = DateFormat('HH:mm');
+    final createdTime = visit.visitDate != null ? fmt.format(visit.visitDate!) : null;
+    final inTime = visit.checkInTime != null ? fmt.format(toUserTime(visit.checkInTime!)) : null;
+    final outTime = visit.checkOutTime != null ? fmt.format(toUserTime(visit.checkOutTime!)) : null;
+    String? coords(double? lat, double? lng) =>
+        (lat != null && lng != null) ? '${lat.toStringAsFixed(4)}° N, ${lng.toStringAsFixed(4)}° E' : null;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Symbols.timeline, size: 18, color: cs.primary),
+              const SizedBox(width: 8),
+              Text(context.s.visitDetailTimelineLocationsSection,
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: cs.onSurface)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _EmpTimelineRow(
+            icon: Symbols.event_available,
+            title: context.s.timelineCreated,
+            time: createdTime,
+            done: true,
+            tone: x.success,
+          ),
+          const _EmpTimelineGap(),
+          _EmpTimelineRow(
+            icon: Symbols.login,
+            title: context.s.timelineCheckIn,
+            time: inTime,
+            coords: coords(visit.checkInLat, visit.checkInLng),
+            done: visit.checkInTime != null,
+            tone: cs.tertiary,
+          ),
+          const _EmpTimelineGap(),
+          _EmpTimelineRow(
+            icon: Symbols.logout,
+            title: context.s.timelineCheckOut,
+            time: outTime,
+            coords: coords(visit.checkOutLat, visit.checkOutLng),
+            done: visit.checkOutTime != null,
+            tone: cs.error,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmpTimelineGap extends StatelessWidget {
+  const _EmpTimelineGap();
+  @override
+  Widget build(BuildContext context) =>
+      Divider(height: 22, color: context.x.divider);
+}
+
+class _EmpTimelineRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? time;
+  final String? coords;
+  final bool done;
+  final Color tone;
+  const _EmpTimelineRow({
+    required this.icon,
+    required this.title,
+    required this.time,
+    this.coords,
+    required this.done,
+    required this.tone,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final x = context.x;
+    final activeTone = done ? tone : x.textDisabled;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: activeTone.withValues(alpha: 0.14),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(done ? Symbols.check : icon, fill: 1, size: 17, color: activeTone),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(title,
+                  style: TextStyle(
+                      fontSize: 13.5, fontWeight: FontWeight.w700, color: cs.onSurface)),
+              if (coords != null) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Text(coords!,
+                            style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                                color: x.textTertiary,
+                                fontFeatures: const [FontFeature.tabularFigures()])),
+                      ),
+                      const SizedBox(width: 5),
+                      Icon(Symbols.where_to_vote, fill: 1, size: 13, color: x.success),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          time ?? '—',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: time != null ? cs.onSurface : x.textDisabled,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Two meta tiles at the foot: visit date + field employee.
+class _EmpMetaTiles extends StatelessWidget {
+  final Visit visit;
+  const _EmpMetaTiles({required this.visit});
+
+  @override
+  Widget build(BuildContext context) {
+    final dateText = visit.visitDate != null
+        ? DateFormat('yyyy-MM-dd').format(visit.visitDate!)
+        : (visit.effectiveDate != null
+            ? DateFormat('yyyy-MM-dd').format(visit.effectiveDate!)
+            : '—');
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+        Expanded(
+          child: _EmpMetaTile(
+            icon: Symbols.event,
+            label: context.s.visitDetailVisitDate,
+            value: dateText,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _EmpMetaTile(
+            avatarInitial:
+                (visit.employeeName?.trim().isNotEmpty ?? false) ? visit.employeeName!.trim()[0] : '?',
+            label: context.s.createVisitSectionEmployee,
+            value: visit.employeeName ?? '—',
+          ),
+        ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmpMetaTile extends StatelessWidget {
+  final IconData? icon;
+  final String? avatarInitial;
+  final String label;
+  final String value;
+  const _EmpMetaTile({this.icon, this.avatarInitial, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final x = context.x;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(Radii.lg),
+        border: Border.all(color: x.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          if (icon != null)
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: cs.surfaceContainer,
+                borderRadius: BorderRadius.circular(Radii.sm),
+              ),
+              child: Icon(icon, size: 20, color: cs.onSurfaceVariant),
+            )
+          else
+            Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(gradient: x.avatarGradient, shape: BoxShape.circle),
+              child: Text(avatarInitial ?? '?',
+                  style: const TextStyle(
+                      color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+            ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.w600, color: x.textTertiary)),
+                const SizedBox(height: 2),
+                Text(value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 13.5, fontWeight: FontWeight.w800, color: cs.onSurface)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1600,47 +2976,6 @@ class _CustomerLocationBlock extends StatelessWidget {
   }
 }
 
-class _TimelineBlock extends StatelessWidget {
-  final Visit visit;
-  const _TimelineBlock({required this.visit});
-
-  @override
-  Widget build(BuildContext context) {
-    final fmt = DateFormat('HH:mm');
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionLabel(label: context.s.visitDetailTimelineSection),
-          const SizedBox(height: 8),
-          if (visit.checkInTime != null)
-            InfoRow(
-              icon: Icons.login_rounded,
-              text:
-                  '${context.s.timelineCheckIn}: ${fmt.format(context.toUserTime(visit.checkInTime!))}',
-            ),
-          if (visit.checkOutTime != null) ...[
-            const SizedBox(height: 4),
-            InfoRow(
-              icon: Icons.logout_rounded,
-              text:
-                  '${context.s.timelineCheckOut}: ${fmt.format(context.toUserTime(visit.checkOutTime!))}',
-            ),
-          ],
-          if (visit.durationMinutes != null) ...[
-            const SizedBox(height: 4),
-            InfoRow(
-              icon: Icons.schedule_rounded,
-              text: context.s.timelineDuration(
-                  visit.durationMinutes!.toString()),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 class _NotesBlock extends StatelessWidget {
   final Visit visit;
   final TextEditingController controller;
@@ -1733,47 +3068,24 @@ class _DetailSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A Column (not ListView) — this sits inside the detail page's
+    // SingleChildScrollView, which would give a ListView unbounded height.
     return AppShimmer(
-      child: ListView(
+      child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        children: const [
-          SkeletonCard(height: 80),
-          SizedBox(height: 14),
-          SkeletonCard(height: 180),
-          SizedBox(height: 14),
-          SkeletonCard(height: 140),
-          SizedBox(height: 14),
-          SkeletonCard(height: 110),
-          SizedBox(height: 14),
-          SkeletonCard(height: 90),
-        ],
-      ),
-    );
-  }
-}
-
-class _HintRow extends StatelessWidget {
-  final String text;
-  const _HintRow({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-      child: Row(
-        children: [
-          Icon(Icons.info_outline,
-              size: 14, color: context.colors.onSurfaceVariant),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              text,
-              style: context.text.bodySmall?.copyWith(
-                color: context.colors.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
+        child: Column(
+          children: const [
+            SkeletonCard(height: 80),
+            SizedBox(height: 14),
+            SkeletonCard(height: 180),
+            SizedBox(height: 14),
+            SkeletonCard(height: 140),
+            SizedBox(height: 14),
+            SkeletonCard(height: 110),
+            SizedBox(height: 14),
+            SkeletonCard(height: 90),
+          ],
+        ),
       ),
     );
   }

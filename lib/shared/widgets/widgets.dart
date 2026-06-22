@@ -4,6 +4,7 @@ export 'app_card.dart';
 export 'app_refresh_indicator.dart';
 export 'app_text_field.dart';
 export 'confirm_dialog.dart';
+export 'cv_sub_app_bar.dart';
 export 'count_up_text.dart';
 export 'empty_view.dart';
 export 'greeting_header.dart';

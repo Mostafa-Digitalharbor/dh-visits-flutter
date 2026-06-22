@@ -52,7 +52,11 @@ class _ReviewPageState extends State<ReviewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(context.s.reviewTitle)),
+      appBar: CvSubAppBar(
+        title: context.s.reviewTitle,
+        eyebrow: context.s.roleManagerTitle,
+        topInset: MediaQuery.paddingOf(context).top,
+      ),
       body: BlocBuilder<VisitsListBloc, VisitsListState>(
         builder: (context, state) {
           final pending = state.items

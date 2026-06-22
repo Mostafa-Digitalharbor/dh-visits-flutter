@@ -8,15 +8,23 @@ import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../auth/bloc/auth_bloc.dart';
 
-/// Settings — profile card + grouped cards (appearance, language) + logout.
-/// Matches design screen 07.
+/// Displayed app version (design screen 07 → "حول التطبيق").
+const _appVersion = '1.0.0';
+
+/// Settings — profile card + grouped cards (account, appearance, language,
+/// sync/help/about) + logout. Matches design screen 07/14.
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final isManager = context.watch<AuthBloc>().state.user?.canEditVisits ?? false;
     return Scaffold(
-      appBar: AppBar(title: Text(context.s.settingsTitle)),
+      appBar: CvSubAppBar(
+        title: context.s.settingsTitle,
+        eyebrow: isManager ? context.s.roleManagerTitle : context.s.roleEmployeeTitle,
+        topInset: MediaQuery.paddingOf(context).top,
+      ),
       body: const SettingsView(),
     );
   }
@@ -39,6 +47,21 @@ class SettingsView extends StatelessWidget {
     }
   }
 
+  void _comingSoon(BuildContext context) =>
+      context.showSnack(context.s.settingsComingSoon);
+
+  void _onSyncNow(BuildContext context) =>
+      context.showSnack(context.s.settingsSynced, kind: SnackKind.success);
+
+  void _onAbout(BuildContext context) {
+    showAboutDialog(
+      context: context,
+      applicationName: 'Customer Visits',
+      applicationVersion: _appVersion,
+      applicationLegalese: '© 2026 Digital Harbor',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthBloc>().state.user;
@@ -48,7 +71,30 @@ class SettingsView extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: [
               if (user != null)
-                _ProfileCard(name: user.displayName, isManager: user.canEditVisits),
+                _ProfileCard(
+                  name: user.displayName,
+                  login: user.username,
+                  isManager: user.canEditVisits,
+                ),
+              const SizedBox(height: 18),
+              // ── الحساب ──────────────────────────────────────────────────
+              _GroupLabel(context.s.settingsAccount),
+              _GroupCard(children: [
+                _NavRow(
+                  icon: Symbols.manage_accounts,
+                  label: context.s.settingsEditProfile,
+                  onTap: () => _comingSoon(context),
+                ),
+                const _RowDivider(),
+                _SwitchRow(
+                  icon: Symbols.notifications,
+                  label: context.s.settingsNotifications,
+                  subtitle: context.s.settingsNotificationsSub,
+                  value: state.notifications,
+                  onChanged: (v) =>
+                      context.read<SettingsCubit>().setNotifications(v),
+                ),
+              ]),
               const SizedBox(height: 18),
               _GroupLabel(context.s.themeMode),
               _GroupCard(children: [
@@ -90,12 +136,33 @@ class SettingsView extends StatelessWidget {
                   onTap: () => context.read<SettingsCubit>().setLocale(const Locale('en')),
                 ),
               ]),
+              const SizedBox(height: 18),
+              // ── المزامنة / المساعدة / حول التطبيق ───────────────────────
+              _GroupCard(children: [
+                _SyncRow(
+                  subtitle: context.s.settingsSyncedJustNow,
+                  onSync: () => _onSyncNow(context),
+                ),
+                const _RowDivider(),
+                _NavRow(
+                  icon: Symbols.help,
+                  label: context.s.settingsHelp,
+                  onTap: () => _comingSoon(context),
+                ),
+                const _RowDivider(),
+                _NavRow(
+                  icon: Symbols.info,
+                  label: context.s.settingsAbout,
+                  subtitle: '${context.s.settingsVersion} $_appVersion',
+                  onTap: () => _onAbout(context),
+                ),
+              ]),
               const SizedBox(height: 24),
               _LogoutButton(onTap: () => _onLogoutTap(context)),
               const SizedBox(height: 18),
               Center(
                 child: Text(
-                  'Customer Visits · Digital Harbor',
+                  'Customer Visits · Digital Harbor © 2026',
                   style: AppType.bodySm.copyWith(color: context.x.textTertiary),
                 ),
               ),
@@ -108,8 +175,9 @@ class SettingsView extends StatelessWidget {
 
 class _ProfileCard extends StatelessWidget {
   final String name;
+  final String login;
   final bool isManager;
-  const _ProfileCard({required this.name, required this.isManager});
+  const _ProfileCard({required this.name, required this.login, required this.isManager});
 
   @override
   Widget build(BuildContext context) {
@@ -119,18 +187,36 @@ class _ProfileCard extends StatelessWidget {
     return AppCard(
       child: Row(
         children: [
-          Container(
-            width: 64,
-            height: 64,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              gradient: x.avatarGradient,
-              shape: BoxShape.circle,
-              boxShadow: x.elev1,
-            ),
-            child: Text(initial,
-                style: const TextStyle(
-                    color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+          Stack(
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: x.avatarGradient,
+                  shape: BoxShape.circle,
+                  boxShadow: x.elev1,
+                ),
+                child: Text(initial,
+                    style: const TextStyle(
+                        color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+              ),
+              // Online presence dot (bottom inline-start), 2px surface border.
+              PositionedDirectional(
+                start: 2,
+                bottom: 2,
+                child: Container(
+                  width: 15,
+                  height: 15,
+                  decoration: BoxDecoration(
+                    color: x.success,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: cs.surfaceContainerLowest, width: 2),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -139,6 +225,12 @@ class _ProfileCard extends StatelessWidget {
               children: [
                 Text(name,
                     style: AppType.titleLg.copyWith(fontWeight: FontWeight.w800, color: cs.onSurface)),
+                const SizedBox(height: 2),
+                Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: Text(login,
+                      style: AppType.bodySm.copyWith(color: cs.onSurfaceVariant)),
+                ),
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -223,6 +315,82 @@ class _OptionRow extends StatelessWidget {
       trailing: selected
           ? Icon(Symbols.check_circle, fill: 1, color: cs.primary)
           : Icon(Symbols.radio_button_unchecked, color: context.x.textDisabled),
+    );
+  }
+}
+
+/// A tappable row that navigates / triggers an action (icon + title + optional
+/// subtitle + a direction-aware chevron).
+class _NavRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String? subtitle;
+  final VoidCallback onTap;
+  const _NavRow({required this.icon, required this.label, this.subtitle, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    return ListTile(
+      onTap: onTap,
+      leading: Icon(icon, color: cs.onSurfaceVariant),
+      title: Text(label, style: AppType.titleSm.copyWith(color: cs.onSurface)),
+      subtitle: subtitle != null
+          ? Text(subtitle!, style: AppType.bodySm.copyWith(color: context.x.textTertiary))
+          : null,
+      trailing: Icon(
+        context.isRtl ? Symbols.chevron_left : Symbols.chevron_right,
+        color: context.x.textDisabled,
+      ),
+    );
+  }
+}
+
+/// Row with a trailing [Switch] (notifications toggle).
+class _SwitchRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  const _SwitchRow({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    return ListTile(
+      onTap: () => onChanged(!value),
+      leading: Icon(icon, color: cs.onSurfaceVariant),
+      title: Text(label, style: AppType.titleSm.copyWith(color: cs.onSurface)),
+      subtitle: Text(subtitle, style: AppType.bodySm.copyWith(color: context.x.textTertiary)),
+      trailing: Switch(value: value, onChanged: onChanged),
+    );
+  }
+}
+
+/// "آخر مزامنة" row — last-sync sub-text + a "مزامنة الآن" action.
+class _SyncRow extends StatelessWidget {
+  final String subtitle;
+  final VoidCallback onSync;
+  const _SyncRow({required this.subtitle, required this.onSync});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    return ListTile(
+      leading: Icon(Symbols.sync, color: cs.onSurfaceVariant),
+      title: Text(context.s.settingsLastSync, style: AppType.titleSm.copyWith(color: cs.onSurface)),
+      subtitle: Text(subtitle, style: AppType.bodySm.copyWith(color: context.x.textTertiary)),
+      trailing: TextButton(
+        onPressed: onSync,
+        child: Text(context.s.settingsSyncNow),
+      ),
     );
   }
 }

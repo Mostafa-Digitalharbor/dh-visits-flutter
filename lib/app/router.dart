@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/config/server_config_cubit.dart';
 import '../l10n/generated/app_localizations.dart';
+import '../shared/widgets/widgets.dart';
 import '../features/auth/bloc/auth_bloc.dart';
 import '../features/auth/view/login_page.dart';
 import '../features/auth/view/splash_page.dart';
@@ -41,8 +42,10 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
       }
       if (status == AuthStatus.unauthenticated ||
           status == AuthStatus.authenticating) {
-        // Allow /setup too so the user can step back and change the server.
-        return (loc == '/login' || loc == '/setup') ? null : '/login';
+        // On launch, land on the server screen first (it then continues to
+        // /login). /login stays reachable so we don't bounce off it once the
+        // user has moved on from setup.
+        return (loc == '/login' || loc == '/setup') ? null : '/setup';
       }
       // Note: /setup is intentionally excluded here. While the user is changing
       // the server we clear their session, and we don't want a stale
@@ -90,7 +93,11 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
           state,
           Builder(
             builder: (context) => Scaffold(
-              appBar: AppBar(title: Text(AppLocalizations.of(context).customersTitle)),
+              appBar: CvSubAppBar(
+                title: AppLocalizations.of(context).customersTitle,
+                eyebrow: AppLocalizations.of(context).roleManagerTitle,
+                topInset: MediaQuery.paddingOf(context).top,
+              ),
               body: const CustomersListPage(),
             ),
           ),

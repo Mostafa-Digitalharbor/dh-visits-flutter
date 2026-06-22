@@ -7,22 +7,25 @@ import 'settings_repository.dart';
 class SettingsState extends Equatable {
   final ThemeMode themeMode;
   final Locale locale;
+  final bool notifications;
 
   const SettingsState({
     required this.themeMode,
     required this.locale,
+    this.notifications = true,
   });
 
   static const defaultLocale = Locale('ar');
 
-  SettingsState copyWith({ThemeMode? themeMode, Locale? locale}) =>
+  SettingsState copyWith({ThemeMode? themeMode, Locale? locale, bool? notifications}) =>
       SettingsState(
         themeMode: themeMode ?? this.themeMode,
         locale: locale ?? this.locale,
+        notifications: notifications ?? this.notifications,
       );
 
   @override
-  List<Object?> get props => [themeMode, locale];
+  List<Object?> get props => [themeMode, locale, notifications];
 }
 
 class SettingsCubit extends Cubit<SettingsState> {
@@ -34,7 +37,16 @@ class SettingsCubit extends Cubit<SettingsState> {
   static SettingsState _initial(SettingsRepository repo) {
     final mode = _parseThemeMode(repo.readThemeMode());
     final locale = _parseLocale(repo.readLocale());
-    return SettingsState(themeMode: mode, locale: locale);
+    return SettingsState(
+      themeMode: mode,
+      locale: locale,
+      notifications: repo.readNotifications(),
+    );
+  }
+
+  Future<void> setNotifications(bool value) async {
+    await repository.writeNotifications(value);
+    emit(state.copyWith(notifications: value));
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {

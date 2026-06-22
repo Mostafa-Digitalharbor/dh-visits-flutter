@@ -149,6 +149,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginSubmit => 'Sign in';
 
   @override
+  String get loginRememberMe => 'Remember me';
+
+  @override
+  String get loginForgotPassword => 'Forgot password?';
+
+  @override
+  String get loginSecureFooter => 'Secure sign-in · Digital Harbor';
+
+  @override
   String get errInvalidCredentials => 'Invalid credentials';
 
   @override
@@ -207,6 +216,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get customersEmpty => 'No customers found';
 
   @override
+  String get customersStatTotal => 'Total customers';
+
+  @override
+  String get customersStatActive => 'Active customers';
+
+  @override
   String get customerDetailTitle => 'Customer details';
 
   @override
@@ -257,6 +272,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get visitLiveIndicator => 'Live';
+
+  @override
+  String get mapLiveTracking => 'Live tracking';
 
   @override
   String get visitNotesLabel => 'Notes (optional)';
@@ -559,6 +577,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get roleUser => 'Field employee';
 
   @override
+  String get roleManagerTitle => 'Team manager';
+
+  @override
+  String get roleEmployeeTitle => 'Field rep';
+
+  @override
   String get visitsHistoryActiveBadge => 'Active now';
 
   @override
@@ -769,6 +793,73 @@ class AppLocalizationsEn extends AppLocalizations {
   String get visitRangeOutOfRange => 'Out of range';
 
   @override
+  String get statusScheduled => 'Scheduled';
+
+  @override
+  String get statusActive => 'Active now';
+
+  @override
+  String get statusReview => 'Pending review';
+
+  @override
+  String get statusApproved => 'Approved';
+
+  @override
+  String get statusRejected => 'Rejected';
+
+  @override
+  String get visitDetailScheduledTimeLabel => 'Visit time';
+
+  @override
+  String get visitDetailInRange => 'You\'re within the customer\'s range';
+
+  @override
+  String get visitDetailOutRange => 'You\'re outside the customer\'s range';
+
+  @override
+  String visitDetailRangeMeta(String distance, String radius) {
+    return '$distance m away · check-in range $radius m';
+  }
+
+  @override
+  String get visitDetailOutRangeHint => 'Move closer to start the visit';
+
+  @override
+  String get visitDetailCheckInTitle => 'Start the visit';
+
+  @override
+  String get visitDetailCheckInInRangeSub => 'You\'re in range';
+
+  @override
+  String get visitDetailCheckInLocatingSub => 'Locating you…';
+
+  @override
+  String get visitDetailCheckInOverride => 'Check in out of range';
+
+  @override
+  String get visitDetailElapsedLabel => 'Elapsed time';
+
+  @override
+  String visitDetailStartedAt(String time) {
+    return 'Started $time';
+  }
+
+  @override
+  String get visitDetailCheckOutTitle => 'End the visit';
+
+  @override
+  String get visitDetailCheckOutSub => 'Your location will be captured';
+
+  @override
+  String get visitDetailOnTime => 'Completed on time';
+
+  @override
+  String get visitDetailDurationLabel => 'Visit duration';
+
+  @override
+  String get timelineCreated => 'Visit created';
+
+  @override
   String get visitShowLocation => 'Show customer location';
 
   @override
@@ -901,6 +992,33 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsVersion => 'Version';
+
+  @override
+  String get settingsEditProfile => 'Edit profile';
+
+  @override
+  String get settingsNotifications => 'Notifications';
+
+  @override
+  String get settingsNotificationsSub => 'Visit alerts and reminders';
+
+  @override
+  String get settingsLastSync => 'Last sync';
+
+  @override
+  String get settingsSyncNow => 'Sync now';
+
+  @override
+  String get settingsSynced => 'Synced';
+
+  @override
+  String get settingsSyncedJustNow => 'Just now';
+
+  @override
+  String get settingsHelp => 'Help & support';
+
+  @override
+  String get settingsComingSoon => 'Coming soon';
 
   @override
   String get confirmLogoutTitle => 'Sign out';

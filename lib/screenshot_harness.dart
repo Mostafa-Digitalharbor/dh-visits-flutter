@@ -22,12 +22,15 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 
 import 'app/theme.dart';
+import 'core/config/server_config.dart';
+import 'core/config/server_config_cubit.dart';
 import 'core/settings/settings_cubit.dart';
 import 'core/settings/settings_repository.dart';
 import 'features/auth/bloc/auth_bloc.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/data/models/user.dart';
 import 'features/auth/view/login_page.dart';
+import 'features/server_config/view/server_setup_page.dart';
 import 'features/customers/bloc/customers_bloc.dart';
 import 'features/customers/data/customers_repository.dart';
 import 'features/customers/data/models/customer.dart';
@@ -44,6 +47,7 @@ import 'features/visits/view/report_sheet.dart';
 import 'features/visits/view/visit_detail_page.dart';
 import 'features/visits/view/visits_list_page.dart';
 import 'l10n/generated/app_localizations.dart';
+import 'shared/widgets/widgets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -141,6 +145,7 @@ final List<Visit> _visits = [
     customerAddress: 'شارع الهرم، الجيزة',
     customerPhone: '+20 109 999 8888',
     visitTypeName: 'متابعة',
+    description: 'تمّت بنجاح — تم عرض المنتجات على مسؤول المشتريات وتحصيل المستحقات المتأخرة.',
     visitDate: _now,
     checkInState: VisitRangeState.inRange,
     checkOutState: VisitRangeState.inRange,
@@ -365,6 +370,10 @@ class _FakeSettingsRepo implements SettingsRepository {
   @override
   Future<void> writeLocale(String value) async {}
   @override
+  bool readNotifications() => true;
+  @override
+  Future<void> writeNotifications(bool value) async {}
+  @override
   dynamic noSuchMethod(Invocation invocation) => null;
 }
 
@@ -392,6 +401,14 @@ class _FakeSettingsCubit extends SettingsCubit {
   _FakeSettingsCubit() : super(repository: _FakeSettingsRepo());
 }
 
+class _FakeServerConfigCubit extends Cubit<ServerConfig>
+    implements ServerConfigCubit {
+  _FakeServerConfigCubit()
+      : super(const ServerConfig(baseUrl: 'https://visits.harbor.eg'));
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
 // ─── Screen builders ─────────────────────────────────────────────────────────
 
 Widget _wrapScaffold(String title, Widget body) => Scaffold(
@@ -405,6 +422,15 @@ Widget _loginScreen() => MultiBlocProvider(
         BlocProvider<SettingsCubit>.value(value: _FakeSettingsCubit()),
       ],
       child: const LoginPage(),
+    );
+
+Widget _serverSetupScreen() => MultiBlocProvider(
+      providers: [
+        BlocProvider<AuthBloc>.value(value: _FakeAuthBloc(const AuthState.unauthenticated())),
+        BlocProvider<SettingsCubit>.value(value: _FakeSettingsCubit()),
+        BlocProvider<ServerConfigCubit>.value(value: _FakeServerConfigCubit()),
+      ],
+      child: const ServerSetupPage(),
     );
 
 Widget _visitsScreen({required bool manager, required String title}) => MultiBlocProvider(
@@ -425,6 +451,14 @@ Widget _detailScreen(Visit visit) => MultiBlocProvider(
       child: VisitDetailPage(visitId: visit.id, initial: visit),
     );
 
+Widget _detailUserScreen(Visit visit) => MultiBlocProvider(
+      providers: [
+        BlocProvider<AuthBloc>.value(value: _FakeAuthBloc(AuthState.authenticated(_fieldUser))),
+        BlocProvider<VisitsListBloc>.value(value: _FakeVisitsListBloc(_visits)),
+      ],
+      child: VisitDetailPage(visitId: visit.id, initial: visit),
+    );
+
 Widget _dashboardScreen() => MultiBlocProvider(
       providers: [
         BlocProvider<AuthBloc>.value(value: _FakeAuthBloc(AuthState.authenticated(_manager))),
@@ -437,7 +471,10 @@ Widget _customersScreen() => MultiBlocProvider(
       providers: [
         BlocProvider<CustomersBloc>.value(value: _FakeCustomersBloc(_customers)),
       ],
-      child: _wrapScaffold('العملاء', const CustomersListPage()),
+      child: const Scaffold(
+        appBar: CvSubAppBar(title: 'العملاء', eyebrow: 'مدير الفريق'),
+        body: CustomersListPage(),
+      ),
     );
 
 Widget _settingsScreen() => MultiBlocProvider(
@@ -492,6 +529,20 @@ List<_Shot> _buildShots() => [
       _Shot('01_login_ar_light', _ar, ThemeMode.light, _loginScreen()),
       _Shot('02_login_ar_dark', _ar, ThemeMode.dark, _loginScreen()),
       _Shot('03_login_en_light', _en, ThemeMode.light, _loginScreen()),
+      _Shot('19_server_setup_ar_light', _ar, ThemeMode.light, _serverSetupScreen()),
+      _Shot('20_server_setup_ar_dark', _ar, ThemeMode.dark, _serverSetupScreen()),
+      _Shot('21_visit_user_scheduled_ar_light', _ar, ThemeMode.light,
+          _detailUserScreen(_visits[4])),
+      _Shot('22_visit_user_scheduled_ar_dark', _ar, ThemeMode.dark,
+          _detailUserScreen(_visits[4])),
+      _Shot('23_visit_user_active_ar_light', _ar, ThemeMode.light,
+          _detailUserScreen(_visits[0])),
+      _Shot('24_visit_user_active_ar_dark', _ar, ThemeMode.dark,
+          _detailUserScreen(_visits[0])),
+      _Shot('25_visit_user_review_ar_light', _ar, ThemeMode.light,
+          _detailUserScreen(_visits[2])),
+      _Shot('26_visit_user_review_ar_dark', _ar, ThemeMode.dark,
+          _detailUserScreen(_visits[2])),
       _Shot('04_visits_admin_ar_light', _ar, ThemeMode.light,
           _visitsScreen(manager: true, title: 'الزيارات')),
       _Shot('05_visits_admin_ar_dark', _ar, ThemeMode.dark,

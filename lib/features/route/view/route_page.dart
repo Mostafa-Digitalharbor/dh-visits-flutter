@@ -126,7 +126,12 @@ class _RouteMap extends StatelessWidget {
     final cs = context.colors;
     final x = context.x;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bounds = LatLngBounds.fromPoints(points);
+    // CameraFit.bounds throws (NaN/Infinity zoom) when the stops collapse to a
+    // single distinct point. Only fit when there are ≥2 distinct points;
+    // otherwise centre on the lone stop at a fixed zoom.
+    final distinctPoints = points.toSet();
+    final useFit = distinctPoints.length >= 2;
+    final center = points.isNotEmpty ? points.first : const LatLng(30.0444, 31.2357);
     return SizedBox(
       height: 280,
       child: Stack(
@@ -134,7 +139,14 @@ class _RouteMap extends StatelessWidget {
         children: [
           FlutterMap(
             options: MapOptions(
-              initialCameraFit: CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(48)),
+              initialCenter: center,
+              initialZoom: 14.5,
+              initialCameraFit: useFit
+                  ? CameraFit.bounds(
+                      bounds: LatLngBounds.fromPoints(points),
+                      padding: const EdgeInsets.all(48),
+                    )
+                  : null,
               interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
               backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFE5E5E5),
             ),

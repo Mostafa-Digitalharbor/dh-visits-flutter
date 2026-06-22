@@ -362,6 +362,24 @@ abstract class AppLocalizations {
   /// **'Sign in'**
   String get loginSubmit;
 
+  /// No description provided for @loginRememberMe.
+  ///
+  /// In en, this message translates to:
+  /// **'Remember me'**
+  String get loginRememberMe;
+
+  /// No description provided for @loginForgotPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot password?'**
+  String get loginForgotPassword;
+
+  /// No description provided for @loginSecureFooter.
+  ///
+  /// In en, this message translates to:
+  /// **'Secure sign-in · Digital Harbor'**
+  String get loginSecureFooter;
+
   /// No description provided for @errInvalidCredentials.
   ///
   /// In en, this message translates to:
@@ -470,6 +488,18 @@ abstract class AppLocalizations {
   /// **'No customers found'**
   String get customersEmpty;
 
+  /// No description provided for @customersStatTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total customers'**
+  String get customersStatTotal;
+
+  /// No description provided for @customersStatActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active customers'**
+  String get customersStatActive;
+
   /// No description provided for @customerDetailTitle.
   ///
   /// In en, this message translates to:
@@ -559,6 +589,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Live'**
   String get visitLiveIndicator;
+
+  /// No description provided for @mapLiveTracking.
+  ///
+  /// In en, this message translates to:
+  /// **'Live tracking'**
+  String get mapLiveTracking;
 
   /// No description provided for @visitNotesLabel.
   ///
@@ -1154,6 +1190,18 @@ abstract class AppLocalizations {
   /// **'Field employee'**
   String get roleUser;
 
+  /// No description provided for @roleManagerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Team manager'**
+  String get roleManagerTitle;
+
+  /// No description provided for @roleEmployeeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Field rep'**
+  String get roleEmployeeTitle;
+
   /// No description provided for @visitsHistoryActiveBadge.
   ///
   /// In en, this message translates to:
@@ -1550,6 +1598,132 @@ abstract class AppLocalizations {
   /// **'Out of range'**
   String get visitRangeOutOfRange;
 
+  /// No description provided for @statusScheduled.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled'**
+  String get statusScheduled;
+
+  /// No description provided for @statusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active now'**
+  String get statusActive;
+
+  /// No description provided for @statusReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending review'**
+  String get statusReview;
+
+  /// No description provided for @statusApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get statusApproved;
+
+  /// No description provided for @statusRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get statusRejected;
+
+  /// No description provided for @visitDetailScheduledTimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit time'**
+  String get visitDetailScheduledTimeLabel;
+
+  /// No description provided for @visitDetailInRange.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re within the customer\'s range'**
+  String get visitDetailInRange;
+
+  /// No description provided for @visitDetailOutRange.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re outside the customer\'s range'**
+  String get visitDetailOutRange;
+
+  /// No description provided for @visitDetailRangeMeta.
+  ///
+  /// In en, this message translates to:
+  /// **'{distance} m away · check-in range {radius} m'**
+  String visitDetailRangeMeta(String distance, String radius);
+
+  /// No description provided for @visitDetailOutRangeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Move closer to start the visit'**
+  String get visitDetailOutRangeHint;
+
+  /// No description provided for @visitDetailCheckInTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Start the visit'**
+  String get visitDetailCheckInTitle;
+
+  /// No description provided for @visitDetailCheckInInRangeSub.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re in range'**
+  String get visitDetailCheckInInRangeSub;
+
+  /// No description provided for @visitDetailCheckInLocatingSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Locating you…'**
+  String get visitDetailCheckInLocatingSub;
+
+  /// No description provided for @visitDetailCheckInOverride.
+  ///
+  /// In en, this message translates to:
+  /// **'Check in out of range'**
+  String get visitDetailCheckInOverride;
+
+  /// No description provided for @visitDetailElapsedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Elapsed time'**
+  String get visitDetailElapsedLabel;
+
+  /// No description provided for @visitDetailStartedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Started {time}'**
+  String visitDetailStartedAt(String time);
+
+  /// No description provided for @visitDetailCheckOutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'End the visit'**
+  String get visitDetailCheckOutTitle;
+
+  /// No description provided for @visitDetailCheckOutSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Your location will be captured'**
+  String get visitDetailCheckOutSub;
+
+  /// No description provided for @visitDetailOnTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed on time'**
+  String get visitDetailOnTime;
+
+  /// No description provided for @visitDetailDurationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit duration'**
+  String get visitDetailDurationLabel;
+
+  /// No description provided for @timelineCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit created'**
+  String get timelineCreated;
+
   /// No description provided for @visitShowLocation.
   ///
   /// In en, this message translates to:
@@ -1789,6 +1963,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Version'**
   String get settingsVersion;
+
+  /// No description provided for @settingsEditProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit profile'**
+  String get settingsEditProfile;
+
+  /// No description provided for @settingsNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get settingsNotifications;
+
+  /// No description provided for @settingsNotificationsSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit alerts and reminders'**
+  String get settingsNotificationsSub;
+
+  /// No description provided for @settingsLastSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Last sync'**
+  String get settingsLastSync;
+
+  /// No description provided for @settingsSyncNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync now'**
+  String get settingsSyncNow;
+
+  /// No description provided for @settingsSynced.
+  ///
+  /// In en, this message translates to:
+  /// **'Synced'**
+  String get settingsSynced;
+
+  /// No description provided for @settingsSyncedJustNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Just now'**
+  String get settingsSyncedJustNow;
+
+  /// No description provided for @settingsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Help & support'**
+  String get settingsHelp;
+
+  /// No description provided for @settingsComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming soon'**
+  String get settingsComingSoon;
 
   /// No description provided for @confirmLogoutTitle.
   ///
