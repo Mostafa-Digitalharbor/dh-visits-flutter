@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/design/app_assets.dart';
 import '../../../shared/extensions/context_extensions.dart';
 
 class SplashPage extends StatefulWidget {
@@ -129,7 +130,7 @@ class _SplashPageState extends State<SplashPage>
                             padding: const EdgeInsets.all(18),
                             child: ClipOval(
                               child: Image.asset(
-                                'assets/images/logo.jpg',
+                                AppAssets.logo,
                                 fit: BoxFit.contain,
                               ),
                             ),

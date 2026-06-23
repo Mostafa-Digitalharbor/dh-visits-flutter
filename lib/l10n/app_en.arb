@@ -21,6 +21,9 @@
   "@unitMeters": { "placeholders": { "value": { "type": "String" } } },
   "unitMinutes": "{value} min",
   "@unitMinutes": { "placeholders": { "value": { "type": "String" } } },
+  "unitKm": "{value} km",
+  "@unitKm": { "placeholders": { "value": { "type": "String" } } },
+  "unitMinShort": "min",
 
   "themeMode": "Theme",
   "themeLight": "Light",
@@ -364,5 +367,17 @@
   "confirmLogoutTitle": "Sign out",
   "confirmLogoutMessage": "Are you sure you want to sign out?",
   "confirmExitTitle": "Exit app",
-  "confirmExitMessage": "Are you sure you want to exit the app?"
+  "confirmExitMessage": "Are you sure you want to exit the app?",
+
+  "weekdayShortSun": "Sun",
+  "weekdayShortMon": "Mon",
+  "weekdayShortTue": "Tue",
+  "weekdayShortWed": "Wed",
+  "weekdayShortThu": "Thu",
+  "weekdayShortFri": "Fri",
+  "weekdayShortSat": "Sat",
+
+  "aboutAppName": "Customer Visits",
+  "aboutLegalese": "© 2026 Digital Harbor",
+  "aboutFooter": "Customer Visits · Digital Harbor © 2026"
 }

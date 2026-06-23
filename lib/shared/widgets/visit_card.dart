@@ -269,12 +269,19 @@ class VisitCard extends StatelessWidget {
 
   Widget _timesStrip(BuildContext context, ColorScheme cs, AppX x, bool rtl, _CardStatus status,
       String? scheduledAt, String? arrival, String? departure, String dateText) {
+    // The label can shrink to ellipsis so the chip never forces the row wider
+    // than the available space (e.g. long Arabic labels at 1.25× text scale).
     Widget chip(IconData i, String label, String? time, Color tone) =>
         Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(i, size: 16, color: time != null ? tone : x.textDisabled),
-          const SizedBox(width: 6),
-          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: x.textTertiary)),
-          const SizedBox(width: 4),
+          SizedBox(width: context.r(6)),
+          Flexible(
+            child: Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: x.textTertiary)),
+          ),
+          SizedBox(width: context.r(4)),
           Text(time ?? '—:—',
               style: TextStyle(
                   fontSize: 13,
@@ -287,16 +294,27 @@ class VisitCard extends StatelessWidget {
       decoration: BoxDecoration(border: Border(top: BorderSide(color: x.divider))),
       child: Row(
         children: [
-          if (status == _CardStatus.scheduled)
-            chip(Symbols.event, context.s.visitsScheduledLabel, scheduledAt, cs.primary)
-          else ...[
-            chip(Symbols.login, context.s.timelineCheckIn, arrival, x.success),
-            const SizedBox(width: 10),
-            Icon(rtl ? Symbols.arrow_back : Symbols.arrow_forward, size: 16, color: cs.outline),
-            const SizedBox(width: 10),
-            chip(Symbols.logout, context.s.timelineCheckOut, departure, cs.error),
-          ],
-          const Spacer(),
+          // The chip cluster takes the remaining width and shrinks gracefully
+          // instead of overflowing; the date + chevron keep their natural size.
+          Expanded(
+            child: Row(
+              children: [
+                if (status == _CardStatus.scheduled)
+                  Flexible(
+                      child: chip(
+                          Symbols.event, context.s.visitsScheduledLabel, scheduledAt, cs.primary))
+                else ...[
+                  Flexible(child: chip(Symbols.login, context.s.timelineCheckIn, arrival, x.success)),
+                  SizedBox(width: context.r(8)),
+                  Icon(rtl ? Symbols.arrow_back : Symbols.arrow_forward, size: 16, color: cs.outline),
+                  SizedBox(width: context.r(8)),
+                  Flexible(
+                      child: chip(Symbols.logout, context.s.timelineCheckOut, departure, cs.error)),
+                ],
+              ],
+            ),
+          ),
+          SizedBox(width: context.r(8)),
           Text(dateText,
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: x.textTertiary)),
           Icon(rtl ? Symbols.chevron_left : Symbols.chevron_right, size: 18, color: x.textDisabled),

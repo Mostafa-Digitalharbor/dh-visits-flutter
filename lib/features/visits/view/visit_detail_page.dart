@@ -982,11 +982,7 @@ class _MapHeaderState extends State<_MapHeader> with SingleTickerProviderStateMi
             backgroundColor: isDark ? const Color(0xFF0E0F15) : const Color(0xFFE5E5E5),
           ),
           children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.digitalharbor.location_gps',
-              maxNativeZoom: 19,
-            ),
+            const AppMapTileLayer(),
             // Geofence — dashed-look translucent green circle (design §3).
             if (visit.hasCustomerLocation)
               CircleLayer(circles: [

@@ -61,6 +61,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String unitKm(String value) {
+    return '$value km';
+  }
+
+  @override
+  String get unitMinShort => 'min';
+
+  @override
   String get themeMode => 'Theme';
 
   @override
@@ -1031,4 +1039,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get confirmExitMessage => 'Are you sure you want to exit the app?';
+
+  @override
+  String get weekdayShortSun => 'Sun';
+
+  @override
+  String get weekdayShortMon => 'Mon';
+
+  @override
+  String get weekdayShortTue => 'Tue';
+
+  @override
+  String get weekdayShortWed => 'Wed';
+
+  @override
+  String get weekdayShortThu => 'Thu';
+
+  @override
+  String get weekdayShortFri => 'Fri';
+
+  @override
+  String get weekdayShortSat => 'Sat';
+
+  @override
+  String get aboutAppName => 'Customer Visits';
+
+  @override
+  String get aboutLegalese => '© 2026 Digital Harbor';
+
+  @override
+  String get aboutFooter => 'Customer Visits · Digital Harbor © 2026';
 }

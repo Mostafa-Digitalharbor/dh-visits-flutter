@@ -125,8 +125,8 @@ class GreetingHeader extends StatelessWidget {
             Row(
               children: [
                 for (var i = 0; i < stats.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 20),
-                  _Stat(stat: stats[i]),
+                  if (i > 0) SizedBox(width: context.r(20)),
+                  Flexible(child: _Stat(stat: stats[i])),
                 ],
               ],
             ),
@@ -163,11 +163,15 @@ class _Stat extends StatelessWidget {
                 fontWeight: FontWeight.w800,
                 fontFeatures: [FontFeature.tabularFigures()])),
         const SizedBox(width: 4),
-        Text(stat.label,
-            style: TextStyle(
-                color: white.withValues(alpha: 0.82),
-                fontSize: 12,
-                fontWeight: FontWeight.w500)),
+        Flexible(
+          child: Text(stat.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  color: white.withValues(alpha: 0.82),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500)),
+        ),
       ],
     );
   }

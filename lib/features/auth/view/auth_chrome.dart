@@ -23,7 +23,7 @@ class AuthHero extends StatelessWidget {
     return Stack(
       children: [
         Positioned.fill(
-          child: Image.asset('assets/images/map-cairo.png', fit: BoxFit.cover),
+          child: Image.asset(AppAssets.mapCairo, fit: BoxFit.cover),
         ),
         // Brand gradient veil — 155deg navy900@92 → brand@88 → cyan600@82.
         Positioned.fill(
@@ -123,7 +123,7 @@ class _LogoTile extends StatelessWidget {
         ],
         border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1),
       ),
-      child: Image.asset('assets/images/logo-d.png', fit: BoxFit.contain),
+      child: Image.asset(AppAssets.logoMarkD, fit: BoxFit.contain),
     );
   }
 }

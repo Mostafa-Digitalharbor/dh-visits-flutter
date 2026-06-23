@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../app/theme.dart';
@@ -56,9 +57,9 @@ class SettingsView extends StatelessWidget {
   void _onAbout(BuildContext context) {
     showAboutDialog(
       context: context,
-      applicationName: 'Customer Visits',
+      applicationName: context.s.aboutAppName,
       applicationVersion: _appVersion,
-      applicationLegalese: '© 2026 Digital Harbor',
+      applicationLegalese: context.s.aboutLegalese,
     );
   }
 
@@ -77,6 +78,18 @@ class SettingsView extends StatelessWidget {
                   isManager: user.canEditVisits,
                 ),
               const SizedBox(height: 18),
+              // ── الإدارة (للمدير فقط) ────────────────────────────────────
+              if (user?.canEditVisits ?? false) ...[
+                _GroupLabel(context.s.roleManagerTitle),
+                _GroupCard(children: [
+                  _NavRow(
+                    icon: Symbols.groups,
+                    label: context.s.customersTitle,
+                    onTap: () => context.push('/customers'),
+                  ),
+                ]),
+                const SizedBox(height: 18),
+              ],
               // ── الحساب ──────────────────────────────────────────────────
               _GroupLabel(context.s.settingsAccount),
               _GroupCard(children: [
@@ -162,7 +175,7 @@ class SettingsView extends StatelessWidget {
               const SizedBox(height: 18),
               Center(
                 child: Text(
-                  'Customer Visits · Digital Harbor © 2026',
+                  context.s.aboutFooter,
                   style: AppType.bodySm.copyWith(color: context.x.textTertiary),
                 ),
               ),

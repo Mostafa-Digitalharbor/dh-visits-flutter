@@ -144,20 +144,11 @@ class _NearbyMapPageState extends State<NearbyMapPage>
                       : const Color(0xFFE5E5E5),
                 ),
                 children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName:
-                        'com.digitalharbor.location_gps',
-                    // OSM tiles only exist up to zoom 19. Beyond that we let
-                    // flutter_map upscale the last available tile (a bit
-                    // blurry but still legible) instead of showing blank
-                    // tiles.
-                    maxNativeZoom: 19,
+                  // Pre-load tiles in a wider ring around the viewport so
+                  // panning/zooming doesn't expose blank squares while new
+                  // tiles download. Dark-mode tiles get a tint via tileBuilder.
+                  AppMapTileLayer(
                     maxZoom: 22,
-                    // Pre-load tiles in a wider ring around the viewport so
-                    // panning/zooming doesn't expose blank squares while new
-                    // tiles download.
                     panBuffer: 2,
                     keepBuffer: 5,
                     tileBuilder: isDark ? _darkTileBuilder : null,

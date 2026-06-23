@@ -109,6 +109,7 @@ class _UserShellState extends State<_UserShell> {
         title: titles[_tab],
         showSettings: false,
         topInset: MediaQuery.of(context).padding.top,
+        textScale: context.textScale,
       ),
       body: Column(
         children: [
@@ -184,6 +185,7 @@ class _ManagerShellState extends State<_ManagerShell> {
         title: titles[_tabIndex],
         showGroups: true,
         topInset: MediaQuery.of(context).padding.top,
+        textScale: context.textScale,
       ),
       body: Column(
         children: [
@@ -248,14 +250,22 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
   /// title from being pushed below its slot on notched / status-bar devices.
   final double topInset;
 
+  /// The active OS text-scale, captured at construction so the bar can grow its
+  /// fixed height in step with the eyebrow + title it wraps. A `PreferredSize`
+  /// getter has no `BuildContext`, so the value must be threaded in.
+  final double textScale;
+
   const _AppBar({
     this.title,
     this.showGroups = false,
     this.showSettings = true,
     this.topInset = 0,
+    this.textScale = 1.0,
   });
 
-  static const double _barHeight = 60;
+  /// Eyebrow (~13dp) + title (~22dp) lines grown by the OS font scale, plus the
+  /// 20dp of vertical padding the bar paints around them.
+  double get _barHeight => 24 + 34 * textScale.clamp(1.0, 1.25);
 
   @override
   Size get preferredSize => Size.fromHeight(_barHeight + topInset);
@@ -288,7 +298,7 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
                   boxShadow: x.elev1,
                 ),
                 alignment: Alignment.center,
-                child: Image.asset('assets/images/logo-d.png',
+                child: Image.asset(AppAssets.logoMarkD,
                     width: 24, height: 24, color: Colors.white),
               ),
               const SizedBox(width: 12),

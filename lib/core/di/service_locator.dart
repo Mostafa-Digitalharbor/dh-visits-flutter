@@ -10,6 +10,7 @@ import '../network/connectivity_status.dart';
 import '../network/pending_actions_queue.dart';
 import '../settings/settings_repository.dart';
 import '../storage/session_storage.dart';
+import '../../features/attendance/data/attendance_repository.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/customers/data/customers_repository.dart';
 import '../../features/employees/data/employees_repository.dart';
@@ -48,8 +49,10 @@ Future<void> setupServiceLocator() async {
       api: sl(), session: sl(), cookieJar: sl(), serverConfig: sl()));
   sl.registerSingleton<CustomersRepository>(CustomersRepository(api: sl()));
   sl.registerSingleton<EmployeesRepository>(EmployeesRepository(api: sl()));
+  sl.registerSingleton<AttendanceRepository>(
+      AttendanceRepository(api: sl(), session: sl()));
   sl.registerSingleton<VisitsRepository>(
-      VisitsRepository(api: sl(), session: sl()));
+      VisitsRepository(api: sl(), session: sl(), attendance: sl()));
   sl.registerSingleton<LiveLocationRepository>(
       LiveLocationRepository(api: sl(), session: sl()));
   sl.registerSingleton<NearbyRepository>(NearbyRepository(api: sl()));

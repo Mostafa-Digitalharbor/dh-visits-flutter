@@ -83,7 +83,7 @@ class AnalyticsPage extends StatelessWidget {
                   value: cur.avgLabel,
                   label: context.s.analyticsAvgDuration,
                   delta: cur.avgMin - prev.avgMin,
-                  deltaUnit: 'د',
+                  deltaUnit: context.s.unitMinShort,
                   invertDelta: true,
                 ),
               ),
@@ -236,7 +236,17 @@ class _WeeklyChart extends StatelessWidget {
       }).length;
     }).toList();
     final maxCount = (counts.isEmpty ? 0 : counts.reduce((a, b) => a > b ? a : b));
-    const names = ['أحد', 'إثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'];
+    // Indexed by DateTime.weekday % 7 (Sun = 0 … Sat = 6), localised via l10n.
+    final s = context.s;
+    final names = [
+      s.weekdayShortSun,
+      s.weekdayShortMon,
+      s.weekdayShortTue,
+      s.weekdayShortWed,
+      s.weekdayShortThu,
+      s.weekdayShortFri,
+      s.weekdayShortSat,
+    ];
 
     return AppCard(
       child: Column(
@@ -244,10 +254,16 @@ class _WeeklyChart extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(context.s.analyticsWeeklyTitle,
-                  style: AppType.titleSm.copyWith(fontWeight: FontWeight.w700, color: cs.onSurface)),
-              const Spacer(),
+              Expanded(
+                child: Text(context.s.analyticsWeeklyTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppType.titleSm.copyWith(fontWeight: FontWeight.w700, color: cs.onSurface)),
+              ),
+              const SizedBox(width: 8),
               Text(context.s.analyticsWeeklyCompare,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 12, color: x.textTertiary)),
             ],
           ),

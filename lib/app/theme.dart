@@ -6,9 +6,11 @@ import 'design/app_colors.dart';
 import 'design/app_dimens.dart';
 import 'design/app_typography.dart';
 
+export 'design/app_assets.dart';
 export 'design/app_colors.dart';
 export 'design/app_dimens.dart';
 export 'design/app_typography.dart';
+export 'design/responsive.dart';
 
 /// Semantic tokens that [ColorScheme] can't carry: status hues + containers,
 /// brand-tinted elevation shadows, brand/success glows, and the two brand

@@ -61,6 +61,14 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String unitKm(String value) {
+    return '$value كم';
+  }
+
+  @override
+  String get unitMinShort => 'د';
+
+  @override
   String get themeMode => 'المظهر';
 
   @override
@@ -1024,4 +1032,34 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get confirmExitMessage => 'هل تريد إنهاء التطبيق؟';
+
+  @override
+  String get weekdayShortSun => 'أحد';
+
+  @override
+  String get weekdayShortMon => 'إثنين';
+
+  @override
+  String get weekdayShortTue => 'ثلاثاء';
+
+  @override
+  String get weekdayShortWed => 'أربعاء';
+
+  @override
+  String get weekdayShortThu => 'خميس';
+
+  @override
+  String get weekdayShortFri => 'جمعة';
+
+  @override
+  String get weekdayShortSat => 'سبت';
+
+  @override
+  String get aboutAppName => 'زيارات العملاء';
+
+  @override
+  String get aboutLegalese => '© 2026 Digital Harbor';
+
+  @override
+  String get aboutFooter => 'زيارات العملاء · Digital Harbor © 2026';
 }

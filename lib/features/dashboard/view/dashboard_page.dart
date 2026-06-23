@@ -126,13 +126,17 @@ class _KpiGrid extends StatelessWidget {
     final activeNow = visits
         .where((v) => v.state == VisitStateType.checkedIn)
         .length;
+    // Tiles get taller as the OS font scale grows so the count + 2-line label
+    // never clip; wider/narrower phones tweak it slightly via the width scale.
+    final aspect = (1.45 / (context.textScale.clamp(1.0, 1.25) * context.widthScale))
+        .clamp(1.05, 1.5);
     return GridView.count(
       crossAxisCount: 2,
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
+      mainAxisSpacing: context.r(12),
+      crossAxisSpacing: context.r(12),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.45,
+      childAspectRatio: aspect,
       children: [
         _KpiTile(
           label: context.s.dashboardKpiOverdue,
@@ -241,17 +245,25 @@ class _KpiTile extends StatelessWidget {
                   Icon(icon, fill: 1, size: 22, color: color),
                 ],
               ),
-              CountUpText(
-                '$value',
-                style: AppType.number(34, color).copyWith(height: 1),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: CountUpText(
+                    '$value',
+                    style: AppType.number(34, color).copyWith(height: 1),
+                  ),
+                ),
               ),
-              Text(
-                label,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AppType.bodyMd.copyWith(
-                  color: context.colors.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppType.bodyMd.copyWith(
+                    color: context.colors.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -369,13 +381,7 @@ class _ActiveEmployeesCard extends StatelessWidget {
                         : const Color(0xFFE5E5E5),
                   ),
                   children: [
-                    TileLayer(
-                      urlTemplate:
-                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.digitalharbor.location_gps',
-                      maxNativeZoom: 19,
-                      maxZoom: 22,
-                    ),
+                    const AppMapTileLayer(maxZoom: 22),
                     MarkerLayer(
                       markers: [
                         for (final v in active)

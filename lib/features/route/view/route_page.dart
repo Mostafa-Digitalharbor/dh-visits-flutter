@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../app/theme.dart';
+import '../../../core/constants.dart';
 import '../../../core/utils/communications.dart';
 import '../../../core/utils/distance.dart';
 import '../../../shared/extensions/context_extensions.dart';
@@ -68,7 +69,7 @@ class RoutePage extends StatelessWidget {
                       Expanded(
                         child: _SummaryTile(
                           label: context.s.routeTotalDistance,
-                          value: '${km.toStringAsFixed(1)} كم',
+                          value: context.s.unitKm(km.toStringAsFixed(1)),
                           icon: Symbols.route,
                         ),
                       ),
@@ -110,7 +111,8 @@ class RoutePage extends StatelessWidget {
     );
   }
 
-  static int _driveMinutes(double meters) => (meters / 1000 / 30 * 60).round().clamp(1, 999);
+  static int _driveMinutes(double meters) =>
+      (meters / 1000 / AppConstants.driveSpeedKmh * 60).round().clamp(1, 999);
 }
 
 class _RouteMap extends StatelessWidget {
@@ -131,7 +133,9 @@ class _RouteMap extends StatelessWidget {
     // otherwise centre on the lone stop at a fixed zoom.
     final distinctPoints = points.toSet();
     final useFit = distinctPoints.length >= 2;
-    final center = points.isNotEmpty ? points.first : const LatLng(30.0444, 31.2357);
+    final center = points.isNotEmpty
+        ? points.first
+        : const LatLng(AppConstants.mapFallbackLat, AppConstants.mapFallbackLng);
     return SizedBox(
       height: 280,
       child: Stack(
@@ -151,11 +155,7 @@ class _RouteMap extends StatelessWidget {
               backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFE5E5E5),
             ),
             children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.digitalharbor.location_gps',
-                maxNativeZoom: 19,
-              ),
+              const AppMapTileLayer(),
               PolylineLayer(polylines: [
                 Polyline(points: points, strokeWidth: 3, color: Colors.white, borderStrokeWidth: 1, borderColor: cs.primary),
               ]),
@@ -183,7 +183,8 @@ class _RouteMap extends StatelessWidget {
                 children: [
                   const Icon(Symbols.route, size: 14, color: Colors.white),
                   const SizedBox(width: 6),
-                  Text('${stops.length} ${context.s.routeStops} · ${km.toStringAsFixed(1)} كم',
+                  Text(
+                      '${stops.length} ${context.s.routeStops} · ${context.s.unitKm(km.toStringAsFixed(1))}',
                       style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
                 ],
               ),

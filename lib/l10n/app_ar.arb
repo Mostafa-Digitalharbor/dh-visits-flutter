@@ -19,6 +19,8 @@
 
   "unitMeters": "{value} م",
   "unitMinutes": "{value} د",
+  "unitKm": "{value} كم",
+  "unitMinShort": "د",
 
   "themeMode": "المظهر",
   "themeLight": "فاتح",
@@ -348,5 +350,17 @@
   "confirmLogoutTitle": "تسجيل الخروج",
   "confirmLogoutMessage": "هل تريد تسجيل الخروج من التطبيق؟",
   "confirmExitTitle": "إنهاء التطبيق",
-  "confirmExitMessage": "هل تريد إنهاء التطبيق؟"
+  "confirmExitMessage": "هل تريد إنهاء التطبيق؟",
+
+  "weekdayShortSun": "أحد",
+  "weekdayShortMon": "إثنين",
+  "weekdayShortTue": "ثلاثاء",
+  "weekdayShortWed": "أربعاء",
+  "weekdayShortThu": "خميس",
+  "weekdayShortFri": "جمعة",
+  "weekdayShortSat": "سبت",
+
+  "aboutAppName": "زيارات العملاء",
+  "aboutLegalese": "© 2026 Digital Harbor",
+  "aboutFooter": "زيارات العملاء · Digital Harbor © 2026"
 }

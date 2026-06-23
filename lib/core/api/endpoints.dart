@@ -15,4 +15,12 @@ class Endpoints {
   /// (read customers, create/read visits, etc.) goes through `call_kw` on
   /// standard models — no custom REST controllers required on the server.
   static const String callKw = '/web/dataset/call_kw';
+
+  /// Odoo's built-in attendance toggle (the same route the web "systray"
+  /// check-in/out button uses). Runs server-side with elevated rights, so a
+  /// regular employee can clock themselves in/out even though they can't
+  /// `create` an `hr.attendance` row directly. Accepts `{latitude, longitude}`
+  /// and records them in the native `in_/out_latitude/longitude` fields.
+  /// Toggles state: returns `attendance_state` = 'checked_in' | 'checked_out'.
+  static const String attendanceSystray = '/hr_attendance/systray_check_in_out';
 }

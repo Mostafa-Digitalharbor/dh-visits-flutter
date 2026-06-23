@@ -60,31 +60,38 @@ class CvSubAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (eyebrow != null)
-                    Text(eyebrow!,
+              // The bar is a fixed-height chrome element (PreferredSize). Cap
+              // how far the eyebrow + title can scale up so a large system
+              // font setting can't push the two lines past the 60px bar and
+              // trigger a vertical overflow; 1.1x stays comfortably legible.
+              child: MediaQuery.withClampedTextScaling(
+                maxScaleFactor: 1.1,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (eyebrow != null)
+                      Text(eyebrow!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 11,
+                              height: 1.15,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                              color: cs.onSurfaceVariant)),
+                    Text(title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 19,
                             height: 1.15,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3,
-                            color: cs.onSurfaceVariant)),
-                  Text(title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: 19,
-                          height: 1.15,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.2,
-                          color: cs.onSurface)),
-                ],
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                            color: cs.onSurface)),
+                  ],
+                ),
               ),
             ),
             for (final a in actions) ...[const SizedBox(width: 8), a],

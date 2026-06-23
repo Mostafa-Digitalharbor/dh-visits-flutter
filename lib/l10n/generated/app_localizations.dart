@@ -194,6 +194,18 @@ abstract class AppLocalizations {
   /// **'{value} min'**
   String unitMinutes(String value);
 
+  /// No description provided for @unitKm.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} km'**
+  String unitKm(String value);
+
+  /// No description provided for @unitMinShort.
+  ///
+  /// In en, this message translates to:
+  /// **'min'**
+  String get unitMinShort;
+
   /// No description provided for @themeMode.
   ///
   /// In en, this message translates to:
@@ -2041,6 +2053,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Are you sure you want to exit the app?'**
   String get confirmExitMessage;
+
+  /// No description provided for @weekdayShortSun.
+  ///
+  /// In en, this message translates to:
+  /// **'Sun'**
+  String get weekdayShortSun;
+
+  /// No description provided for @weekdayShortMon.
+  ///
+  /// In en, this message translates to:
+  /// **'Mon'**
+  String get weekdayShortMon;
+
+  /// No description provided for @weekdayShortTue.
+  ///
+  /// In en, this message translates to:
+  /// **'Tue'**
+  String get weekdayShortTue;
+
+  /// No description provided for @weekdayShortWed.
+  ///
+  /// In en, this message translates to:
+  /// **'Wed'**
+  String get weekdayShortWed;
+
+  /// No description provided for @weekdayShortThu.
+  ///
+  /// In en, this message translates to:
+  /// **'Thu'**
+  String get weekdayShortThu;
+
+  /// No description provided for @weekdayShortFri.
+  ///
+  /// In en, this message translates to:
+  /// **'Fri'**
+  String get weekdayShortFri;
+
+  /// No description provided for @weekdayShortSat.
+  ///
+  /// In en, this message translates to:
+  /// **'Sat'**
+  String get weekdayShortSat;
+
+  /// No description provided for @aboutAppName.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer Visits'**
+  String get aboutAppName;
+
+  /// No description provided for @aboutLegalese.
+  ///
+  /// In en, this message translates to:
+  /// **'© 2026 Digital Harbor'**
+  String get aboutLegalese;
+
+  /// No description provided for @aboutFooter.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer Visits · Digital Harbor © 2026'**
+  String get aboutFooter;
 }
 
 class _AppLocalizationsDelegate
