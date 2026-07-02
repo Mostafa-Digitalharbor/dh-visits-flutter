@@ -37,9 +37,10 @@ class DashboardPage extends StatelessWidget {
           onRefresh: () async {
             final isAdmin =
                 context.read<AuthBloc>().state.user?.canEditVisits ?? false;
-            context
-                .read<VisitsListBloc>()
-                .add(VisitsListLoadRequested(includeDrafts: isAdmin));
+            context.read<VisitsListBloc>().add(VisitsListLoadRequested(
+                  scope:
+                      isAdmin ? VisitListScope.team : VisitListScope.mine,
+                ));
           },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -73,7 +74,7 @@ class _DashboardGreeting extends StatelessWidget {
     bool isToday(DateTime? d) =>
         d != null && d.year == today.year && d.month == today.month && d.day == today.day;
     final todays = visits.where((v) => isToday(v.effectiveDate)).toList();
-    final done = todays.where((v) => v.state == VisitStateType.checkedOut).length;
+    final done = todays.where((v) => v.isDone).length;
     final total = todays.isEmpty ? visits.length : todays.length;
     // Sum of completed visit durations → field time (hours, 1 decimal).
     final mins = visits
@@ -116,7 +117,7 @@ class _KpiGrid extends StatelessWidget {
     final today = _today();
     final overdue = visits.where((v) => v.isOverdue).length;
     final pendingReview = visits
-        .where((v) => v.lifecycleState == VisitLifecycleState.underReview)
+        .where((v) => v.isAwaitingApproval)
         .length;
     final todayCount = visits.where((v) {
       final d = v.effectiveDate;
@@ -124,7 +125,7 @@ class _KpiGrid extends StatelessWidget {
       return _sameDay(d, today);
     }).length;
     final activeNow = visits
-        .where((v) => v.state == VisitStateType.checkedIn)
+        .where((v) => v.isInProgress)
         .length;
     // Tiles get taller as the OS font scale grows so the count + 2-line label
     // never clip; wider/narrower phones tweak it slightly via the width scale.
@@ -148,10 +149,7 @@ class _KpiGrid extends StatelessWidget {
                   HapticFeedback.selectionClick();
                   context
                       .read<VisitsListBloc>()
-                      .add(const VisitsListFilterChanged(VisitsFilter.all));
-                  context.read<VisitsListBloc>().add(
-                        VisitsListTimingFilterChanged(VisitTimingFilter.overdue),
-                      );
+                      .add(const VisitsListScopeChanged(VisitListScope.team));
                   context.go('/');
                 }
               : null,
@@ -177,7 +175,7 @@ class _KpiGrid extends StatelessWidget {
             HapticFeedback.selectionClick();
             context
                 .read<VisitsListBloc>()
-                .add(const VisitsListFilterChanged(VisitsFilter.today));
+                .add(const VisitsListScopeChanged(VisitListScope.team));
             context.go('/');
           },
         ),
@@ -286,7 +284,7 @@ class _ActiveEmployeesCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final active = visits
         .where((v) =>
-            v.state == VisitStateType.checkedIn && v.hasCheckInLocation)
+            v.isInProgress && v.hasCheckInLocation)
         .toList();
     if (active.isEmpty) {
       return AppCard(
@@ -547,8 +545,7 @@ class _TopEmployeesCard extends StatelessWidget {
     // Count only finished work for the employee leaderboard — drafts
     // and pending visits shouldn't reward an employee yet, those are
     // commitments not deliveries.
-    final completedOnly =
-        visits.where((v) => v.state == VisitStateType.checkedOut);
+    final completedOnly = visits.where((v) => v.isDone);
     final counts = <String, int>{};
     for (final v in completedOnly) {
       final name = v.employeeName;

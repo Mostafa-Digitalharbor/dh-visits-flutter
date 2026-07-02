@@ -47,7 +47,7 @@ class RoutePage extends StatelessWidget {
               points[i].latitude, points[i].longitude);
         }
         final km = (meters / 1000);
-        final nextIndex = stops.indexWhere((v) => v.state != VisitStateType.checkedOut);
+        final nextIndex = stops.indexWhere((v) => !v.isDone);
 
         return Column(
           children: [

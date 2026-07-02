@@ -5,629 +5,433 @@ import '../../../core/api/api_client.dart';
 import '../../../core/api/endpoints.dart';
 import '../../../core/constants.dart';
 import '../../../core/storage/session_storage.dart';
-import '../../../core/utils/distance.dart';
 import '../../attendance/data/attendance_repository.dart';
 import 'models/visit.dart';
-import 'models/visit_type.dart';
+import 'models/visit_participant.dart';
 
-/// Visits live in a **dedicated custom model** (`x_dh_visit`) built on the
-/// Odoo server: one real, manager-readable column per field (customer,
-/// salesperson, date, type, check-in/out time + GPS, notes) plus a proper
-/// approval workflow in `x_state`.
+/// Which slice of visits a manager is looking at. Backing domains are applied
+/// on top of Odoo record rules (which already scope to the manager's
+/// hierarchy), so these only narrow by state.
+enum VisitManagerScope { team, pending, escalated }
+
+/// Talks to the `dh_visit_management` Odoo module.
 ///
-/// The server-side `x_state` (draft → submitted → approved / rejected) is the
-/// manager's approval pipeline. The app's existing [VisitLifecycleState]
-/// (draft / submit / under_review / done / cancel) is mapped onto it so the
-/// mobile UI is untouched:
+/// **Actions** (create / submit / approve / reject / reschedule / start / end /
+/// participants / attachments) go through the module's dedicated `/api/visit/*`
+/// REST endpoints — they enforce the approval rules and return a slim visit
+/// shape ([Visit.fromApi]).
 ///
-///   x_state            ⇄  app lifecycle
-///   draft              ⇄  submit       (scheduled / in-progress, visible)
-///   submitted          ⇄  under_review (checked out, awaiting the manager)
-///   approved           ⇄  done         (manager approved)
-///   rejected           ⇄  cancel       (manager rejected)
-///
-/// Visit *types* still reuse the standard `calendar.event.type` tags.
-/// [_adaptVisit] reshapes a row into what `Visit.fromJson` expects, so the
-/// blocs / UI stay the same.
+/// **Reads that the REST payload doesn't cover** — manager list slices, the
+/// rich detail fields (managers, approval history, escalation, start/end GPS),
+/// the participant lines, and the project/opportunity pickers — go through
+/// `call_kw`. Record rules enforce access server-side either way.
 class VisitsRepository {
   final ApiClient api;
   final SessionStorage session;
 
-  /// Optional: when present, the salesperson's check-in / check-out is also
-  /// mirrored to Odoo's `hr.attendance` (with GPS). Best-effort — failures
-  /// here never block the visit write. Left null in the CLI tools.
+  /// Optional: mirror Start/End into Odoo `hr.attendance` (best-effort).
   final AttendanceRepository? attendance;
 
   VisitsRepository({required this.api, required this.session, this.attendance});
 
   static final DateFormat _odooDateTime = DateFormat('yyyy-MM-dd HH:mm:ss');
-  static final DateFormat _odooDate = DateFormat('yyyy-MM-dd');
 
-  static const List<String> _visitFields = [
-    'id',
-    'x_name',
-    'x_visit_date',
-    'x_partner_id',
-    'x_user_id',
-    'x_employee_id',
-    'x_visit_type_id',
-    'x_check_in_time',
-    'x_check_out_time',
-    'x_check_in_lat',
-    'x_check_in_lng',
-    'x_check_out_lat',
-    'x_check_out_lng',
-    'x_duration_minutes',
-    'x_notes',
-    'x_manager_note',
-    'x_state',
-    'x_customer_lat',
-    'x_customer_lng',
-    'x_customer_address',
-    'x_customer_phone',
-  ];
+  /// Formats a [DateTime] as Odoo's naive-UTC string (`yyyy-MM-dd HH:mm:ss`).
+  static String formatOdooUtc(DateTime dt) =>
+      _odooDateTime.format(dt.toUtc());
 
   // ---------------------------------------------------------------------------
-  // State mapping between the server workflow and the app's lifecycle enum.
+  // REST actions (/api/visit/*)
   // ---------------------------------------------------------------------------
 
-  /// `x_state` (server) → the app's lifecycle wire string.
-  String _xStateToAppWire(String? x) {
-    switch (x) {
-      case 'draft':
-        return 'submit';
-      case 'submitted':
-        return 'under_review';
-      case 'approved':
-        return 'done';
-      case 'rejected':
-        return 'cancel';
-      default:
-        return 'submit';
+  /// The current user's own visits (server scopes to the caller).
+  Future<List<Visit>> myVisits({
+    List<dynamic> domain = const [],
+    int limit = 80,
+    int offset = 0,
+  }) async {
+    final result = await api.jsonRpc(
+      Endpoints.visitMy,
+      params: {'domain': domain, 'limit': limit, 'offset': offset},
+    );
+    final visits = (result is Map ? result['visits'] : null);
+    if (visits is! List) return const [];
+    return visits
+        .whereType<Map>()
+        .map((m) => Visit.fromApi(Map<String, dynamic>.from(m)))
+        .toList();
+  }
+
+  /// Reads one visit via the REST endpoint (slim shape). For the full detail
+  /// screen prefer [readVisitFull].
+  Future<Visit?> getVisit(int visitId) async {
+    final result = await api.jsonRpc(
+      Endpoints.visitGet,
+      params: {'visit_id': visitId},
+    );
+    final v = (result is Map ? result['visit'] : null);
+    if (v is! Map) return null;
+    return Visit.fromApi(Map<String, dynamic>.from(v));
+  }
+
+  /// Creates a draft visit. [vals] accepts only the whitelisted keys
+  /// (`visit_type`, `project_id`, `opportunity_id`, `scheduled_datetime`,
+  /// `purpose`, `location`, `employee_id`, `latitude`, `longitude`).
+  Future<Visit> createVisit(Map<String, dynamic> vals) async {
+    final result = await api.jsonRpc(
+      Endpoints.visitCreate,
+      params: {'vals': vals},
+    );
+    final v = (result is Map ? result['visit'] : null);
+    if (v is! Map) {
+      throw StateError('create: unexpected response $result');
     }
+    return Visit.fromApi(Map<String, dynamic>.from(v));
   }
 
-  /// App lifecycle wire string → `x_state` (server).
-  String _appWireToXState(String? appWire) {
-    switch (appWire) {
-      case 'under_review':
-        return 'submitted';
-      case 'done':
-        return 'approved';
-      case 'cancel':
-        return 'rejected';
-      case 'draft':
-      case 'submit':
-      default:
-        return 'draft';
-    }
+  Future<String?> submit(int visitId) => _stateAction(Endpoints.visitSubmit, visitId);
+
+  Future<String?> approve(int visitId) =>
+      _stateAction(Endpoints.visitApprove, visitId);
+
+  Future<String?> reject(int visitId, String reason) => _stateAction(
+        Endpoints.visitReject,
+        visitId,
+        extra: {'reason': reason},
+      );
+
+  Future<String?> reschedule(
+    int visitId, {
+    DateTime? scheduledDatetime,
+    String? purpose,
+    String? location,
+  }) =>
+      _stateAction(Endpoints.visitReschedule, visitId, extra: {
+        if (scheduledDatetime != null)
+          'scheduled_datetime': formatOdooUtc(scheduledDatetime),
+        if (purpose != null) 'purpose': purpose,
+        if (location != null) 'location': location,
+      });
+
+  /// Adds additional participants; each participant's manager must approve.
+  Future<List<VisitParticipant>> addParticipants(
+    int visitId,
+    List<int> employeeIds,
+  ) async {
+    final result = await api.jsonRpc(
+      Endpoints.visitAddParticipants,
+      params: {'visit_id': visitId, 'employee_ids': employeeIds},
+    );
+    final parts = (result is Map ? result['participants'] : null);
+    if (parts is! List) return const [];
+    return parts
+        .whereType<Map>()
+        .map((m) => VisitParticipant.fromApi(Map<String, dynamic>.from(m)))
+        .toList();
   }
 
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
-
-  Future<({int? uid, bool isManager})> _currentUser() async {
-    final u = await session.getUser();
-    if (u == null) return (uid: null, isManager: false);
-    final uid = (u['uid'] as num?)?.toInt();
-    final isManager = u['is_manager'] == true ||
-        u['is_admin'] == true ||
-        u['is_system'] == true;
-    return (uid: uid, isManager: isManager);
-  }
-
-  /// Normalises any datetime representation to an ISO-8601 UTC string (`…Z`).
-  String? _toIsoUtc(dynamic raw) {
-    if (raw == null || raw == false) return null;
-    if (raw is DateTime) return raw.toUtc().toIso8601String();
-    var s = raw.toString().trim();
-    if (s.isEmpty) return null;
-    final hasMarker =
-        s.endsWith('Z') || s.contains('+') || s.lastIndexOf('-') > 10;
-    if (!hasMarker) s = '${s.replaceFirst(' ', 'T')}Z';
-    return DateTime.tryParse(s)?.toUtc().toIso8601String();
-  }
-
-  /// Converts any datetime representation to Odoo's naive-UTC string format.
-  String? _toOdooDateTime(dynamic raw) {
-    final iso = _toIsoUtc(raw);
-    if (iso == null) return null;
-    return _odooDateTime.format(DateTime.parse(iso).toUtc());
-  }
-
-  double? _num(dynamic raw) => raw is num ? raw.toDouble() : null;
-
-  /// A GPS coordinate, treating Odoo's unset-float default (0.0) as "absent".
-  /// Real coordinates in the operating region are never exactly 0.
-  double? _coord(dynamic raw) {
-    final v = _num(raw);
-    if (v == null || v == 0.0) return null;
-    return v;
-  }
-
-  Map<String, dynamic>? _m2o(dynamic raw) {
-    if (raw is List && raw.length >= 2) {
-      return {'id': (raw[0] as num?)?.toInt(), 'name': raw[1]?.toString()};
-    }
-    return null;
-  }
-
-  String? _str(dynamic raw) =>
-      (raw == null || raw == false) ? null : raw.toString();
-
-  /// Converts an `x_dh_visit` row into the JSON shape `Visit.fromJson` expects.
-  Map<String, dynamic> _adaptVisit(Map<String, dynamic> row) {
-    final ciTime = _toIsoUtc(row['x_check_in_time']);
-    final coTime = _toIsoUtc(row['x_check_out_time']);
-    // GPS only meaningful once the matching timestamp exists.
-    final ciLat = ciTime != null ? _coord(row['x_check_in_lat']) : null;
-    final ciLng = ciTime != null ? _coord(row['x_check_in_lng']) : null;
-    final coLat = coTime != null ? _coord(row['x_check_out_lat']) : null;
-    final coLng = coTime != null ? _coord(row['x_check_out_lng']) : null;
-    final custLat = _coord(row['x_customer_lat']);
-    final custLng = _coord(row['x_customer_lng']);
-
-    String? mobileState;
-    if (coTime != null) {
-      mobileState = 'checked_out';
-    } else if (ciTime != null) {
-      mobileState = 'checked_in';
-    }
-
-    int? durationMinutes;
-    double? visitDuration;
-    if (ciTime != null && coTime != null) {
-      final d = DateTime.parse(coTime).difference(DateTime.parse(ciTime));
-      if (!d.isNegative) {
-        durationMinutes = d.inMinutes;
-        visitDuration = d.inSeconds / 3600.0;
+  /// Starts an approved visit (records GPS). Mirrors into `hr.attendance`.
+  Future<String?> start(
+    int visitId, {
+    double? latitude,
+    double? longitude,
+    String? location,
+  }) async {
+    final result = await api.jsonRpc(
+      Endpoints.visitStart,
+      params: {
+        'visit_id': visitId,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (location != null) 'location': location,
+      },
+    );
+    if (latitude != null && longitude != null) {
+      try {
+        await attendance?.checkIn(latitude: latitude, longitude: longitude);
+      } catch (e) {
+        debugPrint('[VisitsRepository] attendance check-in failed: $e');
       }
     }
-
-    String? rangeFor(double? lat, double? lng) {
-      if (lat == null || lng == null) return null;
-      if (custLat == null || custLng == null) return 'no';
-      final dist = haversineMeters(custLat, custLng, lat, lng);
-      return dist <= AppConstants.checkInRangeMeters
-          ? 'in_range'
-          : 'not_in_range';
-    }
-
-    String? visitDate;
-    final dateRaw = row['x_visit_date'];
-    if (dateRaw != null && dateRaw != false) {
-      final s = dateRaw.toString();
-      visitDate = s.length >= 10 ? s.substring(0, 10) : s;
-    }
-
-    final custM2o = _m2o(row['x_partner_id']);
-    final vt = _m2o(row['x_visit_type_id']);
-    final employee = _m2o(row['x_user_id']);
-
-    final customerBlock = <String, dynamic>{
-      'id': custM2o?['id'],
-      'name': _str(row['x_name']) ?? custM2o?['name'],
-      if (custLat != null) 'latitude': custLat,
-      if (custLng != null) 'longitude': custLng,
-      'address': _str(row['x_customer_address']),
-      'phone': _str(row['x_customer_phone']),
-    };
-
-    return <String, dynamic>{
-      'id': row['id'],
-      'name': _str(row['x_name']),
-      'visit_date': visitDate,
-      'customer': customerBlock,
-      'employee': employee,
-      'visit_type':
-          vt != null ? {'id': vt['id'], 'name': vt['name']} : null,
-      'check_in_time': ciTime,
-      'check_out_time': coTime,
-      'duration_minutes': durationMinutes,
-      'visit_duration': visitDuration,
-      'state': _xStateToAppWire(_str(row['x_state'])),
-      'mobile_state': mobileState,
-      'description': _str(row['x_notes']),
-      'check_in_lat': ciLat,
-      'check_in_lng': ciLng,
-      'check_out_lat': coLat,
-      'check_out_lng': coLng,
-      'check_in_state': rangeFor(ciLat, ciLng),
-      'check_out_state': rangeFor(coLat, coLng),
-    };
+    return (result is Map ? result['state']?.toString() : null);
   }
 
-  /// Reads a single visit and returns it in the adapted `Visit` JSON shape.
-  Future<Map<String, dynamic>?> _readVisit(int id) async {
+  /// Ends an in-progress visit (outcome required, records GPS). Mirrors into
+  /// `hr.attendance`.
+  Future<String?> end(
+    int visitId, {
+    required String outcome,
+    double? latitude,
+    double? longitude,
+    String? location,
+  }) async {
+    final result = await api.jsonRpc(
+      Endpoints.visitEnd,
+      params: {
+        'visit_id': visitId,
+        'outcome': outcome,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (location != null) 'location': location,
+      },
+    );
+    if (latitude != null && longitude != null) {
+      try {
+        await attendance?.checkOut(latitude: latitude, longitude: longitude);
+      } catch (e) {
+        debugPrint('[VisitsRepository] attendance check-out failed: $e');
+      }
+    }
+    return (result is Map ? result['state']?.toString() : null);
+  }
+
+  /// Uploads a base64-encoded attachment to a visit. Returns the attachment id.
+  Future<int?> uploadAttachment(
+    int visitId, {
+    required String filename,
+    required String dataB64,
+  }) async {
+    final result = await api.jsonRpc(
+      Endpoints.visitUploadAttachment,
+      params: {
+        'visit_id': visitId,
+        'filename': filename,
+        'data_b64': dataB64,
+      },
+    );
+    return (result is Map ? (result['attachment_id'] as num?)?.toInt() : null);
+  }
+
+  Future<String?> _stateAction(
+    String path,
+    int visitId, {
+    Map<String, dynamic> extra = const {},
+  }) async {
+    final result = await api.jsonRpc(
+      path,
+      params: {'visit_id': visitId, ...extra},
+    );
+    return (result is Map ? result['state']?.toString() : null);
+  }
+
+  // ---------------------------------------------------------------------------
+  // call_kw reads / actions not exposed by the REST API
+  // ---------------------------------------------------------------------------
+
+  /// Manager list slices. Record rules restrict rows to the manager's
+  /// hierarchy; [scope] narrows further by state.
+  Future<List<Visit>> managerList(
+    VisitManagerScope scope, {
+    int limit = 200,
+  }) async {
+    final domain = <dynamic>[];
+    switch (scope) {
+      case VisitManagerScope.pending:
+        domain.add([
+          'state',
+          'in',
+          [
+            'waiting_participant_manager_approval',
+            'waiting_direct_manager_approval',
+            'reschedule_requested',
+          ],
+        ]);
+        break;
+      case VisitManagerScope.escalated:
+        domain.add(['state', '=', 'escalated']);
+        break;
+      case VisitManagerScope.team:
+        break; // everything visible to this manager
+    }
+    final result = await api.jsonRpc(
+      Endpoints.callKw,
+      params: {
+        'model': AppConstants.visitModel,
+        'method': 'search_read',
+        'args': [domain, Visit.odooReadFields],
+        'kwargs': {
+          'limit': limit,
+          'order': 'scheduled_datetime desc, id desc',
+        },
+      },
+    );
+    final rows = result is List ? result : const [];
+    return rows
+        .whereType<Map>()
+        .map((r) => Visit.fromOdooRow(Map<String, dynamic>.from(r)))
+        .toList();
+  }
+
+  /// Full detail read (rich fields + participant lines).
+  Future<Visit?> readVisitFull(int visitId) async {
     final result = await api.jsonRpc(
       Endpoints.callKw,
       params: {
         'model': AppConstants.visitModel,
         'method': 'read',
         'args': [
-          [id],
-          _visitFields,
+          [visitId],
+          Visit.odooReadFields,
         ],
         'kwargs': {},
       },
     );
-    final rows = result is List ? result : <dynamic>[];
+    final rows = result is List ? result : const [];
     if (rows.isEmpty || rows.first is! Map) return null;
-    return _adaptVisit(Map<String, dynamic>.from(rows.first as Map));
+    final participants = await readParticipants(visitId);
+    return Visit.fromOdooRow(
+      Map<String, dynamic>.from(rows.first as Map),
+      participants: participants,
+    );
   }
 
-  /// Customer snapshot fields (`x_customer_*`) pulled from a partner.
-  Future<Map<String, dynamic>> _readPartnerSnapshot(int partnerId) async {
-    final out = <String, dynamic>{};
+  Future<List<VisitParticipant>> readParticipants(int visitId) async {
+    final result = await api.jsonRpc(
+      Endpoints.callKw,
+      params: {
+        'model': AppConstants.visitParticipantModel,
+        'method': 'search_read',
+        'args': [
+          [
+            ['visit_id', '=', visitId],
+          ],
+          ['id', 'employee_id', 'manager_id', 'approval_state', 'reject_reason'],
+        ],
+        'kwargs': {},
+      },
+    );
+    final rows = result is List ? result : const [];
+    return rows
+        .whereType<Map>()
+        .map((r) => VisitParticipant.fromOdooRow(Map<String, dynamic>.from(r)))
+        .toList();
+  }
+
+  /// Participant-manager approves one participant line (`action_approve`).
+  Future<void> approveParticipant(int participantId) async {
+    await _participantAction('action_approve', participantId);
+  }
+
+  /// Participant-manager rejects one participant line. The reason is written to
+  /// the line first, then `action_reject` is invoked (which reads it / triggers
+  /// the configured rejection policy). Writing the reason is best-effort in
+  /// case record rules only allow the action method.
+  Future<void> rejectParticipant(int participantId, String reason) async {
     try {
-      final result = await api.jsonRpc(
+      await api.jsonRpc(
         Endpoints.callKw,
         params: {
-          'model': AppConstants.partnerModel,
-          'method': 'read',
+          'model': AppConstants.visitParticipantModel,
+          'method': 'write',
           'args': [
-            [partnerId],
-            [
-              'name',
-              'partner_latitude',
-              'partner_longitude',
-              'contact_address',
-              'phone'
-            ],
+            [participantId],
+            {'reject_reason': reason},
           ],
           'kwargs': {},
         },
       );
-      final rows = result is List ? result : <dynamic>[];
-      if (rows.isEmpty || rows.first is! Map) return out;
-      final r = Map<String, dynamic>.from(rows.first as Map);
-      final lat = _num(r['partner_latitude']);
-      final lng = _num(r['partner_longitude']);
-      if (lat != null) out['x_customer_lat'] = lat;
-      if (lng != null) out['x_customer_lng'] = lng;
-      final addr = _str(r['contact_address']);
-      if (addr != null) out['x_customer_address'] = addr;
-      final phone = _str(r['phone']);
-      if (phone != null) out['x_customer_phone'] = phone;
-    } catch (_) {}
-    return out;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Reads
-  // ---------------------------------------------------------------------------
-
-  Future<List<Visit>> list({
-    int? customerId,
-    int? employeeId,
-    DateTime? from,
-    DateTime? to,
-    String state = 'all',
-    bool includeDrafts = false,
-  }) async {
-    final me = await _currentUser();
-    final domain = <dynamic>[];
-    // Field users only ever see their own visits (record rules enforce this
-    // server-side too, but filtering keeps payloads small). Managers see all.
-    if (!me.isManager && me.uid != null) {
-      domain.add(['x_user_id', '=', me.uid]);
-    }
-    if (customerId != null) {
-      domain.add(['x_partner_id', '=', customerId]);
-    }
-    if (employeeId != null) {
-      domain.add(['x_user_id', '=', employeeId]);
-    }
-    if (from != null) {
-      domain.add(['x_visit_date', '>=', _odooDate.format(from)]);
-    }
-    if (to != null) {
-      domain.add(['x_visit_date', '<=', _odooDate.format(to)]);
-    }
-
-    final result = await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': AppConstants.visitModel,
-        'method': 'search_read',
-        'args': [domain],
-        'kwargs': {
-          'fields': _visitFields,
-          'order': 'x_visit_date desc, id desc',
-        },
-      },
-    );
-    final rows = result is List ? result : <dynamic>[];
-    var visits = rows
-        .whereType<Map>()
-        .map((row) =>
-            Visit.fromJson(_adaptVisit(Map<String, dynamic>.from(row))))
-        .toList();
-
-    if (!includeDrafts) {
-      visits = visits
-          .where((v) => v.lifecycleState != VisitLifecycleState.draft)
-          .toList();
-    }
-    switch (state) {
-      case 'checked_in':
-        visits =
-            visits.where((v) => v.state == VisitStateType.checkedIn).toList();
-        break;
-      case 'checked_out':
-        visits =
-            visits.where((v) => v.state == VisitStateType.checkedOut).toList();
-        break;
-    }
-    return visits;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Writes
-  // ---------------------------------------------------------------------------
-
-  /// Field-user check-in: creates a fresh visit already carrying the check-in
-  /// timestamp + coordinates and the customer snapshot. Starts in `draft`
-  /// (in-progress); it moves to `submitted` (awaiting the manager) on
-  /// check-out.
-  Future<Visit> checkIn({
-    required int customerId,
-    required double latitude,
-    required double longitude,
-    String? customerName,
-    double? customerLat,
-    double? customerLng,
-    String? customerAddress,
-    String? customerPhone,
-    DateTime? timestamp,
-  }) async {
-    final me = await _currentUser();
-    final now = (timestamp ?? DateTime.now().toUtc()).toUtc();
-    final vals = <String, dynamic>{
-      'x_name': (customerName == null || customerName.isEmpty)
-          ? 'Visit'
-          : customerName,
-      'x_partner_id': customerId,
-      if (me.uid != null) 'x_user_id': me.uid,
-      'x_visit_date': _odooDate.format(now),
-      'x_check_in_time': _odooDateTime.format(now),
-      'x_check_in_lat': latitude,
-      'x_check_in_lng': longitude,
-      'x_state': 'draft',
-      if (customerLat != null) 'x_customer_lat': customerLat,
-      if (customerLng != null) 'x_customer_lng': customerLng,
-      if (customerAddress != null) 'x_customer_address': customerAddress,
-      if (customerPhone != null) 'x_customer_phone': customerPhone,
-    };
-    final result = await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': AppConstants.visitModel,
-        'method': 'create',
-        'args': [vals],
-        'kwargs': {},
-      },
-    );
-    final id = (result as num).toInt();
-
-    // Mirror the check-in into hr.attendance (GPS + time). Best-effort: a
-    // failure here must not fail the visit check-in.
-    try {
-      await attendance?.checkIn(latitude: latitude, longitude: longitude);
     } catch (e) {
-      debugPrint('[VisitsRepository] attendance check-in failed: $e');
+      debugPrint('[VisitsRepository] participant reason write failed: $e');
     }
-
-    final adapted = await _readVisit(id);
-    return Visit.fromJson(adapted ?? {'id': id, ...vals});
+    await _participantAction('action_reject', participantId);
   }
 
-  /// Field-user check-out: records the check-out time + coordinates and moves
-  /// the visit to `submitted` (awaiting the manager's approval).
-  Future<Visit> checkOut({
-    required int visitId,
-    required double latitude,
-    required double longitude,
-    String? notes,
-    DateTime? timestamp,
-  }) async {
-    final now = (timestamp ?? DateTime.now().toUtc()).toUtc();
-    final vals = <String, dynamic>{
-      'x_check_out_time': _odooDateTime.format(now),
-      'x_check_out_lat': latitude,
-      'x_check_out_lng': longitude,
-      'x_state': 'submitted',
-      if (notes != null && notes.trim().isNotEmpty) 'x_notes': notes.trim(),
-    };
+  Future<void> _participantAction(String method, int participantId) async {
     await api.jsonRpc(
       Endpoints.callKw,
       params: {
-        'model': AppConstants.visitModel,
-        'method': 'write',
+        'model': AppConstants.visitParticipantModel,
+        'method': method,
         'args': [
-          [visitId],
-          vals,
+          [participantId],
         ],
         'kwargs': {},
       },
     );
-
-    // Mirror the check-out into hr.attendance (GPS + time). Best-effort.
-    try {
-      await attendance?.checkOut(latitude: latitude, longitude: longitude);
-    } catch (e) {
-      debugPrint('[VisitsRepository] attendance check-out failed: $e');
-    }
-
-    final adapted = await _readVisit(visitId);
-    return Visit.fromJson(adapted ?? {'id': visitId, ...vals});
   }
 
-  /// Admin: create a scheduled visit for a salesperson.
-  Future<int> create({
-    required int customerId,
-    required int salespersonUserId,
-    required DateTime visitDate,
-    int? visitTypeId,
-    String? visitTypeName,
-    String? customerName,
-    double? customerLat,
-    double? customerLng,
-    String? customerAddress,
-    String? customerPhone,
-    String? description,
-    VisitLifecycleState state = VisitLifecycleState.submit,
-  }) async {
-    final vals = <String, dynamic>{
-      'x_name': (customerName == null || customerName.isEmpty)
-          ? 'Visit'
-          : customerName,
-      'x_partner_id': customerId,
-      'x_user_id': salespersonUserId,
-      'x_visit_date': _odooDate.format(visitDate),
-      'x_state': _appWireToXState(lifecycleToWire(state)),
-      if (visitTypeId != null) 'x_visit_type_id': visitTypeId,
-      if (description != null && description.isNotEmpty) 'x_notes': description,
-      if (customerLat != null) 'x_customer_lat': customerLat,
-      if (customerLng != null) 'x_customer_lng': customerLng,
-      if (customerAddress != null) 'x_customer_address': customerAddress,
-      if (customerPhone != null) 'x_customer_phone': customerPhone,
-    };
+  /// Owner/manager cancels a visit (`action_cancel`; not in the REST API).
+  Future<void> cancel(int visitId) => _visitAction('action_cancel', visitId);
+
+  /// Sends a visit back to draft (`action_reset_to_draft`).
+  Future<void> resetToDraft(int visitId) =>
+      _visitAction('action_reset_to_draft', visitId);
+
+  Future<void> _visitAction(String method, int visitId) async {
+    await api.jsonRpc(
+      Endpoints.callKw,
+      params: {
+        'model': AppConstants.visitModel,
+        'method': method,
+        'args': [
+          [visitId],
+        ],
+        'kwargs': {},
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pickers for the create form
+  // ---------------------------------------------------------------------------
+
+  /// Projects (with their customer) for the project-visit picker.
+  Future<List<LinkedRecord>> listProjects() =>
+      _listLinked(AppConstants.projectModel, const []);
+
+  /// Opportunities (with their customer) for the opportunity-visit picker.
+  Future<List<LinkedRecord>> listOpportunities() => _listLinked(
+        AppConstants.crmLeadModel,
+        const [
+          ['type', '=', 'opportunity'],
+        ],
+      );
+
+  Future<List<LinkedRecord>> _listLinked(
+    String model,
+    List<dynamic> domain,
+  ) async {
     final result = await api.jsonRpc(
       Endpoints.callKw,
       params: {
-        'model': AppConstants.visitModel,
-        'method': 'create',
-        'args': [vals],
-        'kwargs': {},
-      },
-    );
-    return (result as num).toInt();
-  }
-
-  /// Generic partial update. Accepts the same Odoo-style field keys the UI
-  /// already builds and maps them onto the `x_dh_visit` columns.
-  Future<void> update(int visitId, Map<String, dynamic> partial) async {
-    final vals = <String, dynamic>{};
-
-    if (partial.containsKey('description')) {
-      vals['x_notes'] = (partial['description'] ?? '').toString();
-    }
-    if (partial.containsKey('state')) {
-      vals['x_state'] = _appWireToXState(partial['state']?.toString());
-    }
-    if (partial.containsKey('visit_date')) {
-      vals['x_visit_date'] = partial['visit_date'].toString();
-    }
-    if (partial.containsKey('salesperson_id')) {
-      vals['x_user_id'] = partial['salesperson_id'];
-    }
-    if (partial.containsKey('partner_id')) {
-      final pid = (partial['partner_id'] as num).toInt();
-      vals['x_partner_id'] = pid;
-      // Refresh the customer snapshot so coords/in-range stay correct after a
-      // re-assignment.
-      vals.addAll(await _readPartnerSnapshot(pid));
-    }
-    if (partial.containsKey('visit_type_id')) {
-      final raw = partial['visit_type_id'];
-      vals['x_visit_type_id'] =
-          (raw == false || raw == null) ? false : (raw as num).toInt();
-    }
-    if (partial.containsKey('check_in_date_time')) {
-      vals['x_check_in_time'] = _toOdooDateTime(partial['check_in_date_time']);
-    }
-    if (partial.containsKey('check_in_lat')) {
-      vals['x_check_in_lat'] = partial['check_in_lat'];
-    }
-    if (partial.containsKey('check_in_lng')) {
-      vals['x_check_in_lng'] = partial['check_in_lng'];
-    }
-    if (partial.containsKey('check_out_date_time')) {
-      vals['x_check_out_time'] = _toOdooDateTime(partial['check_out_date_time']);
-    }
-    if (partial.containsKey('check_out_lat')) {
-      vals['x_check_out_lat'] = partial['check_out_lat'];
-    }
-    if (partial.containsKey('check_out_lng')) {
-      vals['x_check_out_lng'] = partial['check_out_lng'];
-    }
-
-    if (vals.isEmpty) return;
-    await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': AppConstants.visitModel,
-        'method': 'write',
-        'args': [
-          [visitId],
-          vals,
-        ],
-        'kwargs': {},
-      },
-    );
-
-    // Mirror an in-app check-in / check-out into hr.attendance so the user's
-    // Odoo presence indicator flips green / red. Manager-created visits are
-    // checked in/out through update() (not checkIn()/checkOut()), so without
-    // this the systray dot would never change. Best-effort — an attendance
-    // failure must never fail the visit write itself.
-    final ciLat = partial['check_in_lat'];
-    final ciLng = partial['check_in_lng'];
-    if (ciLat is num && ciLng is num) {
-      try {
-        await attendance?.checkIn(
-            latitude: ciLat.toDouble(), longitude: ciLng.toDouble());
-      } catch (e) {
-        debugPrint('[VisitsRepository] attendance check-in (update) failed: $e');
-      }
-    }
-    final coLat = partial['check_out_lat'];
-    final coLng = partial['check_out_lng'];
-    if (coLat is num && coLng is num) {
-      try {
-        await attendance?.checkOut(
-            latitude: coLat.toDouble(), longitude: coLng.toDouble());
-      } catch (e) {
-        debugPrint('[VisitsRepository] attendance check-out (update) failed: $e');
-      }
-    }
-  }
-
-  Future<void> delete(int visitId) async {
-    await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': AppConstants.visitModel,
-        'method': 'unlink',
-        'args': [
-          [visitId],
-        ],
-        'kwargs': {},
-      },
-    );
-  }
-
-  /// Visit types map to standard `calendar.event.type` ("Tags"). Returns
-  /// whatever the company has defined; empty if none.
-  Future<List<VisitType>> listVisitTypes() async {
-    final result = await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': AppConstants.calendarEventTypeModel,
+        'model': model,
         'method': 'search_read',
-        'args': [<dynamic>[]],
-        'kwargs': {
-          'fields': ['id', 'name'],
-          'order': 'name asc',
-        },
+        'args': [domain, ['id', 'name', 'partner_id']],
+        'kwargs': {'order': 'name asc', 'limit': 500},
       },
     );
-    final items = result is List ? result : <dynamic>[];
-    return items
-        .whereType<Map>()
-        .map((e) => VisitType.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
+    final rows = result is List ? result : const [];
+    return rows.whereType<Map>().map((r) {
+      final row = Map<String, dynamic>.from(r);
+      int? pid;
+      String? pname;
+      final p = row['partner_id'];
+      if (p is List && p.length >= 2) {
+        pid = (p[0] as num?)?.toInt();
+        pname = p[1]?.toString();
+      }
+      return LinkedRecord(
+        id: (row['id'] as num).toInt(),
+        name: row['name']?.toString() ?? '',
+        partnerId: pid,
+        partnerName: pname,
+      );
+    }).toList();
   }
+}
+
+/// A project or opportunity option in the create-visit picker, carrying the
+/// customer it will auto-fill.
+class LinkedRecord {
+  final int id;
+  final String name;
+  final int? partnerId;
+  final String? partnerName;
+
+  const LinkedRecord({
+    required this.id,
+    required this.name,
+    this.partnerId,
+    this.partnerName,
+  });
 }

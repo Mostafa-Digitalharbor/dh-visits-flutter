@@ -1,9 +1,12 @@
 part of 'visit_bloc.dart';
 
-enum VisitStatus { idle, submitting, checkedIn, checkedOut }
+/// Lifecycle of the *currently running* visit shown in the persistent bar.
+enum VisitStatus { idle, submitting, running, ended }
 
 class VisitState extends Equatable {
   final VisitStatus status;
+
+  /// The visit currently `in_progress` (started, not yet ended), if any.
   final Visit? activeVisit;
   final ApiException? error;
 

@@ -27,9 +27,9 @@ class PersistentVisitBar extends StatelessWidget {
           prev.activeVisit?.id != curr.activeVisit?.id,
       builder: (context, state) {
         final visit = state.activeVisit;
-        final showing = state.status == VisitStatus.checkedIn &&
+        final showing = state.status == VisitStatus.running &&
             visit != null &&
-            visit.checkInTime != null;
+            visit.startDatetime != null;
         return AnimatedSwitcher(
           duration: const Duration(milliseconds: 220),
           switchInCurve: Curves.easeOut,

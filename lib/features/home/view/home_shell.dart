@@ -48,9 +48,10 @@ class _HomeShellState extends State<HomeShell> {
       if (!isManager) {
         context.read<VisitBloc>().add(const VisitResumeRequested());
       }
-      context
-          .read<VisitsListBloc>()
-          .add(VisitsListLoadRequested(includeDrafts: isManager));
+      context.read<VisitsListBloc>().add(VisitsListLoadRequested(
+            scope:
+                isManager ? VisitListScope.pending : VisitListScope.mine,
+          ));
     });
   }
 

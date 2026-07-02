@@ -6,27 +6,24 @@ sealed class VisitsListEvent extends Equatable {
   List<Object?> get props => [];
 }
 
+/// (Re)load the current scope from the backend.
 class VisitsListLoadRequested extends VisitsListEvent {
-  /// True when the request is being made on behalf of an admin — the
-  /// repository will also return draft visits in that case so the
-  /// manager has visibility over the full pipeline. Defaults to false
-  /// for safety (field users keep the trimmed view).
-  final bool includeDrafts;
-  const VisitsListLoadRequested({this.includeDrafts = false});
-
+  /// Optional scope override; defaults to keeping the current scope.
+  final VisitListScope? scope;
+  const VisitsListLoadRequested({this.scope});
   @override
-  List<Object?> get props => [includeDrafts];
+  List<Object?> get props => [scope];
 }
 
-class VisitsListFilterChanged extends VisitsListEvent {
-  final VisitsFilter filter;
-  const VisitsListFilterChanged(this.filter);
+/// Switch tab (mine / pending / team / escalated) and refetch.
+class VisitsListScopeChanged extends VisitsListEvent {
+  final VisitListScope scope;
+  const VisitsListScopeChanged(this.scope);
   @override
-  List<Object?> get props => [filter];
+  List<Object?> get props => [scope];
 }
 
-/// Pure client-side filter — does NOT refetch from the server. The page
-/// applies `searchQuery` on top of `state.items` when rendering.
+/// Client-side substring filter; no refetch.
 class VisitsListSearchChanged extends VisitsListEvent {
   final String query;
   const VisitsListSearchChanged(this.query);
@@ -34,19 +31,10 @@ class VisitsListSearchChanged extends VisitsListEvent {
   List<Object?> get props => [query];
 }
 
-/// Admin-only quick filter on lifecycle state. Client-side; no refetch.
-class VisitsListStatusFilterChanged extends VisitsListEvent {
-  final VisitStatusFilter filter;
-  const VisitsListStatusFilterChanged(this.filter);
+/// Client-side filter on a single workflow state (`null` = all); no refetch.
+class VisitsListStateFilterChanged extends VisitsListEvent {
+  final VisitState? state;
+  const VisitsListStateFilterChanged(this.state);
   @override
-  List<Object?> get props => [filter];
-}
-
-/// Admin-only quick filter on execution timing (on time / early /
-/// overdue). Client-side; no refetch.
-class VisitsListTimingFilterChanged extends VisitsListEvent {
-  final VisitTimingFilter filter;
-  const VisitsListTimingFilterChanged(this.filter);
-  @override
-  List<Object?> get props => [filter];
+  List<Object?> get props => [state];
 }

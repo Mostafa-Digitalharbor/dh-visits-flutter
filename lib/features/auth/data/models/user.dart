@@ -1,5 +1,39 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../core/constants.dart';
+
+/// The user's role inside the `dh_visit_management` module, derived from their
+/// Odoo security-group membership (highest wins). Drives which visit screens,
+/// list tabs and action buttons the app exposes.
+enum VisitRole { none, user, manager, projectManager, admin }
+
+/// Maps a user's `res.users.group_ids` onto a [VisitRole] (highest match wins).
+VisitRole visitRoleFromGroupIds(Iterable<int> groupIds) {
+  final ids = groupIds.toSet();
+  if (ids.contains(AppConstants.groupVisitAdminId)) return VisitRole.admin;
+  if (ids.contains(AppConstants.groupVisitProjectManagerId)) {
+    return VisitRole.projectManager;
+  }
+  if (ids.contains(AppConstants.groupVisitManagerId)) return VisitRole.manager;
+  if (ids.contains(AppConstants.groupVisitUserId)) return VisitRole.user;
+  return VisitRole.none;
+}
+
+VisitRole _visitRoleFromName(dynamic raw) {
+  switch (raw?.toString()) {
+    case 'admin':
+      return VisitRole.admin;
+    case 'projectManager':
+      return VisitRole.projectManager;
+    case 'manager':
+      return VisitRole.manager;
+    case 'user':
+      return VisitRole.user;
+    default:
+      return VisitRole.none;
+  }
+}
+
 class AuthUser extends Equatable {
   final int uid;
   final String username;
@@ -28,6 +62,10 @@ class AuthUser extends Equatable {
   /// them in the user's preferred timezone instead of the device clock.
   final String? tz;
 
+  /// The user's role in the `dh_visit_management` module, derived from their
+  /// Odoo security groups right after login (see [AuthRepository.login]).
+  final VisitRole visitRole;
+
   const AuthUser({
     required this.uid,
     required this.username,
@@ -38,11 +76,31 @@ class AuthUser extends Equatable {
     this.isSystem = false,
     this.isManager = false,
     this.tz,
+    this.visitRole = VisitRole.none,
   });
 
-  /// Combined gate used across the UI to decide whether to expose edit
-  /// affordances and the manager-only screens (Customers, full Settings).
-  bool get canEditVisits => isManager || isAdmin;
+  /// True for any manager-tier visit role (manager / project manager / admin).
+  bool get isVisitManager =>
+      visitRole == VisitRole.manager ||
+      visitRole == VisitRole.projectManager ||
+      visitRole == VisitRole.admin;
+
+  /// Whether the user gets the manager experience (Team/Pending tabs, approve
+  /// affordances, planning visits for others). Keyed off the visit role, with
+  /// the Odoo admin flag as a safety net.
+  bool get canEditVisits => isVisitManager || isAdmin;
+
+  /// Can act as an approver on visits routed to them (direct/higher manager,
+  /// project manager on escalated visits, admin). The server still enforces
+  /// the exact approver rules; this only gates showing the buttons.
+  bool get canApproveVisits => isVisitManager || isAdmin;
+
+  /// Project managers and admins additionally see escalated visits.
+  bool get canSeeEscalated =>
+      visitRole == VisitRole.projectManager || visitRole == VisitRole.admin;
+
+  /// Managers/admins can plan (create) visits on behalf of a subordinate.
+  bool get canPlanForOthers => isVisitManager || isAdmin;
 
   /// Human-friendly name. Falls back to login if employee name unknown.
   String get displayName => employeeName ?? username;
@@ -62,6 +120,7 @@ class AuthUser extends Equatable {
       // as managers. If a server *does* expose `is_manager`, honour it too.
       isManager: json['is_manager'] == true || isAdmin || isSystem,
       tz: _parseTz(json['tz']),
+      visitRole: _visitRoleFromName(json['visit_role']),
     );
   }
 
@@ -75,9 +134,10 @@ class AuthUser extends Equatable {
         'is_system': isSystem,
         'is_manager': isManager,
         'tz': tz,
+        'visit_role': visitRole.name,
       };
 
-  AuthUser copyWith({String? tz}) => AuthUser(
+  AuthUser copyWith({String? tz, VisitRole? visitRole}) => AuthUser(
         uid: uid,
         username: username,
         employeeName: employeeName,
@@ -87,6 +147,7 @@ class AuthUser extends Equatable {
         isSystem: isSystem,
         isManager: isManager,
         tz: tz ?? this.tz,
+        visitRole: visitRole ?? this.visitRole,
       );
 
   static String? _parseTz(dynamic raw) {
@@ -98,5 +159,5 @@ class AuthUser extends Equatable {
 
   @override
   List<Object?> get props =>
-      [uid, username, employeeId, isAdmin, isManager, tz];
+      [uid, username, employeeId, isAdmin, isManager, tz, visitRole];
 }

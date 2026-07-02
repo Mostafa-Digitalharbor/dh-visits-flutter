@@ -120,7 +120,7 @@ class _Metrics {
   }
 
   factory _Metrics.from(List<Visit> visits) {
-    final completed = visits.where((v) => v.state == VisitStateType.checkedOut).toList();
+    final completed = visits.where((v) => v.isDone).toList();
     final onTime = completed.where((v) => (v.executionDaysDelta ?? 0) == 0).length;
     final pct = completed.isEmpty ? 0 : (onTime / completed.length * 100).round();
     // Field km — sum of distances between consecutive check-in points.
@@ -341,7 +341,7 @@ class _ByEmployee extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final completed = visits.where((v) => v.state == VisitStateType.checkedOut);
+    final completed = visits.where((v) => v.isDone);
     final byEmp = <String, List<Visit>>{};
     for (final v in completed) {
       final name = v.employeeName;

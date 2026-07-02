@@ -4,75 +4,80 @@ enum CreateVisitStatus { idle, submitting, success, failure }
 
 class CreateVisitState extends Equatable {
   final CreateVisitStatus status;
-  final Customer? customer;
+  final VisitType visitType;
+  final LinkedRecord? linked;
+  final DateTime? scheduled;
+  final String purpose;
+  final String location;
+
+  /// Optional subordinate the visit is planned for (managers only). `null`
+  /// means the visit is created for the caller.
   final Employee? employee;
-  final DateTime? date;
-  final int? visitTypeId;
-  final String? visitTypeName;
-  final String notes;
+  final List<Employee> participants;
+
   final int? createdVisitId;
   final ApiException? error;
 
-  /// Initial lifecycle the admin wants the visit to land in. Defaults
-  /// to `draft` because a brand-new visit hasn't been worked yet —
-  /// flipping it to `submit` happens once the employee actually goes
-  /// out, not at the moment of creation.
-  final VisitLifecycleState lifecycleState;
-
   const CreateVisitState({
     this.status = CreateVisitStatus.idle,
-    this.customer,
+    this.visitType = VisitType.project,
+    this.linked,
+    this.scheduled,
+    this.purpose = '',
+    this.location = '',
     this.employee,
-    this.date,
-    this.visitTypeId,
-    this.visitTypeName,
-    this.notes = '',
+    this.participants = const [],
     this.createdVisitId,
     this.error,
-    this.lifecycleState = VisitLifecycleState.draft,
   });
 
   bool get isValid =>
-      customer != null && employee != null && date != null;
+      visitType != VisitType.unknown &&
+      linked != null &&
+      scheduled != null &&
+      purpose.trim().isNotEmpty;
+
+  /// Customer name to display, taken from the chosen project/opportunity.
+  String? get customerName => linked?.partnerName;
 
   CreateVisitState copyWith({
     CreateVisitStatus? status,
-    Customer? customer,
+    VisitType? visitType,
+    LinkedRecord? linked,
+    bool clearLinked = false,
+    DateTime? scheduled,
+    String? purpose,
+    String? location,
     Employee? employee,
-    DateTime? date,
-    int? visitTypeId,
-    String? visitTypeName,
-    bool clearVisitType = false,
-    String? notes,
+    bool clearEmployee = false,
+    List<Employee>? participants,
     int? createdVisitId,
     ApiException? error,
-    VisitLifecycleState? lifecycleState,
   }) =>
       CreateVisitState(
         status: status ?? this.status,
-        customer: customer ?? this.customer,
-        employee: employee ?? this.employee,
-        date: date ?? this.date,
-        visitTypeId: clearVisitType ? null : (visitTypeId ?? this.visitTypeId),
-        visitTypeName:
-            clearVisitType ? null : (visitTypeName ?? this.visitTypeName),
-        notes: notes ?? this.notes,
+        visitType: visitType ?? this.visitType,
+        linked: clearLinked ? null : (linked ?? this.linked),
+        scheduled: scheduled ?? this.scheduled,
+        purpose: purpose ?? this.purpose,
+        location: location ?? this.location,
+        employee: clearEmployee ? null : (employee ?? this.employee),
+        participants: participants ?? this.participants,
         createdVisitId: createdVisitId ?? this.createdVisitId,
         error: error,
-        lifecycleState: lifecycleState ?? this.lifecycleState,
       );
 
   @override
   List<Object?> get props => [
         status,
-        customer?.id,
-        employee?.userId,
-        date,
-        visitTypeId,
-        visitTypeName,
-        notes,
+        visitType,
+        linked?.id,
+        scheduled,
+        purpose,
+        location,
+        employee?.hrEmployeeId,
+        participants.map((e) => e.hrEmployeeId).toList(),
         createdVisitId,
         error,
-        lifecycleState,
       ];
 }

@@ -10,10 +10,10 @@ import '../../../core/di/service_locator.dart';
 import '../../../core/utils/user_time.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
-import '../../auth/bloc/auth_bloc.dart';
 import '../../visits/bloc/visits_list_bloc.dart';
 import '../../visits/data/models/visit.dart';
 import '../../visits/data/visits_repository.dart';
+import '../../visits/view/action_sheets.dart';
 
 /// Manager review queue (design screen 09). Lists every visit in the
 /// `under_review` lifecycle as an approve/reject card. Approving writes
@@ -28,16 +28,22 @@ class ReviewPage extends StatefulWidget {
 class _ReviewPageState extends State<ReviewPage> {
   bool _busy = false;
 
-  bool get _isManager => context.read<AuthBloc>().state.user?.canEditVisits ?? false;
-
-  Future<void> _decide(Visit visit, {required bool approve}) async {
+  Future<void> _decide(Visit visit,
+      {required bool approve, String? reason}) async {
     if (_busy) return;
     setState(() => _busy = true);
     HapticFeedback.mediumImpact();
     try {
-      await sl<VisitsRepository>().update(visit.id, {'state': approve ? 'done' : 'submit'});
+      final repo = sl<VisitsRepository>();
+      if (approve) {
+        await repo.approve(visit.id);
+      } else {
+        await repo.reject(visit.id, reason ?? '');
+      }
       if (!mounted) return;
-      context.read<VisitsListBloc>().add(VisitsListLoadRequested(includeDrafts: _isManager));
+      context
+          .read<VisitsListBloc>()
+          .add(const VisitsListLoadRequested(scope: VisitListScope.pending));
       context.showSnack(
         approve ? context.s.reviewApproved : context.s.reviewRejected,
         kind: approve ? SnackKind.success : SnackKind.info,
@@ -59,9 +65,8 @@ class _ReviewPageState extends State<ReviewPage> {
       ),
       body: BlocBuilder<VisitsListBloc, VisitsListState>(
         builder: (context, state) {
-          final pending = state.items
-              .where((v) => v.lifecycleState == VisitLifecycleState.underReview)
-              .toList();
+          final pending =
+              state.items.where((v) => v.isAwaitingApproval).toList();
           if (pending.isEmpty) {
             return EmptyView(
               icon: Symbols.task_alt,
@@ -78,7 +83,11 @@ class _ReviewPageState extends State<ReviewPage> {
                   visit: v,
                   busy: _busy,
                   onApprove: () => _decide(v, approve: true),
-                  onReject: () => _decide(v, approve: false),
+                  onReject: () async {
+                    final reason = await showRejectReasonSheet(context);
+                    if (reason == null || !mounted) return;
+                    _decide(v, approve: false, reason: reason);
+                  },
                 ),
                 const SizedBox(height: 14),
               ],
@@ -124,9 +133,8 @@ class _ReviewCard extends StatelessWidget {
   const _ReviewCard(
       {required this.visit, required this.busy, required this.onApprove, required this.onReject});
 
-  bool get _flagged =>
-      visit.checkInState == VisitRangeState.notInRange ||
-      visit.checkOutState == VisitRangeState.notInRange;
+  // The new workflow enforces geofence server-side; no client range flag.
+  bool get _flagged => false;
 
   @override
   Widget build(BuildContext context) {

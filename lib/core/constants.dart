@@ -47,17 +47,33 @@ class AppConstants {
   static const double checkInRangeMeters = 200.0;
 
   // ---- Standard Odoo models the app talks to via generic JSON-RPC ----
-  // No custom module: customers are partners, visits are calendar events.
   static const String partnerModel = 'res.partner';
   static const String calendarEventModel = 'calendar.event';
   static const String calendarEventTypeModel = 'calendar.event.type';
   static const String usersModel = 'res.users';
 
-  /// Visits now live in a dedicated custom model (`x_dh_visit`) built on the
-  /// Odoo server, with one real, manager-readable column per field plus an
-  /// approval workflow (`x_state`: draft → submitted → approved / rejected).
-  /// Visit *types* still reuse the standard `calendar.event.type` tags.
-  static const String visitModel = 'x_dh_visit';
+  /// Visits live in the `dh_visit_management` Odoo module. The visit record is
+  /// `dh.visit` with a full approval workflow (`state`: draft → submitted →
+  /// waiting_* approval → approved → in_progress → done, plus rejected /
+  /// cancelled / escalated / reschedule_requested). A visit is tied to a
+  /// project or opportunity (the customer auto-fills from it).
+  ///
+  /// Visit *actions* go through the module's dedicated `/api/visit/*` REST
+  /// endpoints (see [Endpoints]); manager list reads and the rich detail
+  /// fields not exposed by the REST payload are read via `call_kw` on the
+  /// models below (record rules enforce access server-side).
+  static const String visitModel = 'dh.visit';
+  static const String visitParticipantModel = 'dh.visit.participant';
+  static const String projectModel = 'project.project';
+  static const String crmLeadModel = 'crm.lead';
+
+  // ---- dh_visit_management security groups (res.groups) ----
+  // The logged-in user's visit role is derived by matching their `group_ids`
+  // against these (highest wins). See AuthUser.visitRole.
+  static const int groupVisitUserId = 41; // dh_visit_management.group_visit_user
+  static const int groupVisitManagerId = 42; // group_visit_manager
+  static const int groupVisitProjectManagerId = 43; // group_visit_project_manager
+  static const int groupVisitAdminId = 44; // group_visit_admin
 
   // Attendance: the salesperson's check-in / check-out is also mirrored to
   // Odoo's standard `hr.attendance` (with GPS in the native `in_*` / `out_*`

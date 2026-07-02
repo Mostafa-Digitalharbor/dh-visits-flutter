@@ -6,23 +6,25 @@ sealed class VisitEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class VisitCheckInRequested extends VisitEvent {
-  final Customer customer;
-  const VisitCheckInRequested({required this.customer});
+/// Start an approved visit (captures GPS, moves it to `in_progress`).
+class VisitStartRequested extends VisitEvent {
+  final Visit visit;
+  const VisitStartRequested({required this.visit});
   @override
-  List<Object?> get props => [customer];
+  List<Object?> get props => [visit];
 }
 
-class VisitCheckOutRequested extends VisitEvent {
+/// End the running visit (outcome required, captures GPS, moves to `done`).
+class VisitEndRequested extends VisitEvent {
   final int visitId;
-  final String? notes;
-  const VisitCheckOutRequested({required this.visitId, this.notes});
+  final String outcome;
+  const VisitEndRequested({required this.visitId, required this.outcome});
   @override
-  List<Object?> get props => [visitId, notes];
+  List<Object?> get props => [visitId, outcome];
 }
 
-/// On app/home init, ask backend if there is an open visit for this employee
-/// and rehydrate the active visit screen.
+/// On app/home init, ask the backend for an in-progress visit and rehydrate
+/// the persistent bar.
 class VisitResumeRequested extends VisitEvent {
   const VisitResumeRequested();
 }

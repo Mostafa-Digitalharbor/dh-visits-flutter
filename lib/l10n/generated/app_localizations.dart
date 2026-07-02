@@ -2113,6 +2113,534 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Customer Visits · Digital Harbor © 2026'**
   String get aboutFooter;
+
+  /// No description provided for @wfStateDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get wfStateDraft;
+
+  /// No description provided for @wfStateSubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Submitted'**
+  String get wfStateSubmitted;
+
+  /// No description provided for @wfStateWaitingParticipant.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting participant approval'**
+  String get wfStateWaitingParticipant;
+
+  /// No description provided for @wfStateWaitingManager.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting manager approval'**
+  String get wfStateWaitingManager;
+
+  /// No description provided for @wfStateEscalated.
+  ///
+  /// In en, this message translates to:
+  /// **'Escalated'**
+  String get wfStateEscalated;
+
+  /// No description provided for @wfStateApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get wfStateApproved;
+
+  /// No description provided for @wfStateRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get wfStateRejected;
+
+  /// No description provided for @wfStateCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get wfStateCancelled;
+
+  /// No description provided for @wfStateReschedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Reschedule requested'**
+  String get wfStateReschedule;
+
+  /// No description provided for @wfStateInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get wfStateInProgress;
+
+  /// No description provided for @wfStateDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get wfStateDone;
+
+  /// No description provided for @wfStateUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'—'**
+  String get wfStateUnknown;
+
+  /// No description provided for @wfScopeMine.
+  ///
+  /// In en, this message translates to:
+  /// **'My visits'**
+  String get wfScopeMine;
+
+  /// No description provided for @wfScopePending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get wfScopePending;
+
+  /// No description provided for @wfScopeTeam.
+  ///
+  /// In en, this message translates to:
+  /// **'Team'**
+  String get wfScopeTeam;
+
+  /// No description provided for @wfScopeEscalated.
+  ///
+  /// In en, this message translates to:
+  /// **'Escalated'**
+  String get wfScopeEscalated;
+
+  /// No description provided for @wfActionSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit for approval'**
+  String get wfActionSubmit;
+
+  /// No description provided for @wfActionApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get wfActionApprove;
+
+  /// No description provided for @wfActionReject.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject'**
+  String get wfActionReject;
+
+  /// No description provided for @wfActionReschedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Request reschedule'**
+  String get wfActionReschedule;
+
+  /// No description provided for @wfActionStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start visit'**
+  String get wfActionStart;
+
+  /// No description provided for @wfActionEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End visit'**
+  String get wfActionEnd;
+
+  /// No description provided for @wfActionCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel visit'**
+  String get wfActionCancel;
+
+  /// No description provided for @wfActionAddParticipant.
+  ///
+  /// In en, this message translates to:
+  /// **'Add participant'**
+  String get wfActionAddParticipant;
+
+  /// No description provided for @wfActionAddAttachment.
+  ///
+  /// In en, this message translates to:
+  /// **'Add attachment'**
+  String get wfActionAddAttachment;
+
+  /// No description provided for @wfTypeProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Project'**
+  String get wfTypeProject;
+
+  /// No description provided for @wfTypeOpportunity.
+  ///
+  /// In en, this message translates to:
+  /// **'Opportunity'**
+  String get wfTypeOpportunity;
+
+  /// No description provided for @wfFieldType.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit type'**
+  String get wfFieldType;
+
+  /// No description provided for @wfFieldProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Project'**
+  String get wfFieldProject;
+
+  /// No description provided for @wfFieldOpportunity.
+  ///
+  /// In en, this message translates to:
+  /// **'Opportunity'**
+  String get wfFieldOpportunity;
+
+  /// No description provided for @wfFieldCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get wfFieldCustomer;
+
+  /// No description provided for @wfFieldSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled date & time'**
+  String get wfFieldSchedule;
+
+  /// No description provided for @wfFieldPurpose.
+  ///
+  /// In en, this message translates to:
+  /// **'Purpose'**
+  String get wfFieldPurpose;
+
+  /// No description provided for @wfFieldLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Location'**
+  String get wfFieldLocation;
+
+  /// No description provided for @wfFieldOutcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Outcome'**
+  String get wfFieldOutcome;
+
+  /// No description provided for @wfFieldResponsible.
+  ///
+  /// In en, this message translates to:
+  /// **'Responsible employee'**
+  String get wfFieldResponsible;
+
+  /// No description provided for @wfFieldParticipants.
+  ///
+  /// In en, this message translates to:
+  /// **'Additional participants'**
+  String get wfFieldParticipants;
+
+  /// No description provided for @wfFieldDirectManager.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct manager'**
+  String get wfFieldDirectManager;
+
+  /// No description provided for @wfFieldHigherManager.
+  ///
+  /// In en, this message translates to:
+  /// **'Higher manager'**
+  String get wfFieldHigherManager;
+
+  /// No description provided for @wfPickProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Select project'**
+  String get wfPickProject;
+
+  /// No description provided for @wfPickOpportunity.
+  ///
+  /// In en, this message translates to:
+  /// **'Select opportunity'**
+  String get wfPickOpportunity;
+
+  /// No description provided for @wfPickEmployee.
+  ///
+  /// In en, this message translates to:
+  /// **'Select employee'**
+  String get wfPickEmployee;
+
+  /// No description provided for @wfSelfLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Myself'**
+  String get wfSelfLabel;
+
+  /// No description provided for @wfPurposeRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Purpose is required'**
+  String get wfPurposeRequired;
+
+  /// No description provided for @wfOutcomeRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Outcome is required to end the visit'**
+  String get wfOutcomeRequired;
+
+  /// No description provided for @wfRejectReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejection reason'**
+  String get wfRejectReason;
+
+  /// No description provided for @wfRejectReasonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Explain why this visit is rejected…'**
+  String get wfRejectReasonHint;
+
+  /// No description provided for @wfReasonRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'A reason is required'**
+  String get wfReasonRequired;
+
+  /// No description provided for @wfCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New visit'**
+  String get wfCreateTitle;
+
+  /// No description provided for @wfCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit created'**
+  String get wfCreated;
+
+  /// No description provided for @wfSubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Submitted for approval'**
+  String get wfSubmitted;
+
+  /// No description provided for @wfApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit approved'**
+  String get wfApproved;
+
+  /// No description provided for @wfRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit rejected'**
+  String get wfRejected;
+
+  /// No description provided for @wfStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit started'**
+  String get wfStarted;
+
+  /// No description provided for @wfEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit completed'**
+  String get wfEnded;
+
+  /// No description provided for @wfRescheduled.
+  ///
+  /// In en, this message translates to:
+  /// **'Reschedule requested'**
+  String get wfRescheduled;
+
+  /// No description provided for @wfCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit cancelled'**
+  String get wfCancelled;
+
+  /// No description provided for @wfAttachmentAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment added'**
+  String get wfAttachmentAdded;
+
+  /// No description provided for @wfParticipantApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Participant approved'**
+  String get wfParticipantApproved;
+
+  /// No description provided for @wfParticipantRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Participant rejected'**
+  String get wfParticipantRejected;
+
+  /// No description provided for @wfApprovalHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Approval history'**
+  String get wfApprovalHistory;
+
+  /// No description provided for @wfSubmittedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Submitted on'**
+  String get wfSubmittedOn;
+
+  /// No description provided for @wfApprovedByOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved by'**
+  String get wfApprovedByOn;
+
+  /// No description provided for @wfRejectedByOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected by'**
+  String get wfRejectedByOn;
+
+  /// No description provided for @wfReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get wfReason;
+
+  /// No description provided for @wfEscalatedBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Escalated'**
+  String get wfEscalatedBadge;
+
+  /// No description provided for @wfParticipantsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Participants'**
+  String get wfParticipantsSection;
+
+  /// No description provided for @wfParticipantPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get wfParticipantPending;
+
+  /// No description provided for @wfParticipantApprovedState.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get wfParticipantApprovedState;
+
+  /// No description provided for @wfParticipantRejectedState.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get wfParticipantRejectedState;
+
+  /// No description provided for @wfNoParticipants.
+  ///
+  /// In en, this message translates to:
+  /// **'No additional participants'**
+  String get wfNoParticipants;
+
+  /// No description provided for @wfApproveParticipant.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get wfApproveParticipant;
+
+  /// No description provided for @wfRejectParticipant.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject'**
+  String get wfRejectParticipant;
+
+  /// No description provided for @wfEmptyMine.
+  ///
+  /// In en, this message translates to:
+  /// **'You have no visits yet'**
+  String get wfEmptyMine;
+
+  /// No description provided for @wfEmptyPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing awaiting your approval'**
+  String get wfEmptyPending;
+
+  /// No description provided for @wfEmptyTeam.
+  ///
+  /// In en, this message translates to:
+  /// **'No team visits'**
+  String get wfEmptyTeam;
+
+  /// No description provided for @wfEmptyEscalated.
+  ///
+  /// In en, this message translates to:
+  /// **'No escalated visits'**
+  String get wfEmptyEscalated;
+
+  /// No description provided for @wfSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by customer, reference or purpose…'**
+  String get wfSearchHint;
+
+  /// No description provided for @wfRescheduleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Request reschedule'**
+  String get wfRescheduleTitle;
+
+  /// No description provided for @wfListTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Visits'**
+  String get wfListTitle;
+
+  /// No description provided for @wfDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit'**
+  String get wfDetailTitle;
+
+  /// No description provided for @wfStartLocationCaptured.
+  ///
+  /// In en, this message translates to:
+  /// **'Your GPS location will be recorded'**
+  String get wfStartLocationCaptured;
+
+  /// No description provided for @wfConfirmCancelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel visit'**
+  String get wfConfirmCancelTitle;
+
+  /// No description provided for @wfConfirmCancelMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to cancel this visit?'**
+  String get wfConfirmCancelMessage;
+
+  /// No description provided for @wfScheduledLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled'**
+  String get wfScheduledLabel;
+
+  /// No description provided for @wfStartedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Started'**
+  String get wfStartedLabel;
+
+  /// No description provided for @wfEndedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Ended'**
+  String get wfEndedLabel;
+
+  /// No description provided for @wfDurationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get wfDurationLabel;
 }
 
 class _AppLocalizationsDelegate

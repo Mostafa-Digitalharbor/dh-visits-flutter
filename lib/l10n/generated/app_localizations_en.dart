@@ -1069,4 +1069,269 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutFooter => 'Customer Visits · Digital Harbor © 2026';
+
+  @override
+  String get wfStateDraft => 'Draft';
+
+  @override
+  String get wfStateSubmitted => 'Submitted';
+
+  @override
+  String get wfStateWaitingParticipant => 'Waiting participant approval';
+
+  @override
+  String get wfStateWaitingManager => 'Waiting manager approval';
+
+  @override
+  String get wfStateEscalated => 'Escalated';
+
+  @override
+  String get wfStateApproved => 'Approved';
+
+  @override
+  String get wfStateRejected => 'Rejected';
+
+  @override
+  String get wfStateCancelled => 'Cancelled';
+
+  @override
+  String get wfStateReschedule => 'Reschedule requested';
+
+  @override
+  String get wfStateInProgress => 'In progress';
+
+  @override
+  String get wfStateDone => 'Done';
+
+  @override
+  String get wfStateUnknown => '—';
+
+  @override
+  String get wfScopeMine => 'My visits';
+
+  @override
+  String get wfScopePending => 'Pending';
+
+  @override
+  String get wfScopeTeam => 'Team';
+
+  @override
+  String get wfScopeEscalated => 'Escalated';
+
+  @override
+  String get wfActionSubmit => 'Submit for approval';
+
+  @override
+  String get wfActionApprove => 'Approve';
+
+  @override
+  String get wfActionReject => 'Reject';
+
+  @override
+  String get wfActionReschedule => 'Request reschedule';
+
+  @override
+  String get wfActionStart => 'Start visit';
+
+  @override
+  String get wfActionEnd => 'End visit';
+
+  @override
+  String get wfActionCancel => 'Cancel visit';
+
+  @override
+  String get wfActionAddParticipant => 'Add participant';
+
+  @override
+  String get wfActionAddAttachment => 'Add attachment';
+
+  @override
+  String get wfTypeProject => 'Project';
+
+  @override
+  String get wfTypeOpportunity => 'Opportunity';
+
+  @override
+  String get wfFieldType => 'Visit type';
+
+  @override
+  String get wfFieldProject => 'Project';
+
+  @override
+  String get wfFieldOpportunity => 'Opportunity';
+
+  @override
+  String get wfFieldCustomer => 'Customer';
+
+  @override
+  String get wfFieldSchedule => 'Scheduled date & time';
+
+  @override
+  String get wfFieldPurpose => 'Purpose';
+
+  @override
+  String get wfFieldLocation => 'Location';
+
+  @override
+  String get wfFieldOutcome => 'Outcome';
+
+  @override
+  String get wfFieldResponsible => 'Responsible employee';
+
+  @override
+  String get wfFieldParticipants => 'Additional participants';
+
+  @override
+  String get wfFieldDirectManager => 'Direct manager';
+
+  @override
+  String get wfFieldHigherManager => 'Higher manager';
+
+  @override
+  String get wfPickProject => 'Select project';
+
+  @override
+  String get wfPickOpportunity => 'Select opportunity';
+
+  @override
+  String get wfPickEmployee => 'Select employee';
+
+  @override
+  String get wfSelfLabel => 'Myself';
+
+  @override
+  String get wfPurposeRequired => 'Purpose is required';
+
+  @override
+  String get wfOutcomeRequired => 'Outcome is required to end the visit';
+
+  @override
+  String get wfRejectReason => 'Rejection reason';
+
+  @override
+  String get wfRejectReasonHint => 'Explain why this visit is rejected…';
+
+  @override
+  String get wfReasonRequired => 'A reason is required';
+
+  @override
+  String get wfCreateTitle => 'New visit';
+
+  @override
+  String get wfCreated => 'Visit created';
+
+  @override
+  String get wfSubmitted => 'Submitted for approval';
+
+  @override
+  String get wfApproved => 'Visit approved';
+
+  @override
+  String get wfRejected => 'Visit rejected';
+
+  @override
+  String get wfStarted => 'Visit started';
+
+  @override
+  String get wfEnded => 'Visit completed';
+
+  @override
+  String get wfRescheduled => 'Reschedule requested';
+
+  @override
+  String get wfCancelled => 'Visit cancelled';
+
+  @override
+  String get wfAttachmentAdded => 'Attachment added';
+
+  @override
+  String get wfParticipantApproved => 'Participant approved';
+
+  @override
+  String get wfParticipantRejected => 'Participant rejected';
+
+  @override
+  String get wfApprovalHistory => 'Approval history';
+
+  @override
+  String get wfSubmittedOn => 'Submitted on';
+
+  @override
+  String get wfApprovedByOn => 'Approved by';
+
+  @override
+  String get wfRejectedByOn => 'Rejected by';
+
+  @override
+  String get wfReason => 'Reason';
+
+  @override
+  String get wfEscalatedBadge => 'Escalated';
+
+  @override
+  String get wfParticipantsSection => 'Participants';
+
+  @override
+  String get wfParticipantPending => 'Pending';
+
+  @override
+  String get wfParticipantApprovedState => 'Approved';
+
+  @override
+  String get wfParticipantRejectedState => 'Rejected';
+
+  @override
+  String get wfNoParticipants => 'No additional participants';
+
+  @override
+  String get wfApproveParticipant => 'Approve';
+
+  @override
+  String get wfRejectParticipant => 'Reject';
+
+  @override
+  String get wfEmptyMine => 'You have no visits yet';
+
+  @override
+  String get wfEmptyPending => 'Nothing awaiting your approval';
+
+  @override
+  String get wfEmptyTeam => 'No team visits';
+
+  @override
+  String get wfEmptyEscalated => 'No escalated visits';
+
+  @override
+  String get wfSearchHint => 'Search by customer, reference or purpose…';
+
+  @override
+  String get wfRescheduleTitle => 'Request reschedule';
+
+  @override
+  String get wfListTitle => 'Visits';
+
+  @override
+  String get wfDetailTitle => 'Visit';
+
+  @override
+  String get wfStartLocationCaptured => 'Your GPS location will be recorded';
+
+  @override
+  String get wfConfirmCancelTitle => 'Cancel visit';
+
+  @override
+  String get wfConfirmCancelMessage =>
+      'Are you sure you want to cancel this visit?';
+
+  @override
+  String get wfScheduledLabel => 'Scheduled';
+
+  @override
+  String get wfStartedLabel => 'Started';
+
+  @override
+  String get wfEndedLabel => 'Ended';
+
+  @override
+  String get wfDurationLabel => 'Duration';
 }

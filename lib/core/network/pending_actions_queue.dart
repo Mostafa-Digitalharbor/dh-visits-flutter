@@ -140,7 +140,12 @@ class PendingActionsQueue {
       final survivors = <PendingAction>[];
       for (final a in actions) {
         try {
-          await repository.update(a.visitId, a.payload);
+          // Legacy check-in/out payloads are no longer replayable against the
+          // new visit workflow API — drop them so the queue drains cleanly.
+          // (Offline replay for the new Start/End flow is a follow-up.)
+          debugPrint(
+              '[PendingActionsQueue] dropping legacy queued action for '
+              'visit ${a.visitId}');
           _synced.add(a.visitId);
         } on ApiException catch (e) {
           if (e.code == ApiErrorCode.network ||

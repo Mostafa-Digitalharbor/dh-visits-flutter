@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/api/api_exceptions.dart';
@@ -9,8 +7,6 @@ import '../../../core/di/service_locator.dart';
 import '../../../core/utils/communications.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
-import '../../visits/bloc/visit_bloc.dart';
-import '../../visits/data/models/visit.dart';
 import '../data/customers_repository.dart';
 import '../data/models/customer.dart';
 
@@ -193,91 +189,34 @@ class _CustomerBody extends StatelessWidget {
                 const SizedBox(height: 16),
                 _SectionLabel(label: context.s.customerLastVisit),
                 const SizedBox(height: 6),
-                VisitCard(
-                  visit: Visit(
-                    id: customer.lastVisit!.id,
-                    customerId: customer.id,
-                    customerName: customer.name,
-                    employeeName: customer.lastVisit!.employeeName,
-                    checkInTime: customer.lastVisit!.checkInTime,
-                    checkOutTime: customer.lastVisit!.checkOutTime,
-                    state: customer.lastVisit!.checkOutTime != null
-                        ? VisitStateType.checkedOut
-                        : VisitStateType.checkedIn,
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: ListTile(
+                    leading: const Icon(Icons.history),
+                    title: Text(customer.lastVisit!.employeeName ??
+                        '#${customer.lastVisit!.id}'),
+                    subtitle: Text(customer.lastVisit!.checkOutTime != null
+                        ? context.s.wfStateDone
+                        : context.s.wfStateInProgress),
                   ),
                 ),
               ],
               const SizedBox(height: 24),
-              BlocConsumer<VisitBloc, VisitState>(
-                listenWhen: (prev, curr) =>
-                    prev.status != curr.status || prev.error != curr.error,
-                listener: (context, state) {
-                  if (state.status == VisitStatus.checkedIn &&
-                      state.error == null) {
-                    HapticFeedback.mediumImpact();
-                    context.showSnack(context.s.checkInSuccess);
-                    // Hand control back to home shell, which will switch to
-                    // the Active tab so the user can see the running timer.
-                    if (context.canPop()) context.pop();
-                  }
-                  if (state.error != null) {
-                    HapticFeedback.lightImpact();
-                    context.showSnack(state.error!.localize(context));
-                  }
-                },
-                builder: (context, state) {
-                  final loading = state.status == VisitStatus.submitting;
-                  final activeVisit = state.activeVisit;
-                  final isCheckedIn = state.status == VisitStatus.checkedIn &&
-                      activeVisit != null;
-                  final isActiveHere =
-                      isCheckedIn && activeVisit.customerId == customer.id;
-                  final isActiveElsewhere =
-                      isCheckedIn && activeVisit.customerId != customer.id;
-                  return Column(
-                    children: [
-                      if (isActiveHere) ...[
-                        _ActiveVisitBadge(),
-                        const SizedBox(height: 10),
-                      ],
-                      if (isActiveElsewhere) ...[
-                        _BlockedByOtherVisitBadge(
-                          otherCustomerName: activeVisit.customerName,
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                      AppButton(
-                        label: isActiveHere
-                            ? context.s.customerActiveVisitBadge
-                            : isActiveElsewhere
-                                ? context.s.customerCheckInBlockedShort
-                                : context.s.customerActionCheckIn,
-                        icon: isActiveHere
-                            ? Icons.check_circle
-                            : isActiveElsewhere
-                                ? Icons.block
-                                : Icons.login_rounded,
-                        loading: loading,
-                        onPressed: (isActiveHere || isActiveElsewhere)
-                            ? null
-                            : () => context.read<VisitBloc>().add(
-                                  VisitCheckInRequested(customer: customer),
-                                ),
-                      ),
-                      const SizedBox(height: 10),
-                      AppButton.secondary(
-                        label: context.s.customerActionNearby(
-                          AppConstants.defaultRadiusMeters.toStringAsFixed(0),
-                        ),
-                        icon: Icons.map_outlined,
-                        onPressed: () => context.push(
-                          '/customers/${customer.id}/nearby',
-                          extra: customer,
-                        ),
-                      ),
-                    ],
-                  );
-                },
+              AppButton(
+                label: context.s.wfCreateTitle,
+                icon: Icons.add,
+                onPressed: () => context.push('/visits/create'),
+              ),
+              const SizedBox(height: 10),
+              AppButton.secondary(
+                label: context.s.customerActionNearby(
+                  AppConstants.defaultRadiusMeters.toStringAsFixed(0),
+                ),
+                icon: Icons.map_outlined,
+                onPressed: () => context.push(
+                  '/customers/${customer.id}/nearby',
+                  extra: customer,
+                ),
               ),
             ],
           ),
@@ -436,73 +375,6 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _ActiveVisitBadge extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final accent = Colors.green.shade600;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-      decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accent.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.check_circle, color: accent),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              context.s.customerAlreadyCheckedIn,
-              style: context.text.bodyMedium?.copyWith(
-                color: colors.onSurface,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BlockedByOtherVisitBadge extends StatelessWidget {
-  final String? otherCustomerName;
-  const _BlockedByOtherVisitBadge({this.otherCustomerName});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final accent = Colors.orange.shade700;
-    final name = otherCustomerName ?? '-';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-      decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accent.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.warning_amber_rounded, color: accent),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              context.s.customerCheckInBlocked(name),
-              style: context.text.bodyMedium?.copyWith(
-                color: colors.onSurface,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _DetailSkeleton extends StatelessWidget {
   const _DetailSkeleton();

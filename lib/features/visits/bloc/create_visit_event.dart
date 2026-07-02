@@ -6,47 +6,62 @@ sealed class CreateVisitEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class CreateVisitCustomerSelected extends CreateVisitEvent {
-  final Customer customer;
-  const CreateVisitCustomerSelected(this.customer);
+class CreateVisitTypeChanged extends CreateVisitEvent {
+  final VisitType visitType;
+  const CreateVisitTypeChanged(this.visitType);
   @override
-  List<Object?> get props => [customer.id];
+  List<Object?> get props => [visitType];
 }
 
+/// The chosen project or opportunity (carries the customer to display).
+class CreateVisitLinkedSelected extends CreateVisitEvent {
+  final LinkedRecord linked;
+  const CreateVisitLinkedSelected(this.linked);
+  @override
+  List<Object?> get props => [linked.id];
+}
+
+class CreateVisitScheduleSelected extends CreateVisitEvent {
+  final DateTime scheduled;
+  const CreateVisitScheduleSelected(this.scheduled);
+  @override
+  List<Object?> get props => [scheduled];
+}
+
+class CreateVisitPurposeChanged extends CreateVisitEvent {
+  final String purpose;
+  const CreateVisitPurposeChanged(this.purpose);
+  @override
+  List<Object?> get props => [purpose];
+}
+
+class CreateVisitLocationChanged extends CreateVisitEvent {
+  final String location;
+  const CreateVisitLocationChanged(this.location);
+  @override
+  List<Object?> get props => [location];
+}
+
+/// Optional: a manager planning a visit for a subordinate. `null` = self.
 class CreateVisitEmployeeSelected extends CreateVisitEvent {
-  final Employee employee;
+  final Employee? employee;
   const CreateVisitEmployeeSelected(this.employee);
   @override
-  List<Object?> get props => [employee.userId];
+  List<Object?> get props => [employee?.hrEmployeeId];
 }
 
-class CreateVisitDateSelected extends CreateVisitEvent {
-  final DateTime date;
-  const CreateVisitDateSelected(this.date);
+class CreateVisitParticipantAdded extends CreateVisitEvent {
+  final Employee employee;
+  const CreateVisitParticipantAdded(this.employee);
   @override
-  List<Object?> get props => [date];
+  List<Object?> get props => [employee.hrEmployeeId];
 }
 
-class CreateVisitTypeSelected extends CreateVisitEvent {
-  final int? id;
-  final String? name;
-  const CreateVisitTypeSelected({this.id, this.name});
+class CreateVisitParticipantRemoved extends CreateVisitEvent {
+  final Employee employee;
+  const CreateVisitParticipantRemoved(this.employee);
   @override
-  List<Object?> get props => [id, name];
-}
-
-class CreateVisitNotesChanged extends CreateVisitEvent {
-  final String notes;
-  const CreateVisitNotesChanged(this.notes);
-  @override
-  List<Object?> get props => [notes];
-}
-
-class CreateVisitLifecycleSelected extends CreateVisitEvent {
-  final VisitLifecycleState state;
-  const CreateVisitLifecycleSelected(this.state);
-  @override
-  List<Object?> get props => [state];
+  List<Object?> get props => [employee.hrEmployeeId];
 }
 
 class CreateVisitSubmitted extends CreateVisitEvent {

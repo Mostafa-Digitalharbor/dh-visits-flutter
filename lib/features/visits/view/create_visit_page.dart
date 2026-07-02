@@ -1,59 +1,36 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../shared/extensions/context_extensions.dart';
-import '../../../shared/widgets/widgets.dart';
-import '../../customers/data/customers_repository.dart';
-import '../../customers/data/models/customer.dart';
+import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/picker_bottom_sheet.dart';
+import '../../auth/bloc/auth_bloc.dart';
 import '../../employees/data/employees_repository.dart';
 import '../../employees/data/models/employee.dart';
 import '../bloc/create_visit_bloc.dart';
 import '../bloc/visits_list_bloc.dart';
 import '../data/models/visit.dart';
-import '../data/models/visit_type.dart';
 import '../data/visits_repository.dart';
-import 'visit_state_picker.dart';
 
-/// Manager-only form to create a new `customer.visit` (state=draft).
-///
-/// Pre-fills the employee (or customer) when launched from the Employees /
-/// Customers tab with `extra: {'employee': Employee}` or
-/// `extra: {'customer': Customer}`.
 class CreateVisitPage extends StatelessWidget {
-  final Customer? preselectedCustomer;
   final Employee? preselectedEmployee;
-
-  const CreateVisitPage({
-    super.key,
-    this.preselectedCustomer,
-    this.preselectedEmployee,
-  });
+  const CreateVisitPage({super.key, this.preselectedEmployee});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) {
         final bloc = CreateVisitBloc(repository: sl<VisitsRepository>());
-        if (preselectedCustomer != null) {
-          bloc.add(CreateVisitCustomerSelected(preselectedCustomer!));
-        }
         if (preselectedEmployee != null) {
-          bloc.add(CreateVisitEmployeeSelected(preselectedEmployee!));
+          bloc.add(CreateVisitEmployeeSelected(preselectedEmployee));
         }
-        bloc.add(CreateVisitDateSelected(_today()));
         return bloc;
       },
       child: const _CreateVisitView(),
     );
-  }
-
-  static DateTime _today() {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
   }
 }
 
@@ -62,445 +39,299 @@ class _CreateVisitView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canPlanForOthers =
+        context.read<AuthBloc>().state.user?.canPlanForOthers ?? false;
+
     return BlocConsumer<CreateVisitBloc, CreateVisitState>(
       listenWhen: (p, c) => p.status != c.status,
       listener: (context, state) {
         if (state.status == CreateVisitStatus.success) {
-          HapticFeedback.mediumImpact();
-          context.showSnack(context.s.createVisitSuccess);
-          // Refresh the visits list so the new visit appears immediately.
-          // This screen is admin-only so always include drafts.
-          context
-              .read<VisitsListBloc>()
-              .add(const VisitsListLoadRequested(includeDrafts: true));
-          if (context.canPop()) context.pop();
+          context.showSnack(context.s.wfCreated, kind: SnackKind.success);
+          // Refresh the list if it's provided app-wide, then leave.
+          try {
+            context.read<VisitsListBloc>().add(const VisitsListLoadRequested());
+          } catch (_) {}
+          final id = state.createdVisitId;
+          if (id != null) {
+            context.go('/visits/$id');
+          } else {
+            context.pop();
+          }
         } else if (state.status == CreateVisitStatus.failure &&
             state.error != null) {
-          HapticFeedback.lightImpact();
-          context.showSnack(state.error!.localize(context));
+          context.showSnack(state.error!.localize(context),
+              kind: SnackKind.error);
         }
       },
       builder: (context, state) {
-        final submitting = state.status == CreateVisitStatus.submitting;
+        final bloc = context.read<CreateVisitBloc>();
         return Scaffold(
-          appBar: AppBar(
-            leading: Hero(
-              tag: 'create-visit-hero',
-              // The flight shuttle keeps the FAB-style icon while it
-              // animates from the home FAB to the AppBar's leading slot.
-              flightShuttleBuilder: (_, animation, __, ___, ____) {
-                final colors = Theme.of(context).colorScheme;
-                return Material(
-                  type: MaterialType.transparency,
-                  child: Center(
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: colors.primary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(Icons.add, color: colors.onPrimary),
-                    ),
+          appBar: AppBar(title: Text(context.s.wfCreateTitle)),
+          body: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              // Visit type
+              Text(context.s.wfFieldType, style: context.text.labelLarge),
+              const SizedBox(height: 6),
+              SegmentedButton<VisitType>(
+                segments: [
+                  ButtonSegment(
+                    value: VisitType.project,
+                    label: Text(context.s.wfTypeProject),
+                    icon: const Icon(Icons.folder_open_outlined),
+                  ),
+                  ButtonSegment(
+                    value: VisitType.opportunity,
+                    label: Text(context.s.wfTypeOpportunity),
+                    icon: const Icon(Icons.emoji_events_outlined),
+                  ),
+                ],
+                selected: {state.visitType},
+                onSelectionChanged: (s) =>
+                    bloc.add(CreateVisitTypeChanged(s.first)),
+              ),
+              const SizedBox(height: 16),
+
+              // Linked project/opportunity
+              _PickerTile(
+                label: state.visitType == VisitType.project
+                    ? context.s.wfFieldProject
+                    : context.s.wfFieldOpportunity,
+                value: state.linked?.name,
+                icon: Icons.link,
+                onTap: () => _pickLinked(context, bloc, state.visitType),
+              ),
+              if (state.customerName != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 12, top: 2),
+                  child: Row(
+                    children: [
+                      Icon(Icons.business,
+                          size: 15, color: context.colors.onSurfaceVariant),
+                      const SizedBox(width: 4),
+                      Text('${context.s.wfFieldCustomer}: ${state.customerName}',
+                          style: context.text.bodySmall),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 12),
+
+              // Schedule
+              _PickerTile(
+                label: context.s.wfFieldSchedule,
+                value: state.scheduled != null
+                    ? DateFormat('EEE, MMM d • HH:mm').format(state.scheduled!)
+                    : null,
+                icon: Icons.event,
+                onTap: () => _pickSchedule(context, bloc, state.scheduled),
+              ),
+              const SizedBox(height: 12),
+
+              // Purpose (required)
+              TextField(
+                minLines: 2,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  labelText: context.s.wfFieldPurpose,
+                  border: const OutlineInputBorder(),
+                ),
+                onChanged: (v) => bloc.add(CreateVisitPurposeChanged(v)),
+              ),
+              const SizedBox(height: 12),
+
+              // Location
+              TextField(
+                decoration: InputDecoration(
+                  labelText:
+                      '${context.s.wfFieldLocation} ${context.s.commonOptional}',
+                  border: const OutlineInputBorder(),
+                ),
+                onChanged: (v) => bloc.add(CreateVisitLocationChanged(v)),
+              ),
+
+              if (canPlanForOthers) ...[
+                const SizedBox(height: 12),
+                _PickerTile(
+                  label:
+                      '${context.s.wfFieldResponsible} ${context.s.commonOptional}',
+                  value: state.employee?.name ?? context.s.wfSelfLabel,
+                  icon: Icons.person_outline,
+                  onTap: () => _pickEmployee(context, bloc),
+                ),
+                const SizedBox(height: 12),
+                _ParticipantsField(state: state, bloc: bloc),
+              ],
+
+              const SizedBox(height: 24),
+              AppButton(
+                label: context.s.createVisitSubmit,
+                icon: Icons.check,
+                loading: state.status == CreateVisitStatus.submitting,
+                onPressed: state.isValid
+                    ? () => bloc.add(const CreateVisitSubmitted())
+                    : null,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickLinked(
+    BuildContext context,
+    CreateVisitBloc bloc,
+    VisitType type,
+  ) async {
+    final repo = sl<VisitsRepository>();
+    final selected = await showPickerBottomSheet<LinkedRecord>(
+      context: context,
+      title: type == VisitType.project
+          ? context.s.wfPickProject
+          : context.s.wfPickOpportunity,
+      searchHint: context.s.commonSearch,
+      loader: (search) async {
+        final all = type == VisitType.project
+            ? await repo.listProjects()
+            : await repo.listOpportunities();
+        if (search == null || search.isEmpty) return all;
+        final q = search.toLowerCase();
+        return all.where((e) => e.name.toLowerCase().contains(q)).toList();
+      },
+      itemBuilder: (ctx, r) => ListTile(
+        title: Text(r.name),
+        subtitle: r.partnerName != null ? Text(r.partnerName!) : null,
+        onTap: () => Navigator.of(ctx).pop(r),
+      ),
+    );
+    if (selected != null) bloc.add(CreateVisitLinkedSelected(selected));
+  }
+
+  Future<void> _pickSchedule(
+    BuildContext context,
+    CreateVisitBloc bloc,
+    DateTime? current,
+  ) async {
+    final now = DateTime.now();
+    final base = current ?? now;
+    final date = await showDatePicker(
+      context: context,
+      initialDate: base,
+      firstDate: now.subtract(const Duration(days: 1)),
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (date == null || !context.mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(base),
+    );
+    final t = time ?? TimeOfDay.fromDateTime(base);
+    bloc.add(CreateVisitScheduleSelected(
+      DateTime(date.year, date.month, date.day, t.hour, t.minute),
+    ));
+  }
+
+  Future<void> _pickEmployee(
+    BuildContext context,
+    CreateVisitBloc bloc,
+  ) async {
+    final selected = await showPickerBottomSheet<Employee>(
+      context: context,
+      title: context.s.wfPickEmployee,
+      searchHint: context.s.employeesSearchHint,
+      loader: (search) => sl<EmployeesRepository>().list(search: search),
+      itemBuilder: (ctx, e) => ListTile(
+        title: Text(e.name),
+        subtitle: e.login != null ? Text(e.login!) : null,
+        onTap: () => Navigator.of(ctx).pop(e),
+      ),
+    );
+    if (selected != null) bloc.add(CreateVisitEmployeeSelected(selected));
+  }
+}
+
+class _ParticipantsField extends StatelessWidget {
+  final CreateVisitState state;
+  final CreateVisitBloc bloc;
+  const _ParticipantsField({required this.state, required this.bloc});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(context.s.wfFieldParticipants,
+                  style: context.text.labelLarge),
+            ),
+            TextButton.icon(
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(context.s.wfActionAddParticipant),
+              onPressed: () async {
+                final e = await showPickerBottomSheet<Employee>(
+                  context: context,
+                  title: context.s.wfPickEmployee,
+                  searchHint: context.s.employeesSearchHint,
+                  loader: (search) async {
+                    final list =
+                        await sl<EmployeesRepository>().list(search: search);
+                    return list.where((e) => e.hrEmployeeId != null).toList();
+                  },
+                  itemBuilder: (ctx, e) => ListTile(
+                    title: Text(e.name),
+                    onTap: () => Navigator.of(ctx).pop(e),
                   ),
                 );
+                if (e != null) bloc.add(CreateVisitParticipantAdded(e));
               },
-              child: const BackButton(),
             ),
-            title: Text(context.s.createVisitTitle),
-            actions: [
-              TextButton(
-                onPressed: (state.isValid && !submitting)
-                    ? () => context
-                        .read<CreateVisitBloc>()
-                        .add(const CreateVisitSubmitted())
-                    : null,
-                child: submitting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2.2),
-                      )
-                    : Text(context.s.createVisitSubmit),
+          ],
+        ),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final p in state.participants)
+              Chip(
+                label: Text(p.name),
+                onDeleted: () => bloc.add(CreateVisitParticipantRemoved(p)),
               ),
-              const SizedBox(width: 8),
-            ],
-          ),
-          body: AbsorbPointer(
-            absorbing: submitting,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-              children: const [
-                _CustomerField(),
-                SizedBox(height: 12),
-                _EmployeeField(),
-                SizedBox(height: 12),
-                _DateField(),
-                SizedBox(height: 12),
-                _TypeField(),
-                SizedBox(height: 12),
-                _StateField(),
-                SizedBox(height: 12),
-                _NotesField(),
-              ],
-            ),
-          ),
-          bottomNavigationBar: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: AppButton(
-                label: context.s.createVisitSubmit,
-                icon: Icons.check_circle_outline,
-                loading: submitting,
-                onPressed: state.isValid
-                    ? () => context
-                        .read<CreateVisitBloc>()
-                        .add(const CreateVisitSubmitted())
-                    : null,
-              ),
-            ),
-          ),
-        );
-      },
+          ],
+        ),
+      ],
     );
   }
 }
 
-class _CustomerField extends StatelessWidget {
-  const _CustomerField();
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<CreateVisitBloc, CreateVisitState>(
-      buildWhen: (p, c) => p.customer != c.customer,
-      builder: (context, state) => _FieldRow(
-        icon: Icons.business_rounded,
-        label: context.s.createVisitCustomerLabel,
-        value: state.customer?.name,
-        placeholder: context.s.createVisitPickCustomer,
-        onTap: () async {
-          final repo = sl<CustomersRepository>();
-          final picked = await showPickerBottomSheet<Customer>(
-            context: context,
-            title: context.s.createVisitPickCustomer,
-            searchHint: context.s.customersSearchHint,
-            loader: (q) => repo.list(search: q),
-            itemBuilder: (ctx, c) => ListTile(
-              leading: CircleAvatar(
-                backgroundColor: ctx.colors.primaryContainer,
-                child: Text(
-                  c.name.isNotEmpty ? c.name[0].toUpperCase() : '?',
-                  style: TextStyle(color: ctx.colors.onPrimaryContainer),
-                ),
-              ),
-              title: Text(c.name),
-              subtitle: c.address != null ? Text(c.address!) : null,
-              onTap: () => Navigator.of(ctx).pop(c),
-            ),
-          );
-          if (picked != null && context.mounted) {
-            context
-                .read<CreateVisitBloc>()
-                .add(CreateVisitCustomerSelected(picked));
-          }
-        },
-      ),
-    );
-  }
-}
-
-class _EmployeeField extends StatelessWidget {
-  const _EmployeeField();
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<CreateVisitBloc, CreateVisitState>(
-      buildWhen: (p, c) => p.employee != c.employee,
-      builder: (context, state) => _FieldRow(
-        icon: Icons.person_outline,
-        label: context.s.createVisitEmployeeLabel,
-        value: state.employee?.name,
-        placeholder: context.s.createVisitPickEmployee,
-        onTap: () async {
-          final repo = sl<EmployeesRepository>();
-          final picked = await showPickerBottomSheet<Employee>(
-            context: context,
-            title: context.s.createVisitPickEmployee,
-            searchHint: context.s.employeesSearchHint,
-            loader: (q) => repo.list(search: q),
-            itemBuilder: (ctx, e) => ListTile(
-              leading: CircleAvatar(
-                backgroundColor: ctx.colors.tertiaryContainer,
-                child: Text(
-                  e.name.isNotEmpty ? e.name[0].toUpperCase() : '?',
-                  style: TextStyle(color: ctx.colors.onTertiaryContainer),
-                ),
-              ),
-              title: Text(e.name),
-              subtitle: e.login != null ? Text(e.login!) : null,
-              onTap: () => Navigator.of(ctx).pop(e),
-            ),
-          );
-          if (picked != null && context.mounted) {
-            context
-                .read<CreateVisitBloc>()
-                .add(CreateVisitEmployeeSelected(picked));
-          }
-        },
-      ),
-    );
-  }
-}
-
-class _DateField extends StatelessWidget {
-  const _DateField();
-
-  @override
-  Widget build(BuildContext context) {
-    final fmt = DateFormat('yyyy-MM-dd');
-    return BlocBuilder<CreateVisitBloc, CreateVisitState>(
-      buildWhen: (p, c) => p.date != c.date,
-      builder: (context, state) => _FieldRow(
-        icon: Icons.event_outlined,
-        label: context.s.createVisitDateLabel,
-        value: state.date != null ? fmt.format(state.date!) : null,
-        placeholder: context.s.createVisitDateRequired,
-        onTap: () async {
-          final now = DateTime.now();
-          final picked = await showDatePicker(
-            context: context,
-            initialDate: state.date ?? now,
-            firstDate: now.subtract(const Duration(days: 2)),
-            lastDate: now.add(const Duration(days: 365)),
-          );
-          if (picked != null && context.mounted) {
-            context
-                .read<CreateVisitBloc>()
-                .add(CreateVisitDateSelected(picked));
-          }
-        },
-      ),
-    );
-  }
-}
-
-class _TypeField extends StatelessWidget {
-  const _TypeField();
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<CreateVisitBloc, CreateVisitState>(
-      buildWhen: (p, c) =>
-          p.visitTypeId != c.visitTypeId || p.visitTypeName != c.visitTypeName,
-      builder: (context, state) => _FieldRow(
-        icon: Icons.label_outline_rounded,
-        label: context.s.createVisitTypeLabel,
-        value: state.visitTypeName,
-        placeholder: context.s.createVisitPickType,
-        trailing: state.visitTypeId != null
-            ? IconButton(
-                tooltip: context.s.commonClose,
-                icon: const Icon(Icons.close, size: 18),
-                onPressed: () => context
-                    .read<CreateVisitBloc>()
-                    .add(const CreateVisitTypeSelected()),
-              )
-            : null,
-        onTap: () async {
-          final repo = sl<VisitsRepository>();
-          final picked = await showPickerBottomSheet<VisitType>(
-            context: context,
-            title: context.s.createVisitPickType,
-            searchHint: context.s.pickerSearchHint,
-            loader: (q) async {
-              final all = await repo.listVisitTypes();
-              if (q == null || q.isEmpty) return all;
-              final lc = q.toLowerCase();
-              return all
-                  .where((t) => t.name.toLowerCase().contains(lc))
-                  .toList();
-            },
-            itemBuilder: (ctx, t) => ListTile(
-              leading: const Icon(Icons.label_outline_rounded),
-              title: Text(t.name),
-              onTap: () => Navigator.of(ctx).pop(t),
-            ),
-          );
-          if (picked != null && context.mounted) {
-            context.read<CreateVisitBloc>().add(
-                  CreateVisitTypeSelected(id: picked.id, name: picked.name),
-                );
-          }
-        },
-      ),
-    );
-  }
-}
-
-class _StateField extends StatelessWidget {
-  const _StateField();
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<CreateVisitBloc, CreateVisitState>(
-      buildWhen: (p, c) => p.lifecycleState != c.lifecycleState,
-      builder: (context, state) {
-        return _FieldRow(
-          icon: Icons.flag_outlined,
-          label: context.s.createVisitStateLabel,
-          value: lifecycleStateLabel(context, state.lifecycleState),
-          placeholder: context.s.createVisitStateLabel,
-          onTap: () async {
-            // Creation can never set under-review or done — those
-            // require the employee to have actually visited the
-            // customer.
-            final picked = await showLifecycleStatePicker(
-              context,
-              current: state.lifecycleState,
-              allowedStates: const [
-                VisitLifecycleState.draft,
-                VisitLifecycleState.submit,
-              ],
-            );
-            if (picked != null && context.mounted) {
-              context
-                  .read<CreateVisitBloc>()
-                  .add(CreateVisitLifecycleSelected(picked));
-            }
-          },
-        );
-      },
-    );
-  }
-}
-
-class _NotesField extends StatefulWidget {
-  const _NotesField();
-  @override
-  State<_NotesField> createState() => _NotesFieldState();
-}
-
-class _NotesFieldState extends State<_NotesField> {
-  late final TextEditingController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = TextEditingController(
-        text: context.read<CreateVisitBloc>().state.notes);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.notes_rounded,
-                  size: 18, color: context.colors.onSurfaceVariant),
-              const SizedBox(width: 8),
-              Text(
-                context.s.createVisitNotesLabel,
-                style: context.text.labelMedium?.copyWith(
-                  color: context.colors.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _ctrl,
-            maxLines: 4,
-            decoration: InputDecoration(
-              border: const OutlineInputBorder(),
-              hintText: context.s.visitNotesLabel,
-            ),
-            onChanged: (v) => context
-                .read<CreateVisitBloc>()
-                .add(CreateVisitNotesChanged(v)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FieldRow extends StatelessWidget {
-  final IconData icon;
+class _PickerTile extends StatelessWidget {
   final String label;
   final String? value;
-  final String placeholder;
+  final IconData icon;
   final VoidCallback onTap;
-  final Widget? trailing;
-
-  const _FieldRow({
-    required this.icon,
+  const _PickerTile({
     required this.label,
     required this.value,
-    required this.placeholder,
+    required this.icon,
     required this.onTap,
-    this.trailing,
   });
 
   @override
   Widget build(BuildContext context) {
-    final hasValue = value != null && value!.isNotEmpty;
-    return AppCard(
-      padding: EdgeInsets.zero,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
-          child: Row(
-            children: [
-              Icon(icon,
-                  size: 22, color: context.colors.primary),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: context.text.labelSmall?.copyWith(
-                        color: context.colors.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      hasValue ? value! : placeholder,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.text.bodyMedium?.copyWith(
-                        color: hasValue
-                            ? context.colors.onSurface
-                            : context.colors.onSurfaceVariant,
-                        fontWeight:
-                            hasValue ? FontWeight.w600 : FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (trailing != null) trailing!,
-              Icon(Icons.chevron_right,
-                  color: context.colors.onSurfaceVariant),
-            ],
+    return Card(
+      margin: EdgeInsets.zero,
+      child: ListTile(
+        leading: Icon(icon),
+        title: Text(label, style: context.text.labelMedium),
+        subtitle: Text(
+          value ?? context.s.commonRequired,
+          style: context.text.bodyLarge?.copyWith(
+            color: value == null ? context.colors.outline : null,
           ),
         ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: onTap,
       ),
     );
   }

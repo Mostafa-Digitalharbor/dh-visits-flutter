@@ -130,16 +130,11 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
         pageBuilder: (_, state) {
           final extra =
               state.extra is Map ? state.extra as Map<dynamic, dynamic> : null;
-          final preCustomer =
-              extra?['customer'] is Customer ? extra!['customer'] as Customer : null;
           final preEmployee =
               extra?['employee'] is Employee ? extra!['employee'] as Employee : null;
           return slideTransition(
             state,
-            CreateVisitPage(
-              preselectedCustomer: preCustomer,
-              preselectedEmployee: preEmployee,
-            ),
+            CreateVisitPage(preselectedEmployee: preEmployee),
           );
         },
       ),

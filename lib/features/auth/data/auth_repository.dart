@@ -48,45 +48,56 @@ class AuthRepository {
 
     var user = AuthUser.fromJson(Map<String, dynamic>.from(result));
 
-    // The session_info payload sometimes returns `tz: false`, so always
-    // read it directly from the user model right after login.
+    // The session_info payload doesn't carry the tz (sometimes `false`) nor the
+    // visit security groups, so read both directly from the user model right
+    // after login in a single `call_kw`.
     try {
-      final tz = await _readUserTz(user.uid);
-      if (tz != null) {
-        user = user.copyWith(tz: tz);
-      }
+      final profile = await _readUserProfile(user.uid);
+      user = user.copyWith(
+        tz: profile.tz,
+        visitRole: profile.visitRole,
+      );
     } catch (e) {
-      debugPrint('[debug] AuthRepository.login: tz fetch failed ($e) — '
-          'falling back to device clock');
+      debugPrint('[debug] AuthRepository.login: profile fetch failed ($e) — '
+          'falling back to device clock / no visit role');
     }
 
     await session.saveUser(user.toJson());
     return user;
   }
 
-  /// Reads `res.users.tz` for the given uid via Odoo's `call_kw`.
-  /// Returns `null` if the field is unset (Odoo serialises it as `false`).
-  Future<String?> _readUserTz(int uid) async {
+  /// Reads `res.users.tz` + `group_ids` for the given uid via `call_kw` and
+  /// derives the visit role. `tz` is `null` when unset (Odoo serialises `false`).
+  Future<({String? tz, VisitRole visitRole})> _readUserProfile(int uid) async {
     final result = await api.jsonRpc(
       '/web/dataset/call_kw',
       params: {
-        'model': 'res.users',
+        'model': AppConstants.usersModel,
         'method': 'read',
         'args': [
           [uid],
-          ['tz'],
+          ['tz', 'group_ids'],
         ],
         'kwargs': {},
       },
     );
-    if (result is! List || result.isEmpty) return null;
-    final row = result.first;
-    if (row is! Map) return null;
-    final raw = row['tz'];
-    if (raw == null || raw == false) return null;
-    final s = raw.toString().trim();
-    if (s.isEmpty || s == 'false') return null;
-    return s;
+    if (result is! List || result.isEmpty || result.first is! Map) {
+      return (tz: null, visitRole: VisitRole.none);
+    }
+    final row = Map<String, dynamic>.from(result.first as Map);
+
+    String? tz;
+    final rawTz = row['tz'];
+    if (rawTz != null && rawTz != false) {
+      final s = rawTz.toString().trim();
+      if (s.isNotEmpty && s != 'false') tz = s;
+    }
+
+    final groupIds = (row['group_ids'] is List)
+        ? (row['group_ids'] as List).whereType<num>().map((n) => n.toInt())
+        : const <int>[];
+
+    return (tz: tz, visitRole: visitRoleFromGroupIds(groupIds));
   }
 
   Future<AuthUser?> currentUser() async {

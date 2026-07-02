@@ -1062,4 +1062,268 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get aboutFooter => 'زيارات العملاء · Digital Harbor © 2026';
+
+  @override
+  String get wfStateDraft => 'مسودة';
+
+  @override
+  String get wfStateSubmitted => 'مُقدَّمة';
+
+  @override
+  String get wfStateWaitingParticipant => 'بانتظار موافقة مدير المشارك';
+
+  @override
+  String get wfStateWaitingManager => 'بانتظار موافقة المدير';
+
+  @override
+  String get wfStateEscalated => 'مُصعَّدة';
+
+  @override
+  String get wfStateApproved => 'معتمدة';
+
+  @override
+  String get wfStateRejected => 'مرفوضة';
+
+  @override
+  String get wfStateCancelled => 'ملغاة';
+
+  @override
+  String get wfStateReschedule => 'طلب إعادة جدولة';
+
+  @override
+  String get wfStateInProgress => 'جارية';
+
+  @override
+  String get wfStateDone => 'منتهية';
+
+  @override
+  String get wfStateUnknown => '—';
+
+  @override
+  String get wfScopeMine => 'زياراتي';
+
+  @override
+  String get wfScopePending => 'بانتظار الموافقة';
+
+  @override
+  String get wfScopeTeam => 'الفريق';
+
+  @override
+  String get wfScopeEscalated => 'المُصعَّدة';
+
+  @override
+  String get wfActionSubmit => 'تقديم للموافقة';
+
+  @override
+  String get wfActionApprove => 'موافقة';
+
+  @override
+  String get wfActionReject => 'رفض';
+
+  @override
+  String get wfActionReschedule => 'طلب إعادة جدولة';
+
+  @override
+  String get wfActionStart => 'بدء الزيارة';
+
+  @override
+  String get wfActionEnd => 'إنهاء الزيارة';
+
+  @override
+  String get wfActionCancel => 'إلغاء الزيارة';
+
+  @override
+  String get wfActionAddParticipant => 'إضافة مشارك';
+
+  @override
+  String get wfActionAddAttachment => 'إضافة مرفق';
+
+  @override
+  String get wfTypeProject => 'مشروع';
+
+  @override
+  String get wfTypeOpportunity => 'فرصة';
+
+  @override
+  String get wfFieldType => 'نوع الزيارة';
+
+  @override
+  String get wfFieldProject => 'المشروع';
+
+  @override
+  String get wfFieldOpportunity => 'الفرصة';
+
+  @override
+  String get wfFieldCustomer => 'العميل';
+
+  @override
+  String get wfFieldSchedule => 'تاريخ ووقت الزيارة';
+
+  @override
+  String get wfFieldPurpose => 'الغرض';
+
+  @override
+  String get wfFieldLocation => 'الموقع';
+
+  @override
+  String get wfFieldOutcome => 'النتيجة';
+
+  @override
+  String get wfFieldResponsible => 'الموظف المسؤول';
+
+  @override
+  String get wfFieldParticipants => 'مشاركون إضافيون';
+
+  @override
+  String get wfFieldDirectManager => 'المدير المباشر';
+
+  @override
+  String get wfFieldHigherManager => 'المدير الأعلى';
+
+  @override
+  String get wfPickProject => 'اختر مشروعًا';
+
+  @override
+  String get wfPickOpportunity => 'اختر فرصة';
+
+  @override
+  String get wfPickEmployee => 'اختر موظفًا';
+
+  @override
+  String get wfSelfLabel => 'أنا';
+
+  @override
+  String get wfPurposeRequired => 'الغرض مطلوب';
+
+  @override
+  String get wfOutcomeRequired => 'النتيجة مطلوبة لإنهاء الزيارة';
+
+  @override
+  String get wfRejectReason => 'سبب الرفض';
+
+  @override
+  String get wfRejectReasonHint => 'اكتب سبب رفض الزيارة…';
+
+  @override
+  String get wfReasonRequired => 'السبب مطلوب';
+
+  @override
+  String get wfCreateTitle => 'زيارة جديدة';
+
+  @override
+  String get wfCreated => 'تم إنشاء الزيارة';
+
+  @override
+  String get wfSubmitted => 'تم التقديم للموافقة';
+
+  @override
+  String get wfApproved => 'تمت الموافقة على الزيارة';
+
+  @override
+  String get wfRejected => 'تم رفض الزيارة';
+
+  @override
+  String get wfStarted => 'بدأت الزيارة';
+
+  @override
+  String get wfEnded => 'اكتملت الزيارة';
+
+  @override
+  String get wfRescheduled => 'تم طلب إعادة الجدولة';
+
+  @override
+  String get wfCancelled => 'تم إلغاء الزيارة';
+
+  @override
+  String get wfAttachmentAdded => 'تمت إضافة المرفق';
+
+  @override
+  String get wfParticipantApproved => 'تمت الموافقة على المشارك';
+
+  @override
+  String get wfParticipantRejected => 'تم رفض المشارك';
+
+  @override
+  String get wfApprovalHistory => 'سجل الموافقات';
+
+  @override
+  String get wfSubmittedOn => 'قُدِّمت في';
+
+  @override
+  String get wfApprovedByOn => 'اعتمدها';
+
+  @override
+  String get wfRejectedByOn => 'رفضها';
+
+  @override
+  String get wfReason => 'السبب';
+
+  @override
+  String get wfEscalatedBadge => 'مُصعَّدة';
+
+  @override
+  String get wfParticipantsSection => 'المشاركون';
+
+  @override
+  String get wfParticipantPending => 'قيد الانتظار';
+
+  @override
+  String get wfParticipantApprovedState => 'موافَق';
+
+  @override
+  String get wfParticipantRejectedState => 'مرفوض';
+
+  @override
+  String get wfNoParticipants => 'لا يوجد مشاركون إضافيون';
+
+  @override
+  String get wfApproveParticipant => 'موافقة';
+
+  @override
+  String get wfRejectParticipant => 'رفض';
+
+  @override
+  String get wfEmptyMine => 'لا توجد لديك زيارات بعد';
+
+  @override
+  String get wfEmptyPending => 'لا شيء بانتظار موافقتك';
+
+  @override
+  String get wfEmptyTeam => 'لا توجد زيارات للفريق';
+
+  @override
+  String get wfEmptyEscalated => 'لا توجد زيارات مُصعَّدة';
+
+  @override
+  String get wfSearchHint => 'ابحث بالعميل أو المرجع أو الغرض…';
+
+  @override
+  String get wfRescheduleTitle => 'طلب إعادة جدولة';
+
+  @override
+  String get wfListTitle => 'الزيارات';
+
+  @override
+  String get wfDetailTitle => 'زيارة';
+
+  @override
+  String get wfStartLocationCaptured => 'سيتم تسجيل موقعك عبر الـ GPS';
+
+  @override
+  String get wfConfirmCancelTitle => 'إلغاء الزيارة';
+
+  @override
+  String get wfConfirmCancelMessage => 'متأكد إنك عايز تلغي الزيارة دي؟';
+
+  @override
+  String get wfScheduledLabel => 'مجدولة';
+
+  @override
+  String get wfStartedLabel => 'بدأت';
+
+  @override
+  String get wfEndedLabel => 'انتهت';
+
+  @override
+  String get wfDurationLabel => 'المدة';
 }

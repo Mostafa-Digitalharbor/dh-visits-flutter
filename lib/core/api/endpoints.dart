@@ -23,4 +23,20 @@ class Endpoints {
   /// and records them in the native `in_/out_latitude/longitude` fields.
   /// Toggles state: returns `attendance_state` = 'checked_in' | 'checked_out'.
   static const String attendanceSystray = '/hr_attendance/systray_check_in_out';
+
+  // ---- dh_visit_management mobile REST API (JSON-RPC `type='json'`) --------
+  // Dedicated controllers for the visit approval workflow. All are POST with
+  // the JSON-RPC envelope; auth is the same session cookie as the rest of the
+  // app. See docs/VISITS_API.md.
+  static const String visitMy = '/api/visit/my';
+  static const String visitGet = '/api/visit/get';
+  static const String visitCreate = '/api/visit/create';
+  static const String visitSubmit = '/api/visit/submit';
+  static const String visitApprove = '/api/visit/approve';
+  static const String visitReject = '/api/visit/reject';
+  static const String visitReschedule = '/api/visit/reschedule';
+  static const String visitAddParticipants = '/api/visit/add_participants';
+  static const String visitStart = '/api/visit/start';
+  static const String visitEnd = '/api/visit/end';
+  static const String visitUploadAttachment = '/api/visit/upload_attachment';
 }

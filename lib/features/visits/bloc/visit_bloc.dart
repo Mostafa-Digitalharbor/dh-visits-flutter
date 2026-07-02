@@ -3,36 +3,32 @@ import 'package:equatable/equatable.dart';
 
 import '../../../core/api/api_exceptions.dart';
 import '../../../core/location/location_service.dart';
-import '../../customers/data/models/customer.dart';
 import '../data/models/visit.dart';
+import '../data/models/visit.dart' as vm show VisitState;
 import '../data/visits_repository.dart';
 
 part 'visit_event.dart';
 part 'visit_state.dart';
 
+/// Tracks the single visit that is currently **in progress** (started with GPS,
+/// not yet ended) so the persistent bar and Start/End buttons stay in sync.
 class VisitBloc extends Bloc<VisitEvent, VisitState> {
   final VisitsRepository repository;
   final LocationService locationService;
 
   VisitBloc({required this.repository, required this.locationService})
       : super(const VisitState()) {
-    on<VisitCheckInRequested>(_onCheckIn);
-    on<VisitCheckOutRequested>(_onCheckOut);
+    on<VisitStartRequested>(_onStart);
+    on<VisitEndRequested>(_onEnd);
     on<VisitResumeRequested>(_onResume);
     on<VisitCleared>((event, emit) => emit(const VisitState()));
   }
 
-  Future<void> _onCheckIn(
-    VisitCheckInRequested event,
+  Future<void> _onStart(
+    VisitStartRequested event,
     Emitter<VisitState> emit,
   ) async {
-    // Guard: only one open visit at a time per employee. The backend does
-    // NOT enforce this, so if we allow a second check-in both records end up
-    // open in the DB. We block it here regardless of which customer is
-    // currently checked-in.
-    if (state.status == VisitStatus.checkedIn) {
-      return;
-    }
+    if (state.status == VisitStatus.running) return; // one running visit at a time
     emit(state.copyWith(status: VisitStatus.submitting, error: null));
     try {
       final ok = await locationService.ensurePermission();
@@ -44,26 +40,17 @@ class VisitBloc extends Bloc<VisitEvent, VisitState> {
         return;
       }
       final pos = await locationService.getCurrent();
-      final visit = await repository.checkIn(
-        customerId: event.customer.id,
+      await repository.start(
+        event.visit.id,
         latitude: pos.latitude,
         longitude: pos.longitude,
-        customerName: event.customer.name,
-        customerLat: event.customer.latitude,
-        customerLng: event.customer.longitude,
-        customerAddress: event.customer.address,
-        customerPhone: event.customer.phone ?? event.customer.mobile,
       );
-      // Check-in response only carries visit_id/state/check_in_time, so we
-      // enrich it locally with the customer the user picked.
-      final enriched = visit.copyWith(
-        customerId: event.customer.id,
-        customerName: event.customer.name,
+      // Reflect the new state locally; the bar reads startDatetime for its timer.
+      final running = event.visit.copyWith(
+        state: vm.VisitState.inProgress,
+        startDatetime: DateTime.now().toUtc(),
       );
-      emit(state.copyWith(
-        status: VisitStatus.checkedIn,
-        activeVisit: enriched,
-      ));
+      emit(state.copyWith(status: VisitStatus.running, activeVisit: running));
     } on ApiException catch (e) {
       emit(state.copyWith(status: VisitStatus.idle, error: e));
     } catch (e) {
@@ -74,8 +61,8 @@ class VisitBloc extends Bloc<VisitEvent, VisitState> {
     }
   }
 
-  Future<void> _onCheckOut(
-    VisitCheckOutRequested event,
+  Future<void> _onEnd(
+    VisitEndRequested event,
     Emitter<VisitState> emit,
   ) async {
     emit(state.copyWith(status: VisitStatus.submitting, error: null));
@@ -83,36 +70,24 @@ class VisitBloc extends Bloc<VisitEvent, VisitState> {
       final ok = await locationService.ensurePermission();
       if (!ok) {
         emit(state.copyWith(
-          status: VisitStatus.checkedIn,
+          status: VisitStatus.running,
           error: ApiException(code: ApiErrorCode.locationPermission),
         ));
         return;
       }
       final pos = await locationService.getCurrent();
-      final visit = await repository.checkOut(
-        visitId: event.visitId,
+      await repository.end(
+        event.visitId,
+        outcome: event.outcome,
         latitude: pos.latitude,
         longitude: pos.longitude,
-        notes: event.notes,
       );
-      // Preserve customer info already carried on activeVisit (check-out
-      // response also omits it).
-      final prev = state.activeVisit;
-      final enriched = prev == null
-          ? visit
-          : visit.copyWith(
-              customerId: prev.customerId,
-              customerName: prev.customerName,
-            );
-      emit(state.copyWith(
-        status: VisitStatus.checkedOut,
-        activeVisit: enriched,
-      ));
+      emit(const VisitState(status: VisitStatus.ended));
     } on ApiException catch (e) {
-      emit(state.copyWith(status: VisitStatus.checkedIn, error: e));
+      emit(state.copyWith(status: VisitStatus.running, error: e));
     } catch (e) {
       emit(state.copyWith(
-        status: VisitStatus.checkedIn,
+        status: VisitStatus.running,
         error: ApiException.unknown(e.toString()),
       ));
     }
@@ -122,17 +97,21 @@ class VisitBloc extends Bloc<VisitEvent, VisitState> {
     VisitResumeRequested event,
     Emitter<VisitState> emit,
   ) async {
-    // Only attempt recovery when we don't already have an active visit in memory.
-    if (state.status == VisitStatus.checkedIn) return;
+    if (state.status == VisitStatus.running) return;
     try {
-      final open = await repository.list(state: 'checked_in');
+      final open = await repository.myVisits(
+        domain: [
+          ['state', '=', 'in_progress'],
+        ],
+        limit: 1,
+      );
       if (open.isEmpty) return;
       emit(state.copyWith(
-        status: VisitStatus.checkedIn,
+        status: VisitStatus.running,
         activeVisit: open.first,
       ));
     } on ApiException {
-      // Silent — recovery is a best-effort enhancement.
+      // Silent — recovery is best-effort.
     }
   }
 }
