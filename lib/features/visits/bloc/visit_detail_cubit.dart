@@ -2,6 +2,8 @@ import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 
 import '../../../core/api/api_exceptions.dart';
+import '../../../core/di/service_locator.dart';
+import '../../../core/network/pending_actions_queue.dart';
 import '../data/models/visit.dart';
 import '../data/visits_repository.dart';
 
@@ -138,8 +140,9 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
         ),
       );
 
-  Future<bool> start({double? latitude, double? longitude}) => _run(
+  Future<bool> start({double? latitude, double? longitude}) => _runQueueable(
         'start',
+        {'type': 'start', 'latitude': latitude, 'longitude': longitude},
         () => repository.start(visitId,
             latitude: latitude, longitude: longitude),
       );
@@ -149,11 +152,63 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
     double? latitude,
     double? longitude,
   }) =>
-      _run(
+      _runQueueable(
         'end',
+        {
+          'type': 'end',
+          'outcome': outcome,
+          'latitude': latitude,
+          'longitude': longitude,
+        },
         () => repository.end(visitId,
             outcome: outcome, latitude: latitude, longitude: longitude),
       );
+
+  /// Like [_run] but for the GPS-stamped Start / End actions: if the network is
+  /// down we persist the action to the offline queue and report a soft success
+  /// (`<action>_queued`) instead of an error, so a field rep in a dead zone can
+  /// keep working. The queue replays it automatically when connectivity is back.
+  Future<bool> _runQueueable(
+    String action,
+    Map<String, dynamic> payload,
+    Future<void> Function() body,
+  ) async {
+    emit(state.copyWith(status: VisitDetailStatus.acting, error: null));
+    try {
+      await body();
+      final visit = await repository.readVisitFull(visitId);
+      emit(VisitDetailState(
+        status: VisitDetailStatus.ready,
+        visit: visit,
+        lastAction: action,
+      ));
+      return true;
+    } on ApiException catch (e) {
+      if (e.code == ApiErrorCode.network || e.code == ApiErrorCode.timeout) {
+        await sl<PendingActionsQueue>().enqueue(visitId, payload);
+        emit(state.copyWith(
+          status: VisitDetailStatus.ready,
+          lastAction: '${action}_queued',
+        ));
+        return true;
+      }
+      final visit = await _safeReload();
+      emit(VisitDetailState(
+        status: VisitDetailStatus.ready,
+        visit: visit ?? state.visit,
+        error: e,
+      ));
+      return false;
+    } catch (e) {
+      final visit = await _safeReload();
+      emit(VisitDetailState(
+        status: VisitDetailStatus.ready,
+        visit: visit ?? state.visit,
+        error: ApiException.unknown(e.toString()),
+      ));
+      return false;
+    }
+  }
 
   Future<bool> addParticipants(List<int> employeeIds) => _run(
         'add_participants',

@@ -1,9 +1,15 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/location/location_service.dart';
@@ -15,10 +21,12 @@ import '../../auth/data/models/user.dart';
 import '../bloc/visit_bloc.dart' hide VisitState;
 import '../bloc/visit_detail_cubit.dart';
 import '../data/models/visit.dart';
+import '../data/models/visit_attachment.dart';
 import '../data/models/visit_participant.dart';
 import '../data/visits_repository.dart';
 import 'action_sheets.dart';
 import 'visit_labels.dart';
+import 'visit_map_card.dart';
 
 class VisitDetailPage extends StatelessWidget {
   final int visitId;
@@ -65,6 +73,9 @@ class _VisitDetailView extends StatelessWidget {
         return s.wfParticipantRejected;
       case 'add_participants':
         return s.wfActionAddParticipant;
+      case 'start_queued':
+      case 'end_queued':
+        return s.wfQueuedOffline;
       default:
         return s.commonSave;
     }
@@ -124,10 +135,16 @@ class _VisitDetailView extends StatelessWidget {
             children: [
               _Header(visit: visit),
               const SizedBox(height: 16),
+              VisitMapCard(visit: visit),
+              const SizedBox(height: 16),
               _InfoSection(visit: visit),
               if (visit.participants.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 _ParticipantsSection(visit: visit),
+              ],
+              if (visit.attachmentCount > 0) ...[
+                const SizedBox(height: 16),
+                _AttachmentsSection(visit: visit),
               ],
               const SizedBox(height: 16),
               _HistorySection(visit: visit),
@@ -277,7 +294,10 @@ class _ParticipantTile extends StatelessWidget {
     if (participant.approvalState != ParticipantApprovalState.pending) {
       return false;
     }
-    if (visit.state != VisitState.waitingParticipantManagerApproval) {
+    // The current backend keeps a visit with pending participants in
+    // `submitted`; older builds used `waiting_participant_manager_approval`.
+    if (visit.state != VisitState.submitted &&
+        visit.state != VisitState.waitingParticipantManagerApproval) {
       return false;
     }
     final u = me;
@@ -328,6 +348,99 @@ class _ParticipantTile extends StatelessWidget {
               ],
             )
           : null,
+    );
+  }
+}
+
+class _AttachmentsSection extends StatelessWidget {
+  final Visit visit;
+  const _AttachmentsSection({required this.visit});
+
+  IconData _iconFor(String? mimetype) {
+    final m = mimetype ?? '';
+    if (m.startsWith('image/')) return Icons.image_outlined;
+    if (m.contains('pdf')) return Icons.picture_as_pdf_outlined;
+    if (m.startsWith('video/')) return Icons.videocam_outlined;
+    if (m.startsWith('audio/')) return Icons.audiotrack_outlined;
+    return Icons.insert_drive_file_outlined;
+  }
+
+  Future<void> _openAttachment(
+      BuildContext context, VisitAttachment a) async {
+    context.showSnack(context.s.commonLoading);
+    try {
+      final b64 = await sl<VisitsRepository>().downloadAttachmentB64(a.id);
+      if (b64 == null || b64.isEmpty) {
+        if (context.mounted) {
+          context.showSnack(context.s.errUnknown, kind: SnackKind.error);
+        }
+        return;
+      }
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/${a.name}');
+      await file.writeAsBytes(base64Decode(b64));
+      await OpenFilex.open(file.path);
+    } catch (e) {
+      if (context.mounted) {
+        context.showSnack(e.toString(), kind: SnackKind.error);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(context.s.wfActionAddAttachment,
+                style: context.text.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            FutureBuilder<List<VisitAttachment>>(
+              // Re-fetch whenever the count changes (e.g. after an upload).
+              key: ValueKey(visit.attachmentCount),
+              future: sl<VisitsRepository>().readAttachments(visit.id),
+              builder: (context, snap) {
+                if (snap.connectionState != ConnectionState.done) {
+                  return const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Center(
+                      child: SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  );
+                }
+                final items = snap.data ?? const [];
+                if (items.isEmpty) {
+                  return Text(context.s.wfNoParticipants,
+                      style: context.text.bodySmall);
+                }
+                return Column(
+                  children: [
+                    for (final a in items)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        leading: Icon(_iconFor(a.mimetype)),
+                        title: Text(a.name,
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        subtitle: Text(a.readableSize),
+                        trailing: const Icon(Icons.download_outlined, size: 20),
+                        onTap: () => _openAttachment(context, a),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -398,6 +511,33 @@ class _ActionBar extends StatelessWidget {
     final ok = await loc.ensurePermission();
     if (!ok) return null;
     final pos = await loc.getCurrent();
+    // Anti-spoofing: the OS flags positions coming from a mock provider. We
+    // "allow with a flag" (per the SFA best-practice review) — warn, record it
+    // for review, and let the user decide, rather than hard-blocking.
+    if (pos.isMocked) {
+      unawaited(Sentry.captureMessage(
+        'Mock GPS location used on visit ${visit.name ?? visit.id}',
+        level: SentryLevel.warning,
+      ));
+      if (!context.mounted) return null;
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: Icon(Icons.gpp_maybe_outlined, color: ctx.colors.error),
+          title: Text(ctx.s.wfMockLocationTitle),
+          content: Text(ctx.s.wfMockLocationMessage),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(ctx.s.commonCancel)),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(ctx.s.commonContinue)),
+          ],
+        ),
+      );
+      if (proceed != true) return null;
+    }
     return (pos.latitude, pos.longitude);
   }
 
@@ -409,6 +549,21 @@ class _ActionBar extends StatelessWidget {
     final bytes = f.bytes;
     if (bytes == null) return;
     await cubit.uploadAttachment(filename: f.name, dataB64: base64Encode(bytes));
+  }
+
+  /// Capture a proof-of-visit photo straight from the camera and upload it as
+  /// an attachment. Downscaled + compressed so the base64 payload stays small.
+  Future<void> _captureAndUpload(
+      BuildContext context, VisitDetailCubit cubit) async {
+    final shot = await ImagePicker().pickImage(
+      source: ImageSource.camera,
+      imageQuality: 70,
+      maxWidth: 1600,
+    );
+    if (shot == null) return;
+    final bytes = await shot.readAsBytes();
+    await cubit.uploadAttachment(
+        filename: shot.name, dataB64: base64Encode(bytes));
   }
 
   @override
@@ -492,6 +647,11 @@ class _ActionBar extends StatelessWidget {
     if ((isOwner || (me?.canApproveVisits ?? false)) &&
         !visit.isCancelled &&
         !visit.isRejected) {
+      buttons.add(AppButton.secondary(
+        label: context.s.wfActionTakePhoto,
+        icon: Icons.photo_camera_outlined,
+        onPressed: () => _captureAndUpload(context, cubit),
+      ));
       buttons.add(AppButton.secondary(
         label: visit.attachmentCount > 0
             ? '${context.s.wfActionAddAttachment} (${visit.attachmentCount})'

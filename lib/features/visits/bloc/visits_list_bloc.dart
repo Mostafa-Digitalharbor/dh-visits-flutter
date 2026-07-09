@@ -66,6 +66,14 @@ class VisitsListBloc extends Bloc<VisitsListEvent, VisitsListState> {
     } on ApiException catch (e) {
       await _ensureMinSkeleton(started);
       emit(state.copyWith(status: VisitsListStatus.failure, error: e));
+    } catch (e) {
+      // Never leave the UI stuck on the loading skeleton — surface any
+      // unexpected error (e.g. a response-parsing failure) as a failure state.
+      await _ensureMinSkeleton(started);
+      emit(state.copyWith(
+        status: VisitsListStatus.failure,
+        error: ApiException.unknown(e.toString()),
+      ));
     }
   }
 

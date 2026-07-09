@@ -56,6 +56,7 @@ class AuthRepository {
       user = user.copyWith(
         tz: profile.tz,
         visitRole: profile.visitRole,
+        employeeId: profile.employeeId,
       );
     } catch (e) {
       debugPrint('[debug] AuthRepository.login: profile fetch failed ($e) — '
@@ -68,7 +69,8 @@ class AuthRepository {
 
   /// Reads `res.users.tz` + `group_ids` for the given uid via `call_kw` and
   /// derives the visit role. `tz` is `null` when unset (Odoo serialises `false`).
-  Future<({String? tz, VisitRole visitRole})> _readUserProfile(int uid) async {
+  Future<({String? tz, VisitRole visitRole, int? employeeId})> _readUserProfile(
+      int uid) async {
     final result = await api.jsonRpc(
       '/web/dataset/call_kw',
       params: {
@@ -76,13 +78,13 @@ class AuthRepository {
         'method': 'read',
         'args': [
           [uid],
-          ['tz', 'group_ids'],
+          ['tz', 'group_ids', 'employee_id'],
         ],
         'kwargs': {},
       },
     );
     if (result is! List || result.isEmpty || result.first is! Map) {
-      return (tz: null, visitRole: VisitRole.none);
+      return (tz: null, visitRole: VisitRole.none, employeeId: null);
     }
     final row = Map<String, dynamic>.from(result.first as Map);
 
@@ -97,7 +99,18 @@ class AuthRepository {
         ? (row['group_ids'] as List).whereType<num>().map((n) => n.toInt())
         : const <int>[];
 
-    return (tz: tz, visitRole: visitRoleFromGroupIds(groupIds));
+    // `employee_id` on res.users is a many2one → `[id, name]` or `false`.
+    int? employeeId;
+    final emp = row['employee_id'];
+    if (emp is List && emp.isNotEmpty && emp.first is num) {
+      employeeId = (emp.first as num).toInt();
+    }
+
+    return (
+      tz: tz,
+      visitRole: visitRoleFromGroupIds(groupIds),
+      employeeId: employeeId,
+    );
   }
 
   Future<AuthUser?> currentUser() async {

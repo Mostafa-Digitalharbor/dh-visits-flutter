@@ -29,6 +29,7 @@ class _ServerSetupPageState extends State<ServerSetupPage> {
   /// Shown only when we couldn't auto-detect the database from the server.
   bool _needsDatabase = false;
   bool _saving = false;
+  bool _detecting = false;
 
   @override
   void initState() {
@@ -50,6 +51,38 @@ class _ServerSetupPageState extends State<ServerSetupPage> {
     if (v == null || v.trim().isEmpty) return context.s.commonRequired;
     if (!ServerConfig.isValidUrl(v)) return context.s.serverSetupInvalidUrl;
     return null;
+  }
+
+  /// Explicit "Detect database" action: points the API client at the entered
+  /// URL and asks the server for its database name, filling the field.
+  Future<void> _detectDatabase() async {
+    FocusScope.of(context).unfocus();
+    final raw = _urlCtrl.text.trim();
+    if (raw.isEmpty || !ServerConfig.isValidUrl(raw)) {
+      context.showSnack(context.s.serverSetupInvalidUrl, kind: SnackKind.error);
+      return;
+    }
+    HapticFeedback.lightImpact();
+    final cubit = context.read<ServerConfigCubit>();
+    setState(() => _detecting = true);
+
+    final url = ServerConfig.normalizeUrl(raw);
+    // Point the client at this host so detection queries hit the right server.
+    await cubit.save(baseUrl: url);
+    final db = await cubit.detectDatabase();
+    if (!mounted) return;
+
+    setState(() {
+      _detecting = false;
+      _needsDatabase = true; // reveal the field either way
+      if (db != null) _dbCtrl.text = db;
+    });
+    context.showSnack(
+      db != null
+          ? context.s.serverSetupDetected(db)
+          : context.s.serverSetupDetectFailed,
+      kind: db != null ? SnackKind.success : SnackKind.error,
+    );
   }
 
   Future<void> _submit() async {
@@ -139,8 +172,27 @@ class _ServerSetupPageState extends State<ServerSetupPage> {
                           FilteringTextInputFormatter.deny(RegExp(r'\s')),
                         ],
                       ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: TextButton.icon(
+                          onPressed:
+                              (_detecting || _saving) ? null : _detectDatabase,
+                          icon: _detecting
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Symbols.search, size: 18),
+                          label: Text(_detecting
+                              ? context.s.serverSetupDetecting
+                              : context.s.serverSetupDetectDb),
+                        ),
+                      ),
                       if (_needsDatabase) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 4),
                         ScaleFadeIn(
                           child: AuthField(
                             controller: _dbCtrl,

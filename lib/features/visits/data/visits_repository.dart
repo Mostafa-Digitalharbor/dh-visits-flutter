@@ -7,6 +7,8 @@ import '../../../core/constants.dart';
 import '../../../core/storage/session_storage.dart';
 import '../../attendance/data/attendance_repository.dart';
 import 'models/visit.dart';
+import 'models/visit_activity.dart';
+import 'models/visit_attachment.dart';
 import 'models/visit_participant.dart';
 
 /// Which slice of visits a manager is looking at. Backing domains are applied
@@ -231,6 +233,10 @@ class VisitsRepository {
           'state',
           'in',
           [
+            // The current backend uses `submitted` as the single
+            // pending-approval state; the `waiting_*` states are kept for
+            // forward-compatibility.
+            'submitted',
             'waiting_participant_manager_approval',
             'waiting_direct_manager_approval',
             'reschedule_requested',
@@ -238,7 +244,10 @@ class VisitsRepository {
         ]);
         break;
       case VisitManagerScope.escalated:
-        domain.add(['state', '=', 'escalated']);
+        // The current backend flags escalation with `is_escalated=True` while
+        // keeping the visit in its pending state (rather than a dedicated
+        // `escalated` state), so filter on the flag.
+        domain.add(['is_escalated', '=', true]);
         break;
       case VisitManagerScope.team:
         break; // everything visible to this manager
@@ -353,10 +362,6 @@ class VisitsRepository {
   /// Owner/manager cancels a visit (`action_cancel`; not in the REST API).
   Future<void> cancel(int visitId) => _visitAction('action_cancel', visitId);
 
-  /// Sends a visit back to draft (`action_reset_to_draft`).
-  Future<void> resetToDraft(int visitId) =>
-      _visitAction('action_reset_to_draft', visitId);
-
   Future<void> _visitAction(String method, int visitId) async {
     await api.jsonRpc(
       Endpoints.callKw,
@@ -369,6 +374,169 @@ class VisitsRepository {
         'kwargs': {},
       },
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Attachments (ir.attachment linked via res_model/res_id)
+  // ---------------------------------------------------------------------------
+
+  Future<List<VisitAttachment>> readAttachments(int visitId) async {
+    final result = await api.jsonRpc(
+      Endpoints.callKw,
+      params: {
+        'model': 'ir.attachment',
+        'method': 'search_read',
+        'args': [
+          [
+            ['res_model', '=', AppConstants.visitModel],
+            ['res_id', '=', visitId],
+          ],
+          ['id', 'name', 'mimetype', 'file_size'],
+        ],
+        'kwargs': {'order': 'create_date desc'},
+      },
+    );
+    final rows = result is List ? result : const [];
+    return rows
+        .whereType<Map>()
+        .map((r) => VisitAttachment.fromJson(Map<String, dynamic>.from(r)))
+        .toList();
+  }
+
+  /// Returns the base64-encoded bytes of an attachment (`ir.attachment.datas`).
+  Future<String?> downloadAttachmentB64(int attachmentId) async {
+    final result = await api.jsonRpc(
+      Endpoints.callKw,
+      params: {
+        'model': 'ir.attachment',
+        'method': 'read',
+        'args': [
+          [attachmentId],
+          ['datas'],
+        ],
+        'kwargs': {},
+      },
+    );
+    final rows = result is List ? result : const [];
+    if (rows.isEmpty || rows.first is! Map) return null;
+    final datas = (rows.first as Map)['datas'];
+    return (datas == null || datas == false) ? null : datas.toString();
+  }
+
+  // ---------------------------------------------------------------------------
+  // In-app notifications (mail.activity assigned to the current user)
+  // ---------------------------------------------------------------------------
+
+  Future<int?> _currentUid() async {
+    final u = await session.getUser();
+    return (u?['uid'] as num?)?.toInt();
+  }
+
+  /// The current user's pending activities on visits (approve / escalated /
+  /// participant approvals) — the in-app notification feed.
+  Future<List<VisitActivity>> myActivities() async {
+    final uid = await _currentUid();
+    if (uid == null) return const [];
+    final result = await api.jsonRpc(
+      Endpoints.callKw,
+      params: {
+        'model': 'mail.activity',
+        'method': 'search_read',
+        'args': [
+          [
+            ['user_id', '=', uid],
+            ['res_model', '=', AppConstants.visitModel],
+          ],
+          [
+            'id',
+            'summary',
+            'activity_type_id',
+            'res_id',
+            'res_name',
+            'date_deadline',
+            'state',
+          ],
+        ],
+        'kwargs': {'order': 'date_deadline asc', 'limit': 100},
+      },
+    );
+    final rows = result is List ? result : const [];
+    return rows
+        .whereType<Map>()
+        .map((r) => VisitActivity.fromJson(Map<String, dynamic>.from(r)))
+        .toList();
+  }
+
+  Future<int> myActivityCount() async {
+    final uid = await _currentUid();
+    if (uid == null) return 0;
+    final result = await api.jsonRpc(
+      Endpoints.callKw,
+      params: {
+        'model': 'mail.activity',
+        'method': 'search_count',
+        'args': [
+          [
+            ['user_id', '=', uid],
+            ['res_model', '=', AppConstants.visitModel],
+          ],
+        ],
+        'kwargs': {},
+      },
+    );
+    return (result is num) ? result.toInt() : 0;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Customer geolocation (for the visit-detail map)
+  // ---------------------------------------------------------------------------
+
+  /// Reads the customer's office coordinates (+ address / phone) straight from
+  /// `res.partner` (`base_geolocalize` fields). Used to centre the geofence map
+  /// on the visit-detail page and to power the "Directions" hand-off. Returns
+  /// `null` when the partner has no coordinates (Odoo stores 0.0 for unset) or
+  /// the read is not permitted — the map degrades gracefully to the GPS points.
+  Future<PartnerLocation?> partnerLocation(int partnerId) async {
+    try {
+      final result = await api.jsonRpc(
+        Endpoints.callKw,
+        params: {
+          'model': AppConstants.partnerModel,
+          'method': 'read',
+          'args': [
+            [partnerId],
+            ['partner_latitude', 'partner_longitude', 'contact_address', 'phone'],
+          ],
+          'kwargs': {},
+        },
+      );
+      final rows = result is List ? result : const [];
+      if (rows.isEmpty || rows.first is! Map) return null;
+      final row = Map<String, dynamic>.from(rows.first as Map);
+      double? coord(dynamic raw) {
+        if (raw is! num) return null;
+        final v = raw.toDouble();
+        return v == 0.0 ? null : v;
+      }
+
+      String? str(dynamic raw) {
+        if (raw == null || raw == false) return null;
+        final s = raw.toString().trim();
+        return s.isEmpty ? null : s;
+      }
+
+      final lat = coord(row['partner_latitude']);
+      final lng = coord(row['partner_longitude']);
+      if (lat == null || lng == null) return null;
+      return PartnerLocation(
+        latitude: lat,
+        longitude: lng,
+        address: str(row['contact_address']),
+        phone: str(row['phone']),
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -433,5 +601,21 @@ class LinkedRecord {
     required this.name,
     this.partnerId,
     this.partnerName,
+  });
+}
+
+/// The customer office coordinates (+ address / phone) read from `res.partner`
+/// for the visit-detail geofence map and "Directions" hand-off.
+class PartnerLocation {
+  final double latitude;
+  final double longitude;
+  final String? address;
+  final String? phone;
+
+  const PartnerLocation({
+    required this.latitude,
+    required this.longitude,
+    this.address,
+    this.phone,
   });
 }

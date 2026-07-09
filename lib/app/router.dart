@@ -15,6 +15,7 @@ import '../features/customers/view/customers_list_page.dart';
 import '../features/employees/data/models/employee.dart';
 import '../features/home/view/home_shell.dart';
 import '../features/nearby/view/nearby_map_page.dart';
+import '../features/notifications/view/notifications_page.dart';
 import '../features/review/view/review_page.dart';
 import '../features/server_config/view/server_setup_page.dart';
 import '../features/settings/view/settings_page.dart';
@@ -86,6 +87,11 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
         path: '/review',
         pageBuilder: (_, state) =>
             slideTransition(state, const ReviewPage()),
+      ),
+      GoRoute(
+        path: '/notifications',
+        pageBuilder: (_, state) =>
+            slideTransition(state, const NotificationsPage()),
       ),
       GoRoute(
         path: '/customers',

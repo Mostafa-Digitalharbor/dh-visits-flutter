@@ -45,6 +45,11 @@
   "serverSetupDatabaseHint": "مثال: company-main",
   "serverSetupDatabasePrompt": "تعذّر اكتشاف قاعدة البيانات تلقائياً. أدخل اسمها (اسأل مسؤول النظام).",
   "serverSetupChecking": "جاري الاتصال…",
+  "serverSetupDetectDb": "اكتشاف الداتا بيز",
+  "serverSetupDetecting": "جاري الاكتشاف…",
+  "serverSetupDetected": "تم اكتشاف الداتا بيز: {db}",
+  "@serverSetupDetected": { "placeholders": { "db": { "type": "String" } } },
+  "serverSetupDetectFailed": "تعذّر اكتشاف الداتا بيز — اكتبها يدويًا",
   "loginChangeServer": "تغيير الخادم",
 
   "loginTitle": "Visits",
@@ -462,5 +467,13 @@
   "wfScheduledLabel": "مجدولة",
   "wfStartedLabel": "بدأت",
   "wfEndedLabel": "انتهت",
-  "wfDurationLabel": "المدة"
+  "wfDurationLabel": "المدة",
+  "wfNotificationsTitle": "الإشعارات",
+  "wfNotificationsEmpty": "مفيش حاجة مطلوبة منك",
+  "wfNotificationsDue": "الموعد {date}",
+  "@wfNotificationsDue": { "placeholders": { "date": { "type": "String" } } },
+  "wfActionTakePhoto": "التقاط صورة",
+  "wfMockLocationTitle": "تم رصد موقع مزيّف",
+  "wfMockLocationMessage": "جهازك بيبلّغ عن موقع GPS وهمي (mock). ده هيتسجّل للمراجعة. تكمّل برضه؟",
+  "wfQueuedOffline": "اتسجّل أوفلاين — هيتزامن أول ما النت يرجع"
 }

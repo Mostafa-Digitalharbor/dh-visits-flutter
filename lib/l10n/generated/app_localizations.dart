@@ -326,6 +326,30 @@ abstract class AppLocalizations {
   /// **'Connecting…'**
   String get serverSetupChecking;
 
+  /// No description provided for @serverSetupDetectDb.
+  ///
+  /// In en, this message translates to:
+  /// **'Detect database'**
+  String get serverSetupDetectDb;
+
+  /// No description provided for @serverSetupDetecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Detecting…'**
+  String get serverSetupDetecting;
+
+  /// No description provided for @serverSetupDetected.
+  ///
+  /// In en, this message translates to:
+  /// **'Database detected: {db}'**
+  String serverSetupDetected(String db);
+
+  /// No description provided for @serverSetupDetectFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t detect the database — enter it manually'**
+  String get serverSetupDetectFailed;
+
   /// No description provided for @loginChangeServer.
   ///
   /// In en, this message translates to:
@@ -2641,6 +2665,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Duration'**
   String get wfDurationLabel;
+
+  /// No description provided for @wfNotificationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get wfNotificationsTitle;
+
+  /// No description provided for @wfNotificationsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re all caught up'**
+  String get wfNotificationsEmpty;
+
+  /// No description provided for @wfNotificationsDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Due {date}'**
+  String wfNotificationsDue(String date);
+
+  /// No description provided for @wfActionTakePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Take photo'**
+  String get wfActionTakePhoto;
+
+  /// No description provided for @wfMockLocationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fake location detected'**
+  String get wfMockLocationTitle;
+
+  /// No description provided for @wfMockLocationMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your device is reporting a mock (fake) GPS location. This will be flagged for review. Continue anyway?'**
+  String get wfMockLocationMessage;
+
+  /// No description provided for @wfQueuedOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved offline — it\'ll sync when you\'re back online'**
+  String get wfQueuedOffline;
 }
 
 class _AppLocalizationsDelegate

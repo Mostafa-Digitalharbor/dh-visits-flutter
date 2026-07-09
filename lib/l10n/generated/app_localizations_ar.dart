@@ -132,6 +132,21 @@ class AppLocalizationsAr extends AppLocalizations {
   String get serverSetupChecking => 'جاري الاتصال…';
 
   @override
+  String get serverSetupDetectDb => 'اكتشاف الداتا بيز';
+
+  @override
+  String get serverSetupDetecting => 'جاري الاكتشاف…';
+
+  @override
+  String serverSetupDetected(String db) {
+    return 'تم اكتشاف الداتا بيز: $db';
+  }
+
+  @override
+  String get serverSetupDetectFailed =>
+      'تعذّر اكتشاف الداتا بيز — اكتبها يدويًا';
+
+  @override
   String get loginChangeServer => 'تغيير الخادم';
 
   @override
@@ -1326,4 +1341,28 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get wfDurationLabel => 'المدة';
+
+  @override
+  String get wfNotificationsTitle => 'الإشعارات';
+
+  @override
+  String get wfNotificationsEmpty => 'مفيش حاجة مطلوبة منك';
+
+  @override
+  String wfNotificationsDue(String date) {
+    return 'الموعد $date';
+  }
+
+  @override
+  String get wfActionTakePhoto => 'التقاط صورة';
+
+  @override
+  String get wfMockLocationTitle => 'تم رصد موقع مزيّف';
+
+  @override
+  String get wfMockLocationMessage =>
+      'جهازك بيبلّغ عن موقع GPS وهمي (mock). ده هيتسجّل للمراجعة. تكمّل برضه؟';
+
+  @override
+  String get wfQueuedOffline => 'اتسجّل أوفلاين — هيتزامن أول ما النت يرجع';
 }

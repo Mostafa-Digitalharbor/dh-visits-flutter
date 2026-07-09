@@ -137,11 +137,12 @@ class AuthUser extends Equatable {
         'visit_role': visitRole.name,
       };
 
-  AuthUser copyWith({String? tz, VisitRole? visitRole}) => AuthUser(
+  AuthUser copyWith({String? tz, VisitRole? visitRole, int? employeeId}) =>
+      AuthUser(
         uid: uid,
         username: username,
         employeeName: employeeName,
-        employeeId: employeeId,
+        employeeId: employeeId ?? this.employeeId,
         companyId: companyId,
         isAdmin: isAdmin,
         isSystem: isSystem,

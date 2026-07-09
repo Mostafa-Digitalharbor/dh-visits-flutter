@@ -24,7 +24,10 @@ class AppEnvironment {
   /// release binaries never ship a hard-coded company URL.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: '',
+    // TESTING: seeded with the dh_visit_management test instance so a plain
+    // `flutter run` (no --dart-define) points at the right backend out of the
+    // box. Revert to '' before a multi-tenant store release.
+    defaultValue: 'https://thedigitalharbor-dh-visits-new.odoo.com',
   );
 
   /// Optional build-time Odoo database fallback. Like [baseUrl], this is
@@ -32,7 +35,8 @@ class AppEnvironment {
   /// `--dart-define` is only a convenience seed for dev/CI builds.
   static const String database = String.fromEnvironment(
     'ODOO_DATABASE',
-    defaultValue: '',
+    // TESTING: real database name of the test instance (see [baseUrl]).
+    defaultValue: 'thedigitalharbor-dh-visits-new-main-34241330',
   );
 
   /// Build flavour name surfaced in logs / settings screen.

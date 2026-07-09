@@ -219,8 +219,12 @@ class Visit extends Equatable {
   bool get canSubmit =>
       state == VisitState.draft || state == VisitState.rescheduleRequested;
 
-  /// States where a routed approver may approve/reject.
+  /// States where a routed approver may approve/reject. The current backend
+  /// routes a submitted visit straight to `submitted` (the single pending
+  /// state); the `waiting_*` / `escalated` states also count as pending for
+  /// forward-compatibility.
   bool get isAwaitingApproval =>
+      state == VisitState.submitted ||
       state == VisitState.waitingParticipantManagerApproval ||
       state == VisitState.waitingDirectManagerApproval ||
       state == VisitState.escalated ||
@@ -260,10 +264,11 @@ class Visit extends Equatable {
   double? get checkOutLng => endLng;
   bool get hasCheckInLocation => hasStartLocation;
   bool get hasCheckOutLocation => hasEndLocation;
-  // The new visit model has no customer coordinates snapshot.
-  double? get customerLatitude => null;
-  double? get customerLongitude => null;
-  bool get hasCustomerLocation => false;
+  // The visit's planned coordinates (`dh.visit.latitude/longitude`) stand in
+  // for the "customer location" the old screens (Route map, geofence) expect.
+  double? get customerLatitude => latitude;
+  double? get customerLongitude => longitude;
+  bool get hasCustomerLocation => latitude != null && longitude != null;
   String? get visitTypeName => linkedRecordName;
 
   /// Scheduled day has passed and the visit isn't completed/running/closed.
@@ -302,9 +307,13 @@ class Visit extends Equatable {
   /// From the REST `_visit_to_dict` payload (slim shape used by
   /// `/api/visit/*`). many2one fields are bare ints + a `*_name` string.
   factory Visit.fromApi(Map<String, dynamic> json) {
+    // Odoo serialises an unset many2one as `false` (a bool), not null/0, so we
+    // must guard the cast — otherwise `false as num?` throws and breaks the
+    // whole list parse.
     int? nz(dynamic v) {
-      final n = (v as num?)?.toInt();
-      return (n == null || n == 0) ? null : n;
+      if (v is! num) return null;
+      final n = v.toInt();
+      return n == 0 ? null : n;
     }
 
     return Visit(

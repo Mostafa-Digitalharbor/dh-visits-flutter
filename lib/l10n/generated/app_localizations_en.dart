@@ -133,6 +133,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get serverSetupChecking => 'Connecting…';
 
   @override
+  String get serverSetupDetectDb => 'Detect database';
+
+  @override
+  String get serverSetupDetecting => 'Detecting…';
+
+  @override
+  String serverSetupDetected(String db) {
+    return 'Database detected: $db';
+  }
+
+  @override
+  String get serverSetupDetectFailed =>
+      'Couldn\'t detect the database — enter it manually';
+
+  @override
   String get loginChangeServer => 'Change server';
 
   @override
@@ -1334,4 +1349,29 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wfDurationLabel => 'Duration';
+
+  @override
+  String get wfNotificationsTitle => 'Notifications';
+
+  @override
+  String get wfNotificationsEmpty => 'You\'re all caught up';
+
+  @override
+  String wfNotificationsDue(String date) {
+    return 'Due $date';
+  }
+
+  @override
+  String get wfActionTakePhoto => 'Take photo';
+
+  @override
+  String get wfMockLocationTitle => 'Fake location detected';
+
+  @override
+  String get wfMockLocationMessage =>
+      'Your device is reporting a mock (fake) GPS location. This will be flagged for review. Continue anyway?';
+
+  @override
+  String get wfQueuedOffline =>
+      'Saved offline — it\'ll sync when you\'re back online';
 }

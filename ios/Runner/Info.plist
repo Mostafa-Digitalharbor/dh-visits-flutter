@@ -58,6 +58,9 @@
 		<!-- ============================================================ -->
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>We use your location to record customer visit check-in/out and to share your live position with your manager while you are using the app.</string>
+		<!-- Camera: proof-of-visit photos attached to a visit. -->
+		<key>NSCameraUsageDescription</key>
+		<string>We use the camera so you can attach proof-of-visit photos to a customer visit.</string>
 		<!-- App Transport Security: enforce HTTPS only (matches Android usesCleartextTraffic=false). -->
 		<key>NSAppTransportSecurity</key>
 		<dict>

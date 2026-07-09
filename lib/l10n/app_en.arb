@@ -48,6 +48,11 @@
   "serverSetupDatabaseHint": "e.g. company-main",
   "serverSetupDatabasePrompt": "We couldn't detect the database automatically. Please enter its name (ask your administrator).",
   "serverSetupChecking": "Connecting…",
+  "serverSetupDetectDb": "Detect database",
+  "serverSetupDetecting": "Detecting…",
+  "serverSetupDetected": "Database detected: {db}",
+  "@serverSetupDetected": { "placeholders": { "db": { "type": "String" } } },
+  "serverSetupDetectFailed": "Couldn't detect the database — enter it manually",
   "loginChangeServer": "Change server",
 
   "loginTitle": "Visits",
@@ -479,5 +484,13 @@
   "wfScheduledLabel": "Scheduled",
   "wfStartedLabel": "Started",
   "wfEndedLabel": "Ended",
-  "wfDurationLabel": "Duration"
+  "wfDurationLabel": "Duration",
+  "wfNotificationsTitle": "Notifications",
+  "wfNotificationsEmpty": "You're all caught up",
+  "wfNotificationsDue": "Due {date}",
+  "@wfNotificationsDue": { "placeholders": { "date": { "type": "String" } } },
+  "wfActionTakePhoto": "Take photo",
+  "wfMockLocationTitle": "Fake location detected",
+  "wfMockLocationMessage": "Your device is reporting a mock (fake) GPS location. This will be flagged for review. Continue anyway?",
+  "wfQueuedOffline": "Saved offline — it'll sync when you're back online"
 }

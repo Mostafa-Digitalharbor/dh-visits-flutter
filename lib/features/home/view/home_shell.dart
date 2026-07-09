@@ -5,10 +5,12 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../app/theme.dart';
+import '../../../core/di/service_locator.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../analytics/view/analytics_page.dart';
 import '../../auth/bloc/auth_bloc.dart';
+import '../../visits/data/visits_repository.dart';
 import '../../dashboard/view/dashboard_page.dart';
 import '../../live_location/bloc/live_location_bloc.dart';
 import '../../route/view/route_page.dart';
@@ -123,6 +125,16 @@ class _UserShellState extends State<_UserShell> {
           ),
         ],
       ),
+      // Field employees can plan their own visits (guide §2). Shown only on the
+      // My Visits tab.
+      floatingActionButton: _tab == 0
+          ? FloatingActionButton.extended(
+              heroTag: 'create-visit-user-hero',
+              onPressed: () => context.push('/visits/create'),
+              icon: const Icon(Symbols.add),
+              label: Text(context.s.createVisitTooltip),
+            )
+          : null,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -194,10 +206,26 @@ class _ManagerShellState extends State<_ManagerShell> {
           Expanded(
             child: IndexedStack(
               index: _tabIndex,
-              children: const [
-                DashboardPage(),
-                VisitsListPage(),
-                AnalyticsPage(),
+              children: [
+                // Dashboard & Analytics need the FULL team dataset, so they get
+                // their own `team`-scoped bloc — independent of the list tab,
+                // whose scope changes as the manager switches pending/team/
+                // escalated chips.
+                BlocProvider(
+                  create: (_) =>
+                      VisitsListBloc(repository: sl<VisitsRepository>())
+                        ..add(const VisitsListLoadRequested(
+                            scope: VisitListScope.team)),
+                  child: const DashboardPage(),
+                ),
+                const VisitsListPage(),
+                BlocProvider(
+                  create: (_) =>
+                      VisitsListBloc(repository: sl<VisitsRepository>())
+                        ..add(const VisitsListLoadRequested(
+                            scope: VisitListScope.team)),
+                  child: const AnalyticsPage(),
+                ),
               ],
             ),
           ),
@@ -338,6 +366,8 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
                 const SizedBox(width: 8),
               ],
+              const _NotificationChip(),
+              const SizedBox(width: 8),
               if (showSettings)
                 _ActionChip(
                   icon: Symbols.settings,
@@ -347,6 +377,89 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
             ],
           ),
         ),
+    );
+  }
+}
+
+/// Bell action chip with an unread badge, backed by the current user's pending
+/// visit activities ([VisitsRepository.myActivityCount]). Refreshes its count
+/// when the app returns to the foreground and after visiting the feed.
+class _NotificationChip extends StatefulWidget {
+  const _NotificationChip();
+
+  @override
+  State<_NotificationChip> createState() => _NotificationChipState();
+}
+
+class _NotificationChipState extends State<_NotificationChip>
+    with WidgetsBindingObserver {
+  int _count = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final c = await sl<VisitsRepository>().myActivityCount();
+      if (mounted) setState(() => _count = c);
+    } catch (_) {
+      // Best-effort: a failed count must not break the app bar.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        _ActionChip(
+          icon: Symbols.notifications,
+          tooltip: context.s.wfNotificationsTitle,
+          onTap: () async {
+            await context.push('/notifications');
+            _load();
+          },
+        ),
+        if (_count > 0)
+          Positioned(
+            right: -2,
+            top: -2,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+              decoration: BoxDecoration(
+                color: cs.error,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: cs.surfaceContainerLowest, width: 1.5),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                _count > 99 ? '99+' : '$_count',
+                style: TextStyle(
+                  color: cs.onError,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

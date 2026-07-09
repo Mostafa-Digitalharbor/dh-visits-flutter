@@ -8,10 +8,15 @@ import '../api/api_exceptions.dart';
 import '../../features/visits/data/visits_repository.dart';
 import 'connectivity_status.dart';
 
-/// One queued check-in / check-out / save-notes action that we
-/// couldn't send to the server because the network was down. We keep
-/// the payload as-is plus a few diagnostic fields so the UI can show
-/// the user when their work was captured locally.
+/// One queued visit workflow action (currently **Start** / **End**) that we
+/// couldn't send to the server because the network was down. We keep the
+/// payload as-is plus a few diagnostic fields so the UI can show the user when
+/// their work was captured locally.
+///
+/// Payload shape:
+/// - `type`: `'start'` | `'end'`
+/// - `latitude` / `longitude`: the GPS fix captured offline (nullable)
+/// - `outcome`: the visit outcome text (only for `'end'`)
 class PendingAction {
   final int visitId;
   final Map<String, dynamic> payload;
@@ -138,33 +143,57 @@ class PendingActionsQueue {
       final actions = _readAll();
       if (actions.isEmpty) return;
       final survivors = <PendingAction>[];
-      for (final a in actions) {
+      for (var i = 0; i < actions.length; i++) {
+        final a = actions[i];
         try {
-          // Legacy check-in/out payloads are no longer replayable against the
-          // new visit workflow API — drop them so the queue drains cleanly.
-          // (Offline replay for the new Start/End flow is a follow-up.)
-          debugPrint(
-              '[PendingActionsQueue] dropping legacy queued action for '
-              'visit ${a.visitId}');
+          await _replay(a);
           _synced.add(a.visitId);
         } on ApiException catch (e) {
           if (e.code == ApiErrorCode.network ||
               e.code == ApiErrorCode.timeout) {
-            // Still offline — keep this and everything after.
-            survivors.add(a);
-            survivors.addAll(actions.skip(actions.indexOf(a) + 1));
+            // Still offline — keep this and everything after it, in order.
+            survivors.addAll(actions.skip(i));
             break;
           }
-          // 4xx / server errors → drop the action; surface via debug
-          // log. The user will see the stale state on next refresh.
+          // 4xx / server errors (e.g. the visit's state moved on server-side
+          // while we were offline) → drop the action; the user will see the
+          // real state on next refresh.
           debugPrint(
               '[PendingActionsQueue] dropping visit ${a.visitId}: '
               '${e.code} ${e.serverMessage}');
+        } catch (e) {
+          debugPrint(
+              '[PendingActionsQueue] dropping visit ${a.visitId}: $e');
         }
       }
       await _writeAll(survivors);
     } finally {
       _flushing = false;
+    }
+  }
+
+  /// Replays a single queued action against the live workflow API. Throws the
+  /// repository's [ApiException] on failure so [flush] can decide whether to
+  /// keep (offline) or drop (server rejected) the action.
+  Future<void> _replay(PendingAction a) async {
+    final type = a.payload['type']?.toString();
+    final lat = (a.payload['latitude'] as num?)?.toDouble();
+    final lng = (a.payload['longitude'] as num?)?.toDouble();
+    switch (type) {
+      case 'start':
+        await repository.start(a.visitId, latitude: lat, longitude: lng);
+      case 'end':
+        await repository.end(
+          a.visitId,
+          outcome: a.payload['outcome']?.toString() ?? '',
+          latitude: lat,
+          longitude: lng,
+        );
+      default:
+        // Unknown / legacy payload — nothing we can replay; let it drain.
+        debugPrint(
+            '[PendingActionsQueue] discarding unknown action "$type" for '
+            'visit ${a.visitId}');
     }
   }
 

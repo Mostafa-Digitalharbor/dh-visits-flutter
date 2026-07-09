@@ -2,18 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../app/theme.dart';
+import '../../../core/di/service_locator.dart';
+import '../../../core/network/pending_actions_queue.dart';
 import '../../../core/settings/settings_cubit.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../auth/bloc/auth_bloc.dart';
 
-/// Displayed app version (design screen 07 → "حول التطبيق").
-const _appVersion = '1.0.0';
-
 /// Settings — profile card + grouped cards (account, appearance, language,
-/// sync/help/about) + logout. Matches design screen 07/14.
+/// sync/about) + logout. Matches design screen 07/14.
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
@@ -33,8 +33,30 @@ class SettingsPage extends StatelessWidget {
 
 /// The settings content without a Scaffold/AppBar — usable both as a pushed
 /// route ([SettingsPage]) and as an employee bottom-nav tab body.
-class SettingsView extends StatelessWidget {
+class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
+
+  @override
+  State<SettingsView> createState() => _SettingsViewState();
+}
+
+class _SettingsViewState extends State<SettingsView> {
+  /// Real build version, read from the platform package metadata (falls back to
+  /// a placeholder until the async read completes).
+  String _appVersion = '—';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() => _appVersion = '${info.version}+${info.buildNumber}');
+    }
+  }
 
   Future<void> _onLogoutTap(BuildContext context) async {
     final confirmed = await ConfirmDialog.show(
@@ -48,11 +70,21 @@ class SettingsView extends StatelessWidget {
     }
   }
 
-  void _comingSoon(BuildContext context) =>
-      context.showSnack(context.s.settingsComingSoon);
-
-  void _onSyncNow(BuildContext context) =>
+  /// Drain the offline queue on demand. Honest feedback: reports how many
+  /// pending actions are waiting, or that everything is already up to date.
+  Future<void> _onSyncNow(BuildContext context) async {
+    final queue = sl<PendingActionsQueue>();
+    final pending = queue.pendingCount.value;
+    if (pending == 0) {
       context.showSnack(context.s.settingsSynced, kind: SnackKind.success);
+      return;
+    }
+    context.showSnack(context.s.offlineSyncing(pending));
+    await queue.flush();
+    if (context.mounted) {
+      context.showSnack(context.s.settingsSynced, kind: SnackKind.success);
+    }
+  }
 
   void _onAbout(BuildContext context) {
     showAboutDialog(
@@ -93,12 +125,6 @@ class SettingsView extends StatelessWidget {
               // ── الحساب ──────────────────────────────────────────────────
               _GroupLabel(context.s.settingsAccount),
               _GroupCard(children: [
-                _NavRow(
-                  icon: Symbols.manage_accounts,
-                  label: context.s.settingsEditProfile,
-                  onTap: () => _comingSoon(context),
-                ),
-                const _RowDivider(),
                 _SwitchRow(
                   icon: Symbols.notifications,
                   label: context.s.settingsNotifications,
@@ -155,12 +181,6 @@ class SettingsView extends StatelessWidget {
                 _SyncRow(
                   subtitle: context.s.settingsSyncedJustNow,
                   onSync: () => _onSyncNow(context),
-                ),
-                const _RowDivider(),
-                _NavRow(
-                  icon: Symbols.help,
-                  label: context.s.settingsHelp,
-                  onTap: () => _comingSoon(context),
                 ),
                 const _RowDivider(),
                 _NavRow(
