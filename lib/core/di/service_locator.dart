@@ -8,6 +8,8 @@ import '../config/server_config_repository.dart';
 import '../location/location_service.dart';
 import '../network/connectivity_status.dart';
 import '../network/pending_actions_queue.dart';
+import '../push/push_notification_service.dart';
+import '../push/push_repository.dart';
 import '../settings/settings_repository.dart';
 import '../storage/session_storage.dart';
 import '../../features/attendance/data/attendance_repository.dart';
@@ -56,6 +58,13 @@ Future<void> setupServiceLocator() async {
   sl.registerSingleton<LiveLocationRepository>(
       LiveLocationRepository(api: sl(), session: sl()));
   sl.registerSingleton<NearbyRepository>(NearbyRepository(api: sl()));
+
+  // Push notifications: token registration goes through the same authenticated
+  // ApiClient; the service owns the FCM lifecycle. See app.dart for the
+  // login/logout hooks and docs/BACKEND_PUSH_NOTIFICATIONS.md.
+  sl.registerSingleton<PushRepository>(PushRepository(api: sl()));
+  sl.registerSingleton<PushNotificationService>(
+      PushNotificationService(repository: sl(), prefs: prefs));
 
   final queue = PendingActionsQueue(
     prefs: prefs,

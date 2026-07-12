@@ -203,11 +203,46 @@ def _notify(self, users, title, body, event):
 
 ---
 
-## 9. اللي التطبيق (Flutter) هيوفّره — للتنسيق
+## 9. اللي التطبيق (Flutter) وفّره — ✅ مُنفّذ
 
+الجزء بتاع التطبيق **اتعمل بالكامل** (build ناجح على أندرويد). الكود:
+
+- **`lib/core/push/push_notification_service.dart`** — كل دورة حياة الـ FCM:
+  الأذونات، الـ foreground banner (عبر `flutter_local_notifications` على channel
+  `visit_events`)، جلب الـ token، وتحويل الضغط على الإشعار لـ `visit_id`.
+- **`lib/core/push/push_repository.dart`** — بيكلّم `/api/visit/register_device`
+  و `/api/visit/unregister_device`.
+- **`lib/app/app.dart`** — بيسجّل الـ token بعد كل authenticate (لوجين أو استئناف
+  جلسة)، بيمسحه *قبل* تدمير الجلسة عند اللوجاوت، وبيعمل deep-link لـ
+  `/visits/<visit_id>` عند الضغط على الإشعار (foreground / background / cold-launch).
+- **`lib/main.dart`** — `Firebase.initializeApp` + تسجيل الـ background handler.
+
+السلوك:
 - يجيب FCM token ويبعته عبر `/api/visit/register_device` بعد كل لوجين + عند تغيّر التوكن.
 - يمسحه عبر `/api/visit/unregister_device` عند تسجيل الخروج.
 - يستقبل الـ `data` payload، ويفتح `/visits/<visit_id>` عند الضغط على الإشعار.
 - foreground: يعرض إشعار محلي عبر `flutter_local_notifications`.
 - background/terminated: النظام يعرض `notification` تلقائيًا.
+
+### إعدادات Firebase الفعلية (للباك إند)
+
+| Key | Value |
+|---|---|
+| `PROJECT_ID` | `visits-app1` |
+| `project_number` (FCM sender) | `1029698829865` |
+| Android package | `net.digitalharbor.visits` (+ `net.digitalharbor.visits.debug` لبناء الـ debug) |
+| iOS bundle | `net.digitalharbor.visits` |
+| Endpoint الإرسال | `https://fcm.googleapis.com/v1/projects/visits-app1/messages:send` |
+
+> **ملاحظة عن الـ debug build:** بياخد لاحقة `.debug`. عشان الـ Gradle plugin
+> يعدّي من غير تسجيل تطبيق تاني في Firebase، فيه ملف
+> `android/app/src/debug/google-services.json` بنفس بيانات المشروع بالـ package
+> المسبوق بـ `.debug`. الـ runtime بياخد إعداداته من `lib/firebase_options.dart`
+> (مش من google-services.json)، فالإشعارات بتشتغل على نفس المشروع عادي.
+
+### الناقص لسه (مسؤولية خارج الكود):
+- **iOS:** رفع **APNs Auth Key (.p8)** في Firebase → Cloud Messaging، وتفعيل
+  **Push Notifications** + **Background Modes → Remote notifications** في Xcode.
+- **الباك إند:** **Service Account JSON** من Firebase عشان يبعت عبر FCM HTTP v1
+  (القسم 5) + تنفيذ الـ endpoints والموديل (القسم 7).
 ```

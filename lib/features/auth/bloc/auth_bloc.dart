@@ -12,7 +12,13 @@ part 'auth_state.dart';
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthRepository repository;
 
-  AuthBloc({required this.repository}) : super(const AuthState.unknown()) {
+  /// Optional hook run *before* the session is destroyed on logout — used to
+  /// unregister the FCM device token while the request is still authorised.
+  /// Best-effort: its failure never blocks logout.
+  final Future<void> Function()? onBeforeLogout;
+
+  AuthBloc({required this.repository, this.onBeforeLogout})
+      : super(const AuthState.unknown()) {
     on<AuthStarted>(_onStarted);
     on<AuthLoginRequested>(_onLoginRequested);
     on<AuthLogoutRequested>(_onLogoutRequested);
@@ -69,6 +75,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthLogoutRequested event,
     Emitter<AuthState> emit,
   ) async {
+    if (onBeforeLogout != null) {
+      try {
+        await onBeforeLogout!();
+      } catch (e) {
+        debugPrint('[debug] AuthBloc: onBeforeLogout failed: $e');
+      }
+    }
     await repository.logout();
     emit(const AuthState.unauthenticated());
   }

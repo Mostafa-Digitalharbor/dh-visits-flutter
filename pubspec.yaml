@@ -62,6 +62,15 @@ dependencies:
   open_filex: ^4.7.0
   image_picker: ^1.1.2   # Camera capture for proof-of-visit photos
 
+  # Push notifications (FCM). The backend (dh_visit_management) sends a push on
+  # each visit workflow event; the app registers its FCM token after login and
+  # deep-links to the visit from a notification tap. See
+  # docs/BACKEND_PUSH_NOTIFICATIONS.md. flutter_local_notifications renders the
+  # heads-up banner while the app is in the foreground.
+  firebase_core: ^4.11.0
+  firebase_messaging: ^16.4.1
+  flutter_local_notifications: ^18.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

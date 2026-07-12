@@ -125,13 +125,45 @@ class _VisitDetailView extends StatelessWidget {
       }
       return const Center(child: CircularProgressIndicator());
     }
-    final busy = state.status == VisitDetailStatus.acting;
+    return _VisitDetailBody(state: state, visit: visit);
+  }
+}
+
+/// Hosts the scrollable detail + the bottom action bar. Keeps the action-bar
+/// height in state so the list can reserve exactly enough bottom padding for
+/// its last card to scroll clear of the (variable-height) pinned buttons.
+class _VisitDetailBody extends StatefulWidget {
+  final VisitDetailState state;
+  final Visit visit;
+  const _VisitDetailBody({required this.state, required this.visit});
+
+  @override
+  State<_VisitDetailBody> createState() => _VisitDetailBodyState();
+}
+
+class _VisitDetailBodyState extends State<_VisitDetailBody> {
+  double _barHeight = 0;
+
+  void _onBarHeight(double h) {
+    if ((h - _barHeight).abs() < 0.5) return;
+    // Defer to avoid mutating state during the layout/paint phase.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _barHeight = h);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final visit = widget.visit;
+    final busy = widget.state.status == VisitDetailStatus.acting;
     return Stack(
       children: [
         RefreshIndicator(
           onRefresh: () => context.read<VisitDetailCubit>().load(),
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            // Extra breathing room below the last card so it can scroll fully
+            // clear of the pinned action bar.
+            padding: EdgeInsets.fromLTRB(16, 16, 16, _barHeight + 24),
             children: [
               _Header(visit: visit),
               const SizedBox(height: 16),
@@ -148,7 +180,6 @@ class _VisitDetailView extends StatelessWidget {
               ],
               const SizedBox(height: 16),
               _HistorySection(visit: visit),
-              const SizedBox(height: 100),
             ],
           ),
         ),
@@ -163,9 +194,32 @@ class _VisitDetailView extends StatelessWidget {
           left: 0,
           right: 0,
           bottom: 0,
-          child: _ActionBar(visit: visit),
+          child: _MeasureHeight(
+            onChange: _onBarHeight,
+            child: _ActionBar(visit: visit),
+          ),
         ),
       ],
+    );
+  }
+}
+
+/// Reports its child's rendered height via [onChange] after each layout.
+class _MeasureHeight extends StatelessWidget {
+  final Widget child;
+  final ValueChanged<double> onChange;
+  const _MeasureHeight({required this.child, required this.onChange});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, _) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final box = context.findRenderObject() as RenderBox?;
+          if (box != null && box.hasSize) onChange(box.size.height);
+        });
+        return child;
+      },
     );
   }
 }

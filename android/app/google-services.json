@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1029698829865",
+    "project_id": "visits-app1",
+    "storage_bucket": "visits-app1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1029698829865:android:c1475b63c6bcee0fe9a638",
+        "android_client_info": {
+          "package_name": "net.digitalharbor.visits"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAJsiNAwtOtsXodNM980mbovvZ11tqL8Ng"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -39,4 +39,10 @@ class Endpoints {
   static const String visitStart = '/api/visit/start';
   static const String visitEnd = '/api/visit/end';
   static const String visitUploadAttachment = '/api/visit/upload_attachment';
+
+  // ---- Push notifications (device token registration) ---------------------
+  // The app registers its FCM token after login so the backend can push visit
+  // workflow events. See docs/BACKEND_PUSH_NOTIFICATIONS.md.
+  static const String registerDevice = '/api/visit/register_device';
+  static const String unregisterDevice = '/api/visit/unregister_device';
 }

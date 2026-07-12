@@ -72,5 +72,15 @@
 		<false/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<!-- Push notifications: allow the app to be woken by a remote push so
+		     FCM can deliver visit-workflow events in the background. Also enable
+		     "Push Notifications" + "Background Modes → Remote notifications" in
+		     the Xcode target Signing & Capabilities, and upload an APNs Auth Key
+		     (.p8) to Firebase → Cloud Messaging. -->
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>remote-notification</string>
+			<string>fetch</string>
+		</array>
 	</dict>
 </plist>

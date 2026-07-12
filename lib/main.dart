@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:bloc/bloc.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -10,6 +12,8 @@ import 'app/app.dart';
 import 'core/config/app_environment.dart';
 import 'core/di/service_locator.dart';
 import 'core/observability/sentry_bloc_observer.dart';
+import 'core/push/push_notification_service.dart';
+import 'firebase_options.dart';
 
 Future<void> main() async {
   // Sentry's appRunner wraps everything in a guarded Zone so async errors
@@ -50,6 +54,25 @@ Future<void> _bootstrap() async {
   // Load the full IANA timezone database so we can render Odoo datetimes
   // in the user's `res.users.tz` regardless of the device's clock.
   tz_data.initializeTimeZones();
+
+  // Firebase + push. initializeApp must run before any FCM use (including the
+  // background isolate handler, which we register here at startup). A failure
+  // here (e.g. missing google-services.json in a local build) must not take the
+  // whole app down — notifications just stay off.
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    if (kDebugMode) debugPrint('[push] Firebase init failed: $e');
+  }
+
   await setupServiceLocator();
+
+  // Wire up FCM handlers (permission, foreground banner, tap → deep link).
+  // Token registration itself happens after login (see app.dart).
+  await sl<PushNotificationService>().initialize();
+
   runApp(const CustomerVisitsApp());
 }

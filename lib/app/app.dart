@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/api/api_client.dart';
 import '../core/config/server_config_cubit.dart';
 import '../core/config/server_config_repository.dart';
 import '../core/di/service_locator.dart';
 import '../core/location/location_service.dart';
+import '../core/push/push_notification_service.dart';
 import '../core/settings/settings_cubit.dart';
 import '../core/settings/settings_repository.dart';
 import '../features/auth/bloc/auth_bloc.dart';
@@ -39,19 +41,34 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
   late final AuthBloc _authBloc;
   late final SettingsCubit _settingsCubit;
   late final ServerConfigCubit _serverConfigCubit;
+  late final GoRouter _router;
+  final PushNotificationService _push = sl<PushNotificationService>();
   StreamSubscription<void>? _unauthorizedSub;
+  StreamSubscription<AuthState>? _authSub;
+  StreamSubscription<int>? _visitTapSub;
+
+  /// A visit id from a notification tapped before we were authenticated
+  /// (e.g. cold launch straight from a push). Navigated once logged in.
+  int? _pendingVisitId;
 
   @override
   void initState() {
     super.initState();
-    _authBloc = AuthBloc(repository: sl<AuthRepository>())
-      ..add(const AuthStarted());
+    _authBloc = AuthBloc(
+      repository: sl<AuthRepository>(),
+      // Unregister the FCM token while the session is still valid.
+      onBeforeLogout: () => _push.unregister(),
+    )..add(const AuthStarted());
     _settingsCubit =
         SettingsCubit(repository: sl<SettingsRepository>());
     _serverConfigCubit = ServerConfigCubit(
       repository: sl<ServerConfigRepository>(),
       apiClient: sl<ApiClient>(),
     );
+    // Build the router once so its lifetime (and our nav calls into it) is
+    // stable across rebuilds.
+    _router = buildRouter(_authBloc, _serverConfigCubit);
+
     // Any API call returning 401/AUTH_REQUIRED forces a logout, which the
     // router will pick up and redirect to /login.
     _unauthorizedSub = sl<ApiClient>().onUnauthorized.listen((_) {
@@ -59,11 +76,49 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
         _authBloc.add(const AuthLogoutRequested());
       }
     });
+
+    // Register the device token whenever the user becomes authenticated (covers
+    // both a fresh login and a cold start with an existing session), and flush
+    // any visit deep-link that arrived before login.
+    _authSub = _authBloc.stream.listen((state) {
+      if (state.status == AuthStatus.authenticated) {
+        _push.registerToken();
+        _flushPendingVisit();
+      }
+    });
+
+    // A tapped visit notification → open the visit (or defer until logged in).
+    _visitTapSub = _push.onVisitTap.listen(_handleVisitTap);
+  }
+
+  void _handleVisitTap(int visitId) {
+    if (_authBloc.state.status == AuthStatus.authenticated) {
+      _openVisit(visitId);
+    } else {
+      _pendingVisitId = visitId;
+    }
+  }
+
+  void _flushPendingVisit() {
+    final id = _pendingVisitId;
+    if (id == null) return;
+    _pendingVisitId = null;
+    _openVisit(id);
+  }
+
+  void _openVisit(int visitId) {
+    // Defer to after the current frame so any auth-driven redirect (→ /home)
+    // settles first and the visit page pushes cleanly on top.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _router.push('/visits/$visitId');
+    });
   }
 
   @override
   void dispose() {
     _unauthorizedSub?.cancel();
+    _authSub?.cancel();
+    _visitTapSub?.cancel();
     _authBloc.close();
     _settingsCubit.close();
     _serverConfigCubit.close();
@@ -72,7 +127,6 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
 
   @override
   Widget build(BuildContext context) {
-    final router = buildRouter(_authBloc, _serverConfigCubit);
     return MultiBlocProvider(
       providers: [
         BlocProvider.value(value: _authBloc),
@@ -117,7 +171,7 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
             theme: AppTheme.light(),
             darkTheme: AppTheme.dark(),
             themeMode: settings.themeMode,
-            routerConfig: router,
+            routerConfig: _router,
             // App-wide responsiveness guard: bound the OS text-scale so the
             // design's fixed-height components (app bar, cards, chips, nav)
             // stay legible without overflowing on very large / small font
