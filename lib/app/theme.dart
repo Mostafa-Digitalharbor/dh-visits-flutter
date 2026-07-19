@@ -254,6 +254,18 @@ class AppTheme {
         indicatorColor: scheme.primaryContainer,
         elevation: 0,
         height: 64,
+        // Pin the icon color to the design tokens (mirrors labelTextStyle).
+        // Without this the unselected icon color is unspecified and collapses
+        // into the nav background, so only the *selected* destination's icon
+        // was visible (dashboard showed only when active; analytics never).
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            size: 24,
+            color: states.contains(WidgetState.selected)
+                ? scheme.primary
+                : x.textTertiary,
+          ),
+        ),
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => AppType.labelMd.copyWith(
             fontWeight: states.contains(WidgetState.selected)

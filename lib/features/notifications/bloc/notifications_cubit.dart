@@ -47,12 +47,25 @@ class NotificationsCubit extends Cubit<NotificationsState> {
     emit(state.copyWith(status: NotificationsStatus.loading, error: null));
     try {
       final activities = await repository.myActivities();
+      // isClosed: this cubit is page-scoped, so popping the page while the
+      // read is in flight disposes it before this runs — and emitting on a
+      // closed cubit throws.
+      if (isClosed) return;
       emit(state.copyWith(
         status: NotificationsStatus.success,
         activities: activities,
       ));
     } on ApiException catch (e) {
+      if (isClosed) return;
       emit(state.copyWith(status: NotificationsStatus.failure, error: e));
+    } catch (e) {
+      // Without this, an unexpected failure (a parse error, say) escaped
+      // uncaught and left the page on its spinner forever.
+      if (isClosed) return;
+      emit(state.copyWith(
+        status: NotificationsStatus.failure,
+        error: ApiException.unexpected(e),
+      ));
     }
   }
 }

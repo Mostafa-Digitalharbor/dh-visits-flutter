@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/endpoints.dart';
+import '../../../core/api/odoo_rpc.dart';
 import '../../../core/constants.dart';
 import '../../../core/storage/session_storage.dart';
 
@@ -37,21 +38,13 @@ class AttendanceRepository {
   /// this is a side-effect-free way to know the current state and pick the
   /// right direction (instead of blindly toggling).
   Future<bool> _hasOpenAttendance(int uid) async {
-    final result = await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': AppConstants.hrAttendanceModel,
-        'method': 'search_count',
-        'args': [
-          [
-            ['employee_id.user_id', '=', uid],
-            ['check_out', '=', false],
-          ],
-        ],
-        'kwargs': {},
-      },
+    final count = await api.searchCount(
+      AppConstants.hrAttendanceModel,
+      domain: [
+        ['employee_id.user_id', '=', uid],
+        ['check_out', '=', false],
+      ],
     );
-    final count = (result is num) ? result.toInt() : 0;
     return count > 0;
   }
 

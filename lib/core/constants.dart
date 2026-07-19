@@ -33,6 +33,67 @@ class AppConstants {
   /// last available tile instead of showing blank squares.
   static const int mapMaxNativeZoom = 19;
 
+  /// Interactive zoom bounds shared by every [FlutterMap] in the app.
+  static const double mapMaxZoom = 22.0;
+  static const double mapMinZoom = 3.0;
+
+  // ---- Per-screen initial camera zoom ----
+  // Each map opens at the level that suits what it shows: a single pin can sit
+  // tight, a whole day's route has to fit several. Named so the four screens
+  // no longer each carry an unexplained number.
+
+  /// Visit detail — one customer pin plus the check-in radius.
+  static const double mapZoomVisitDetail = 16.0;
+
+  /// Upper bound when auto-fitting the visit map to its markers, so two very
+  /// close points don't slam the camera to street level.
+  static const double mapZoomVisitFitMax = 17.0;
+
+  /// Dashboard mini-map — several active employees across a city.
+  static const double mapZoomDashboard = 15.0;
+
+  /// Today's route — every stop of the day should be visible at once.
+  static const double mapZoomRoute = 14.5;
+
+  // ---- Fetch page sizes ----
+  /// Visits shown in a list screen. Comfortably beyond a normal workload
+  /// while keeping the payload small enough for a field connection.
+  static const int visitsPageLimit = 200;
+
+  /// Rows pulled for a single visit's related records (participants, history).
+  static const int visitRelatedLimit = 100;
+
+  /// Upper bound for analytics-style sweeps that aggregate many visits.
+  static const int visitsAnalyticsLimit = 500;
+
+  /// Google Maps universal search URL (fallback when the `geo:` scheme has no
+  /// handler). Append a `lat,lng` query.
+  static const String googleMapsSearchUrl =
+      'https://www.google.com/maps/search/?api=1&query=';
+
+  // ---- Networking / timing ----
+  static const Duration apiConnectTimeout = Duration(seconds: 15);
+  static const Duration apiReceiveTimeout = Duration(seconds: 30);
+
+  /// How long an idle socket is kept alive (Dart's default is 15s), so moving
+  /// between screens reuses the connection instead of re-negotiating TLS.
+  ///
+  /// The socket *count* is deliberately left unbounded — see [ApiClient].
+  static const Duration apiIdleTimeout = Duration(seconds: 30);
+
+  /// How recent a presence ping must be for an employee to count as "online"
+  /// on the nearby radar.
+  static const Duration nearbyOnlineWindow = Duration(minutes: 5);
+
+  /// GPS-search radius slider bounds (meters) on the nearby map.
+  static const double nearbyRadiusMinMeters = 5.0;
+  static const double nearbyRadiusMaxMeters = 200.0;
+
+  // ---- Visit scheduling ----
+  /// How far ahead / back a visit may be scheduled in the date picker.
+  static const Duration visitScheduleMaxAhead = Duration(days: 365);
+  static const Duration visitSchedulePastGrace = Duration(days: 1);
+
   /// Fallback map center (Cairo) used when no real coordinate is available.
   static const double mapFallbackLat = 30.0444;
   static const double mapFallbackLng = 31.2357;
@@ -66,6 +127,11 @@ class AppConstants {
   static const String visitParticipantModel = 'dh.visit.participant';
   static const String projectModel = 'project.project';
   static const String crmLeadModel = 'crm.lead';
+
+  /// Standard Odoo models the app reads generically.
+  static const String attachmentModel = 'ir.attachment';
+  static const String mailActivityModel = 'mail.activity';
+  static const String partnerCategoryModel = 'res.partner.category';
 
   // ---- dh_visit_management security groups (res.groups) ----
   // The logged-in user's visit role is derived by matching their `group_ids`

@@ -1,3 +1,5 @@
+import '../../../../l10n/generated/app_localizations.dart';
+
 /// A file attached to a visit (`ir.attachment` linked via
 /// `res_model='dh.visit'`, `res_id=<visit>`).
 class VisitAttachment {
@@ -20,10 +22,16 @@ class VisitAttachment {
         fileSize: (json['file_size'] as num?)?.toInt() ?? 0,
       );
 
-  /// Human-readable size, e.g. "11 B", "4.2 KB", "1.3 MB".
-  String get readableSize {
-    if (fileSize < 1024) return '$fileSize B';
-    if (fileSize < 1024 * 1024) return '${(fileSize / 1024).toStringAsFixed(1)} KB';
-    return '${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB';
+  /// Human-readable size, e.g. "11 B", "4.2 KB", "1.3 MB" — localized, since
+  /// this renders next to the attachment name in the visit detail list.
+  ///
+  /// Takes the localizations rather than a BuildContext so the model stays
+  /// free of widget imports.
+  String readableSize(AppLocalizations s) {
+    const kb = 1024;
+    const mb = kb * 1024;
+    if (fileSize < kb) return s.unitBytes('$fileSize');
+    if (fileSize < mb) return s.unitKilobytes((fileSize / kb).toStringAsFixed(1));
+    return s.unitMegabytes((fileSize / mb).toStringAsFixed(1));
   }
 }

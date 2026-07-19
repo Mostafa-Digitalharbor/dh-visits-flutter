@@ -50,9 +50,14 @@ extension Responsive on BuildContext {
   double hp(double fraction) => screenH * fraction;
 
   /// A fixed-height component grown to fit the active text scale, so it never
-  /// clips its own labels when the user enlarges system fonts. Combines the
-  /// width scale with the text scale.
-  double fixedH(double dp) => dp * widthScale * textScale.clamp(1.0, 1.25);
+  /// clips its own labels when the user enlarges system fonts.
+  ///
+  /// Deliberately does **not** apply [widthScale]: text does not get narrower
+  /// on a narrow phone, so multiplying by a sub-1.0 width factor shrank the
+  /// box while its contents kept full height — clipping on exactly the 320dp
+  /// screens this helper exists to protect. Growth is one-way; the box may get
+  /// taller for large fonts but never shorter than its design height.
+  double fixedH(double dp) => dp * textScale.clamp(1.0, 1.25);
 
   /// Convenience: a responsive [SizedBox] gap (square by default).
   SizedBox gap(double dp) => SizedBox(width: r(dp), height: r(dp));

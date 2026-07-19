@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
+import '../../core/utils/app_date.dart';
 import '../../features/visits/data/models/visit.dart';
 import '../../features/visits/view/visit_labels.dart';
 import '../extensions/context_extensions.dart';
@@ -87,7 +87,7 @@ class VisitCard extends StatelessWidget {
                     _meta(
                       context,
                       icon: Icons.schedule,
-                      text: DateFormat('MMM d, HH:mm').format(schedule.toLocal()),
+                      text: AppDate.dateTime(context, schedule.toLocal()),
                     ),
                   if (showEmployee && visit.employeeName != null)
                     _meta(
@@ -133,7 +133,19 @@ class VisitCard extends StatelessWidget {
       children: [
         Icon(icon, size: 15, color: c),
         const SizedBox(width: 4),
-        Text(text, style: context.text.bodySmall?.copyWith(color: c)),
+        // Flexible, not a bare Text: the enclosing Wrap hands the Row its full
+        // maxWidth, so an unbounded Text takes its intrinsic width and blows
+        // past the card. These labels carry user data (Odoo project /
+        // opportunity and employee names, longer in Arabic) and do overflow.
+        // Loose fit keeps short labels at their natural width.
+        Flexible(
+          child: Text(
+            text,
+            style: context.text.bodySmall?.copyWith(color: c),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }

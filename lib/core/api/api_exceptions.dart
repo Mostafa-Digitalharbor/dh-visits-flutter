@@ -15,12 +15,38 @@ enum ApiErrorCode {
   /// capabilities (live employee location / nearby map) that have no
   /// storage in a vanilla Odoo without the custom visits module.
   notSupported,
+
+  /// The stored session could not be read back on startup (corrupted keystore
+  /// after a device restore, or a changed payload shape). The user simply
+  /// needs to sign in again.
+  sessionRestoreFailed,
+
+  /// The request collided with the record's current state — e.g. the visit was
+  /// already started from another device. Retrying the same call won't help;
+  /// the user must reload and look at the new state.
+  conflict,
+
+  /// A secure connection could not be established: an untrusted or expired
+  /// TLS certificate. Distinct from [network] because "check your internet"
+  /// is the wrong advice — the address is reachable, the certificate isn't
+  /// trusted.
+  insecureConnection,
   unknown,
 }
 
 class ApiException implements Exception {
   final ApiErrorCode code;
+
+  /// A human-readable message *produced by the server* (an Odoo `UserError`
+  /// / `ValidationError` body, say) — meaningful enough to show verbatim,
+  /// which `ApiExceptionL10n.localize` does for the codes that carry one.
+  ///
+  /// Never put a raw Dart/Dio exception string here: it would be rendered to
+  /// the user untranslated. Use [ApiException.unexpected] instead, which
+  /// routes the diagnostic to [details].
   final String? serverMessage;
+
+  /// Diagnostic payload for logs and Sentry. Never rendered to the user.
   final dynamic details;
 
   ApiException({
@@ -62,6 +88,25 @@ class ApiException implements Exception {
 
   factory ApiException.unknown(String? message) =>
       ApiException(code: ApiErrorCode.unknown, serverMessage: message);
+
+  /// An unexpected failure that carries no server-authored message: a JSON
+  /// parse error, a null cast, a plugin throw, an unclassified Dio failure.
+  ///
+  /// The raw text is kept in [details] for Sentry and deliberately kept out
+  /// of [serverMessage] — otherwise `localize()` shows it verbatim and the
+  /// user reads "type 'Null' is not a subtype of type 'String'" in the
+  /// middle of an Arabic screen. They get the generic localized fallback
+  /// instead, while the diagnostic still reaches the logs.
+  factory ApiException.unexpected(Object? error) =>
+      ApiException(code: ApiErrorCode.unknown, details: error?.toString());
+
+  /// Restoring the persisted session threw. Like [unexpected], the raw text
+  /// stays in [details] so the user reads a localized sentence instead of a
+  /// platform exception.
+  factory ApiException.sessionRestoreFailed(Object? error) => ApiException(
+        code: ApiErrorCode.sessionRestoreFailed,
+        details: error?.toString(),
+      );
 
   static ApiErrorCode _mapCode(
     String raw, [
@@ -123,6 +168,17 @@ class ApiException implements Exception {
                 lc.contains('which you are trying to read')));
   }
 
+  /// Includes [details] because this is what Sentry serializes for an
+  /// unhandled bloc error, and for `unexpected` errors the diagnostic lives
+  /// there rather than in [serverMessage].
   @override
-  String toString() => 'ApiException($code, $serverMessage)';
+  String toString() {
+    final parts = [
+      if (serverMessage != null) serverMessage,
+      if (details != null) 'details: $details',
+    ];
+    return parts.isEmpty
+        ? 'ApiException($code)'
+        : 'ApiException($code, ${parts.join(', ')})';
+  }
 }

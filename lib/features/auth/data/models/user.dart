@@ -66,6 +66,14 @@ class AuthUser extends Equatable {
   /// Odoo security groups right after login (see [AuthRepository.login]).
   final VisitRole visitRole;
 
+  /// True when the post-login profile read failed, so [visitRole], [tz] and
+  /// [employeeId] are fallbacks rather than real values.
+  ///
+  /// This is not cosmetic: with no [employeeId] the visit action bar can't
+  /// recognise the user as the visit's owner and every workflow button
+  /// disappears. The app must say so rather than look quietly broken.
+  final bool profileIncomplete;
+
   const AuthUser({
     required this.uid,
     required this.username,
@@ -77,6 +85,7 @@ class AuthUser extends Equatable {
     this.isManager = false,
     this.tz,
     this.visitRole = VisitRole.none,
+    this.profileIncomplete = false,
   });
 
   /// True for any manager-tier visit role (manager / project manager / admin).
@@ -121,6 +130,7 @@ class AuthUser extends Equatable {
       isManager: json['is_manager'] == true || isAdmin || isSystem,
       tz: _parseTz(json['tz']),
       visitRole: _visitRoleFromName(json['visit_role']),
+      profileIncomplete: json['profile_incomplete'] == true,
     );
   }
 
@@ -135,9 +145,18 @@ class AuthUser extends Equatable {
         'is_manager': isManager,
         'tz': tz,
         'visit_role': visitRole.name,
+        // Persisted: the fallback role is what got saved, so a cold start with
+        // this session would otherwise look healthy while still missing every
+        // action button.
+        'profile_incomplete': profileIncomplete,
       };
 
-  AuthUser copyWith({String? tz, VisitRole? visitRole, int? employeeId}) =>
+  AuthUser copyWith({
+    String? tz,
+    VisitRole? visitRole,
+    int? employeeId,
+    bool? profileIncomplete,
+  }) =>
       AuthUser(
         uid: uid,
         username: username,
@@ -149,6 +168,7 @@ class AuthUser extends Equatable {
         isManager: isManager,
         tz: tz ?? this.tz,
         visitRole: visitRole ?? this.visitRole,
+        profileIncomplete: profileIncomplete ?? this.profileIncomplete,
       );
 
   static String? _parseTz(dynamic raw) {
@@ -159,6 +179,14 @@ class AuthUser extends Equatable {
   }
 
   @override
-  List<Object?> get props =>
-      [uid, username, employeeId, isAdmin, isManager, tz, visitRole];
+  List<Object?> get props => [
+        uid,
+        username,
+        employeeId,
+        isAdmin,
+        isManager,
+        tz,
+        visitRole,
+        profileIncomplete,
+      ];
 }

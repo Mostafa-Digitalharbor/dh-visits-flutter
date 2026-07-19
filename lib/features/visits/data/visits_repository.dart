@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/endpoints.dart';
+import '../../../core/api/odoo_rpc.dart';
 import '../../../core/constants.dart';
 import '../../../core/storage/session_storage.dart';
 import '../../attendance/data/attendance_repository.dart';
@@ -15,6 +19,18 @@ import 'models/visit_participant.dart';
 /// on top of Odoo record rules (which already scope to the manager's
 /// hierarchy), so these only narrow by state.
 enum VisitManagerScope { team, pending, escalated }
+
+/// Which end of the visit a mock-location verdict belongs to.
+enum _SpoofPhase { start, end }
+
+/// Machine-readable marker embedded in every mock-location chatter note.
+///
+/// Detection keys off this token, never off the prose around it: the note is
+/// bilingual and will be reworded, but this must keep matching. It doubles as
+/// something a manager can paste into Odoo's own message search to pull every
+/// suspect visit — which is the closest thing to a filterable flag we have
+/// until `dh.visit` gains a real `is_mocked` column.
+const String kMockLocationMarker = 'DH-MOCK-GPS';
 
 /// Talks to the `dh_visit_management` Odoo module.
 ///
@@ -133,11 +149,15 @@ class VisitsRepository {
   }
 
   /// Starts an approved visit (records GPS). Mirrors into `hr.attendance`.
+  ///
+  /// [isMocked] is the OS mock-provider verdict. See [_recordSpoofAttempt] for
+  /// why it is posted to the chatter rather than written to a field.
   Future<String?> start(
     int visitId, {
     double? latitude,
     double? longitude,
     String? location,
+    bool isMocked = false,
   }) async {
     final result = await api.jsonRpc(
       Endpoints.visitStart,
@@ -148,6 +168,13 @@ class VisitsRepository {
         if (location != null) 'location': location,
       },
     );
+    if (isMocked) {
+      await _recordSpoofAttempt(visitId,
+          phase: _SpoofPhase.start,
+          latitude: latitude,
+          longitude: longitude,
+          location: location);
+    }
     if (latitude != null && longitude != null) {
       try {
         await attendance?.checkIn(latitude: latitude, longitude: longitude);
@@ -166,6 +193,7 @@ class VisitsRepository {
     double? latitude,
     double? longitude,
     String? location,
+    bool isMocked = false,
   }) async {
     final result = await api.jsonRpc(
       Endpoints.visitEnd,
@@ -177,6 +205,13 @@ class VisitsRepository {
         if (location != null) 'location': location,
       },
     );
+    if (isMocked) {
+      await _recordSpoofAttempt(visitId,
+          phase: _SpoofPhase.end,
+          latitude: latitude,
+          longitude: longitude,
+          location: location);
+    }
     if (latitude != null && longitude != null) {
       try {
         await attendance?.checkOut(latitude: latitude, longitude: longitude);
@@ -185,6 +220,125 @@ class VisitsRepository {
       }
     }
     return (result is Map ? result['state']?.toString() : null);
+  }
+
+  /// Writes a mock-location verdict onto the visit's chatter, permanently and
+  /// visibly to any manager reviewing the record in Odoo.
+  ///
+  /// **Why the chatter and not a field.** `dh.visit` has no `is_mocked` column
+  /// and adding one needs the backend team, who as of 2026-07-16 still have not
+  /// delivered four earlier asks (the FCM service account, the `/api/visit/my`
+  /// creator-filter bug, coordinates on the REST payload, `crm.lead` access).
+  /// Sequencing our only category-unique control behind that queue would leave
+  /// it dead indefinitely. `message_post` needs no schema change, no module
+  /// release and no ticket — and writing location evidence into the chatter is
+  /// what Odoo's own Field Service does, so this is the idiomatic pattern, not
+  /// a workaround. A real indexed boolean stays the right long-term fix: it is
+  /// what makes the signal *filterable* and *exportable*, which chatter is not.
+  ///
+  /// **Why the body is bilingual and not localised.** This is a permanent audit
+  /// record read by whoever reviews it later, not UI addressed to the person
+  /// who triggered it. Localising it to the *spoofer's* device language would
+  /// mean an Arabic-phone rep produces a note their English-reading manager
+  /// cannot read — so both languages go in, always.
+  ///
+  /// **Why it posts plain text and then upgrades it.** Odoo 17+ trusts only a
+  /// `markupsafe.Markup` body and HTML-escapes a plain string, which JSON-RPC
+  /// cannot send — verified live 2026-07-18: an HTML body came back stored as
+  /// `&lt;p&gt;&lt;strong&gt;…`, i.e. the manager would read raw tags. Writing
+  /// `mail.message.body` afterwards is not escaped and does produce real
+  /// markup. So the first post carries a body that is already complete and
+  /// readable on its own, and the rewrite is a pure formatting improvement: if
+  /// it fails, the note is still there and still says everything. (Plain
+  /// newlines are not an option — Odoo stores them verbatim inside one `<p>`,
+  /// where HTML collapses them into a single run-on line.)
+  ///
+  /// Best-effort: a failure here must never block or reverse a visit action
+  /// that the server already accepted. Sentry keeps the developer-visible copy
+  /// so a silently failing post is still detectable.
+  Future<void> _recordSpoofAttempt(
+    int visitId, {
+    required _SpoofPhase phase,
+    double? latitude,
+    double? longitude,
+    String? location,
+  }) async {
+    final at = phase == _SpoofPhase.start ? 'check-in' : 'check-out';
+    final atAr = phase == _SpoofPhase.start ? 'بدء الزيارة' : 'إنهاء الزيارة';
+    final coords = (latitude != null && longitude != null)
+        ? '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}'
+        : 'unavailable / غير متاح';
+    final where = location != null
+        ? ' • Reported location / الموقع المُبلَّغ: $location'
+        : '';
+
+    // Reads correctly as one flowing line, because this is what survives if the
+    // markup upgrade below never lands.
+    final plain = '⚠ Mock location detected at $at — تم رصد موقع وهمي عند $atAr'
+        ' • The device reported these coordinates came from a fake-GPS app, not'
+        ' the GPS sensor; this visit needs manual review.'
+        ' • أبلغ الجهاز أن هذه الإحداثيات مصدرها تطبيق موقع وهمي وليست من مستشعر'
+        ' GPS، وهذه الزيارة تحتاج مراجعة يدوية.'
+        ' • Coordinates / الإحداثيات: $coords$where'
+        ' • [$kMockLocationMarker]';
+
+    final html = '<p><strong>⚠ Mock location detected at $at '
+        '— تم رصد موقع وهمي عند $atAr</strong></p>'
+        '<p>The device reported that these coordinates came from a mock '
+        'location provider (a fake-GPS app), not the GPS sensor. '
+        'This visit needs manual review.<br/>'
+        'أبلغ الجهاز أن هذه الإحداثيات مصدرها تطبيق موقع وهمي وليست من '
+        'مستشعر GPS. هذه الزيارة تحتاج مراجعة يدوية.</p>'
+        '<ul><li>Coordinates / الإحداثيات: <code>$coords</code></li>'
+        '${location != null ? '<li>Reported location / الموقع المُبلَّغ: $location</li>' : ''}'
+        '</ul><p><code>$kMockLocationMarker</code></p>';
+
+    try {
+      final posted = await api.callMethod(
+        AppConstants.visitModel,
+        'message_post',
+        args: [
+          [visitId]
+        ],
+        kwargs: {
+          'body': plain,
+          'message_type': 'comment',
+          // 'comment' + this subtype is what makes Odoo notify the record's
+          // followers (the manager is one) rather than filing a silent log.
+          // Verified live: posting this way notifies both Sam and Mona.
+          'subtype_xmlid': 'mail.mt_comment',
+        },
+      );
+      final messageId = posted is List && posted.isNotEmpty
+          ? posted.first
+          : (posted is num ? posted : null);
+      if (messageId is num) {
+        // Formatting only — the note above is already complete without it.
+        try {
+          await api.writeRecord(
+            'mail.message',
+            [messageId.toInt()],
+            {'body': html},
+          );
+        } catch (e) {
+          debugPrint('[VisitsRepository] spoof-note markup upgrade failed: $e');
+        }
+      }
+    } catch (e) {
+      // Most likely cause is `_mail_post_access` requiring write permission the
+      // field employee does not have on their own visit. Losing the note must
+      // not lose the visit, but we must know it happened.
+      debugPrint('[VisitsRepository] spoof-attempt note failed: $e');
+      unawaited(Sentry.captureException(
+        e,
+        stackTrace: StackTrace.current,
+        withScope: (scope) => scope.setContexts('mock_location', {
+          'visit_id': visitId,
+          'phase': phase.name,
+          'coordinates': coords,
+        }),
+      ));
+    }
   }
 
   /// Uploads a base64-encoded attachment to a visit. Returns the attachment id.
@@ -252,68 +406,75 @@ class VisitsRepository {
       case VisitManagerScope.team:
         break; // everything visible to this manager
     }
-    final result = await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': AppConstants.visitModel,
-        'method': 'search_read',
-        'args': [domain, Visit.odooReadFields],
-        'kwargs': {
-          'limit': limit,
-          'order': 'scheduled_datetime desc, id desc',
-        },
-      },
+    final rows = await api.searchRead(
+      AppConstants.visitModel,
+      domain: domain,
+      fields: Visit.odooReadFields,
+      limit: limit,
+      order: 'scheduled_datetime desc, id desc',
     );
-    final rows = result is List ? result : const [];
-    return rows
-        .whereType<Map>()
-        .map((r) => Visit.fromOdooRow(Map<String, dynamic>.from(r)))
-        .toList();
+    return rows.map((r) => Visit.fromOdooRow(r)).toList();
   }
 
   /// Full detail read (rich fields + participant lines).
   Future<Visit?> readVisitFull(int visitId) async {
-    final result = await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': AppConstants.visitModel,
-        'method': 'read',
-        'args': [
-          [visitId],
-          Visit.odooReadFields,
-        ],
-        'kwargs': {},
-      },
+    final rows = await api.readRecords(
+      AppConstants.visitModel,
+      [visitId],
+      Visit.odooReadFields,
     );
-    final rows = result is List ? result : const [];
-    if (rows.isEmpty || rows.first is! Map) return null;
+    if (rows.isEmpty) return null;
     final participants = await readParticipants(visitId);
     return Visit.fromOdooRow(
-      Map<String, dynamic>.from(rows.first as Map),
+      rows.first,
       participants: participants,
     );
   }
 
-  Future<List<VisitParticipant>> readParticipants(int visitId) async {
-    final result = await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': AppConstants.visitParticipantModel,
-        'method': 'search_read',
-        'args': [
-          [
-            ['visit_id', '=', visitId],
-          ],
-          ['id', 'employee_id', 'manager_id', 'approval_state', 'reject_reason'],
+  /// Whether a mock-location verdict was ever recorded against this visit.
+  ///
+  /// Reads the chatter rather than a field because that is where the verdict
+  /// lives — see [_recordSpoofAttempt]. Scoped to one visit and only called
+  /// from the detail page, so it stays a single cheap query; do NOT call this
+  /// per row of a list, which would be one round trip per visit.
+  ///
+  /// Returns false on any failure: a warning banner that fails to appear is a
+  /// missed flag, but an exception here would take down a detail page that
+  /// otherwise loaded fine.
+  Future<bool> hasMockLocationFlag(int visitId) async {
+    try {
+      final rows = await api.searchRead(
+        'mail.message',
+        domain: [
+          ['model', '=', AppConstants.visitModel],
+          ['res_id', '=', visitId],
+          ['body', 'ilike', kMockLocationMarker],
         ],
-        'kwargs': {},
-      },
+        fields: const ['id'],
+        limit: 1,
+      );
+      return rows.isNotEmpty;
+    } catch (e) {
+      debugPrint('[VisitsRepository] mock-flag lookup failed: $e');
+      return false;
+    }
+  }
+
+  Future<List<VisitParticipant>> readParticipants(int visitId) async {
+    final rows = await api.searchRead(
+      AppConstants.visitParticipantModel,
+      domain: [
+        ['visit_id', '=', visitId],
+      ],
+      fields: const [
+        'id',
+        'employee_id',
+        'manager_id',
+        'approval_state',
+        'reject_reason',
+      ],
     );
-    final rows = result is List ? result : const [];
-    return rows
-        .whereType<Map>()
-        .map((r) => VisitParticipant.fromOdooRow(Map<String, dynamic>.from(r)))
-        .toList();
+    return rows.map((r) => VisitParticipant.fromOdooRow(r)).toList();
   }
 
   /// Participant-manager approves one participant line (`action_approve`).
@@ -327,17 +488,10 @@ class VisitsRepository {
   /// case record rules only allow the action method.
   Future<void> rejectParticipant(int participantId, String reason) async {
     try {
-      await api.jsonRpc(
-        Endpoints.callKw,
-        params: {
-          'model': AppConstants.visitParticipantModel,
-          'method': 'write',
-          'args': [
-            [participantId],
-            {'reject_reason': reason},
-          ],
-          'kwargs': {},
-        },
+      await api.writeRecord(
+        AppConstants.visitParticipantModel,
+        [participantId],
+        {'reject_reason': reason},
       );
     } catch (e) {
       debugPrint('[VisitsRepository] participant reason write failed: $e');
@@ -346,16 +500,12 @@ class VisitsRepository {
   }
 
   Future<void> _participantAction(String method, int participantId) async {
-    await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': AppConstants.visitParticipantModel,
-        'method': method,
-        'args': [
-          [participantId],
-        ],
-        'kwargs': {},
-      },
+    await api.callMethod(
+      AppConstants.visitParticipantModel,
+      method,
+      args: [
+        [participantId],
+      ],
     );
   }
 
@@ -363,16 +513,12 @@ class VisitsRepository {
   Future<void> cancel(int visitId) => _visitAction('action_cancel', visitId);
 
   Future<void> _visitAction(String method, int visitId) async {
-    await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': AppConstants.visitModel,
-        'method': method,
-        'args': [
-          [visitId],
-        ],
-        'kwargs': {},
-      },
+    await api.callMethod(
+      AppConstants.visitModel,
+      method,
+      args: [
+        [visitId],
+      ],
     );
   }
 
@@ -381,45 +527,27 @@ class VisitsRepository {
   // ---------------------------------------------------------------------------
 
   Future<List<VisitAttachment>> readAttachments(int visitId) async {
-    final result = await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': 'ir.attachment',
-        'method': 'search_read',
-        'args': [
-          [
-            ['res_model', '=', AppConstants.visitModel],
-            ['res_id', '=', visitId],
-          ],
-          ['id', 'name', 'mimetype', 'file_size'],
-        ],
-        'kwargs': {'order': 'create_date desc'},
-      },
+    final rows = await api.searchRead(
+      AppConstants.attachmentModel,
+      domain: [
+        ['res_model', '=', AppConstants.visitModel],
+        ['res_id', '=', visitId],
+      ],
+      fields: const ['id', 'name', 'mimetype', 'file_size'],
+      order: 'create_date desc',
     );
-    final rows = result is List ? result : const [];
-    return rows
-        .whereType<Map>()
-        .map((r) => VisitAttachment.fromJson(Map<String, dynamic>.from(r)))
-        .toList();
+    return rows.map((r) => VisitAttachment.fromJson(r)).toList();
   }
 
   /// Returns the base64-encoded bytes of an attachment (`ir.attachment.datas`).
   Future<String?> downloadAttachmentB64(int attachmentId) async {
-    final result = await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': 'ir.attachment',
-        'method': 'read',
-        'args': [
-          [attachmentId],
-          ['datas'],
-        ],
-        'kwargs': {},
-      },
+    final rows = await api.readRecords(
+      AppConstants.attachmentModel,
+      [attachmentId],
+      const ['datas'],
     );
-    final rows = result is List ? result : const [];
-    if (rows.isEmpty || rows.first is! Map) return null;
-    final datas = (rows.first as Map)['datas'];
+    if (rows.isEmpty) return null;
+    final datas = rows.first['datas'];
     return (datas == null || datas == false) ? null : datas.toString();
   }
 
@@ -437,54 +565,37 @@ class VisitsRepository {
   Future<List<VisitActivity>> myActivities() async {
     final uid = await _currentUid();
     if (uid == null) return const [];
-    final result = await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': 'mail.activity',
-        'method': 'search_read',
-        'args': [
-          [
-            ['user_id', '=', uid],
-            ['res_model', '=', AppConstants.visitModel],
-          ],
-          [
-            'id',
-            'summary',
-            'activity_type_id',
-            'res_id',
-            'res_name',
-            'date_deadline',
-            'state',
-          ],
-        ],
-        'kwargs': {'order': 'date_deadline asc', 'limit': 100},
-      },
+    final rows = await api.searchRead(
+      AppConstants.mailActivityModel,
+      domain: [
+        ['user_id', '=', uid],
+        ['res_model', '=', AppConstants.visitModel],
+      ],
+      fields: const [
+        'id',
+        'summary',
+        'activity_type_id',
+        'res_id',
+        'res_name',
+        'date_deadline',
+        'state',
+      ],
+      limit: AppConstants.visitRelatedLimit,
+      order: 'date_deadline asc',
     );
-    final rows = result is List ? result : const [];
-    return rows
-        .whereType<Map>()
-        .map((r) => VisitActivity.fromJson(Map<String, dynamic>.from(r)))
-        .toList();
+    return rows.map((r) => VisitActivity.fromJson(r)).toList();
   }
 
   Future<int> myActivityCount() async {
     final uid = await _currentUid();
     if (uid == null) return 0;
-    final result = await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': 'mail.activity',
-        'method': 'search_count',
-        'args': [
-          [
-            ['user_id', '=', uid],
-            ['res_model', '=', AppConstants.visitModel],
-          ],
-        ],
-        'kwargs': {},
-      },
+    return api.searchCount(
+      AppConstants.mailActivityModel,
+      domain: [
+        ['user_id', '=', uid],
+        ['res_model', '=', AppConstants.visitModel],
+      ],
     );
-    return (result is num) ? result.toInt() : 0;
   }
 
   // ---------------------------------------------------------------------------
@@ -498,21 +609,13 @@ class VisitsRepository {
   /// the read is not permitted — the map degrades gracefully to the GPS points.
   Future<PartnerLocation?> partnerLocation(int partnerId) async {
     try {
-      final result = await api.jsonRpc(
-        Endpoints.callKw,
-        params: {
-          'model': AppConstants.partnerModel,
-          'method': 'read',
-          'args': [
-            [partnerId],
-            ['partner_latitude', 'partner_longitude', 'contact_address', 'phone'],
-          ],
-          'kwargs': {},
-        },
+      final rows = await api.readRecords(
+        AppConstants.partnerModel,
+        [partnerId],
+        const ['partner_latitude', 'partner_longitude', 'contact_address', 'phone'],
       );
-      final rows = result is List ? result : const [];
-      if (rows.isEmpty || rows.first is! Map) return null;
-      final row = Map<String, dynamic>.from(rows.first as Map);
+      if (rows.isEmpty) return null;
+      final row = rows.first;
       double? coord(dynamic raw) {
         if (raw is! num) return null;
         final v = raw.toDouble();
@@ -559,18 +662,14 @@ class VisitsRepository {
     String model,
     List<dynamic> domain,
   ) async {
-    final result = await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': model,
-        'method': 'search_read',
-        'args': [domain, ['id', 'name', 'partner_id']],
-        'kwargs': {'order': 'name asc', 'limit': 500},
-      },
+    final rows = await api.searchRead(
+      model,
+      domain: domain,
+      fields: const ['id', 'name', 'partner_id'],
+      limit: AppConstants.visitsAnalyticsLimit,
+      order: 'name asc',
     );
-    final rows = result is List ? result : const [];
-    return rows.whereType<Map>().map((r) {
-      final row = Map<String, dynamic>.from(r);
+    return rows.map((row) {
       int? pid;
       String? pname;
       final p = row['partner_id'];

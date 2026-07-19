@@ -159,8 +159,14 @@ location_gps/
 │       └── generated/               # gen-l10n output — مولّد تلقائي
 │
 ├── assets/
-│   └── images/
-│       └── logo.jpg                 # شعار الشركة (مصدر الـ launcher icons)
+│   ├── images/                      # أصول مضمّنة داخل التطبيق
+│   │   ├── visit-logo.png           # اللوجو كامل (باللوحة الكحلي)
+│   │   ├── visit-logo-mark.png      # الرمز بدون خلفية (للأسطح الفاتحة)
+│   │   └── map-cairo.png            # خلفية شاشات الدخول
+│   └── icon/                        # مصادر بناء فقط — غير مضمّنة في التطبيق
+│       ├── visit-logo-master.png    # اللوجو الأصلي (مصدر كل المشتقات)
+│       ├── visit-logo-foreground.png# واجهة الأيقونة التكيّفية + الـ splash
+│       └── visit-logo-ios.png       # أيقونة iOS (بدون شفافية)
 │
 ├── docs/
 │   ├── README.md                    # توثيق الـ Backend API كامل
@@ -228,12 +234,18 @@ flutter run --dart-define-from-file=.env.dev
 
 ### إيقونة التطبيق و splash
 
-بعد تغيير `assets/images/logo.jpg` شغّل:
+بعد تغيير `assets/icon/visit-logo-master.png` شغّل:
 
 ```bash
+pwsh tool/generate_icons.ps1        # يشتق كل المقاسات من اللوجو الأصلي
 dart run flutter_launcher_icons
 dart run flutter_native_splash:create
 ```
+
+`tool/generate_icons.ps1` يولّد كمان أيقونة الإشعارات
+`android/app/src/main/res/drawable-*/ic_notification.png` — وهي **صورة ظلّية
+بيضاء على خلفية شفافة**، لأن أندرويد بيتجاهل ألوان أيقونة شريط الحالة ويستخدم
+قناة الشفافية فقط. لا تستبدلها بأيقونة التطبيق الملوّنة وإلا ظهرت ككتلة مصمتة.
 
 ---
 

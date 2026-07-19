@@ -1,12 +1,16 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../../app/routes.dart';
 import '../../../app/theme.dart';
 import '../../../core/constants.dart';
+import '../../../core/utils/app_date.dart';
 import '../../../core/utils/communications.dart';
 import '../../../core/utils/distance.dart';
 import '../../../shared/extensions/context_extensions.dart';
@@ -36,6 +40,16 @@ class RoutePage extends StatelessWidget {
           ..sort((a, b) => (a.visitDate ?? a.effectiveDate ?? DateTime(0))
               .compareTo(b.visitDate ?? b.effectiveDate ?? DateTime(0)));
 
+        // Check failure before empty: a failed fetch rendering "no stops
+        // today" tells the employee their day is clear when it isn't.
+        if (state.status == VisitsListStatus.failure) {
+          return ErrorView(
+            message: state.error?.localize(context) ?? context.s.errUnknown,
+            onRetry: () => context
+                .read<VisitsListBloc>()
+                .add(const VisitsListLoadRequested()),
+          );
+        }
         if (stops.isEmpty) {
           return EmptyView(icon: Symbols.route, message: context.s.routeEmpty);
         }
@@ -99,8 +113,9 @@ class RoutePage extends StatelessWidget {
                   icon: Symbols.navigation,
                   onPressed: () {
                     final first = stops[nextIndex < 0 ? 0 : nextIndex];
-                    Communications.openInMaps(first.customerLatitude!, first.customerLongitude!,
-                        label: first.customerName);
+                    context.openExternal(() => Communications.openInMaps(
+                        first.customerLatitude!, first.customerLongitude!,
+                        label: first.customerName));
                   },
                 ),
               ),
@@ -127,7 +142,7 @@ class _RouteMap extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = context.colors;
     final x = context.x;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = context.isDark;
     // CameraFit.bounds throws (NaN/Infinity zoom) when the stops collapse to a
     // single distinct point. Only fit when there are ≥2 distinct points;
     // otherwise centre on the lone stop at a fixed zoom.
@@ -137,14 +152,18 @@ class _RouteMap extends StatelessWidget {
         ? points.first
         : const LatLng(AppConstants.mapFallbackLat, AppConstants.mapFallbackLng);
     return SizedBox(
-      height: 280,
+      // A flat 280 is most of a landscape viewport: the sibling Expanded list
+      // gets squeezed to nothing and the Column overflows. Cap it against the
+      // screen so the stop list — the point of the screen — keeps its share.
+      // In portrait this resolves to ~278, i.e. the design height.
+      height: math.min(280, context.hp(0.33)),
       child: Stack(
         fit: StackFit.expand,
         children: [
           FlutterMap(
             options: MapOptions(
               initialCenter: center,
-              initialZoom: 14.5,
+              initialZoom: AppConstants.mapZoomRoute,
               initialCameraFit: useFit
                   ? CameraFit.bounds(
                       bounds: LatLngBounds.fromPoints(points),
@@ -152,7 +171,7 @@ class _RouteMap extends StatelessWidget {
                     )
                   : null,
               interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
-              backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFE5E5E5),
+              backgroundColor: AppColors.mapBackground(isDark),
             ),
             children: [
               const AppMapTileLayer(),
@@ -177,7 +196,7 @@ class _RouteMap extends StatelessWidget {
             start: 12,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(color: AppColors.ink, borderRadius: BorderRadius.circular(999)),
+              decoration: BoxDecoration(color: AppColors.ink, borderRadius: BorderRadius.circular(Radii.pill)),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -198,26 +217,20 @@ class _RouteMap extends StatelessWidget {
 
 class _NumberPin extends StatelessWidget {
   final int n;
+
+  /// The next stop is highlighted with the brand gradient; the rest are ink.
   final bool isNext;
   final AppX x;
   const _NumberPin({required this.n, required this.isNext, required this.x});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
+  Widget build(BuildContext context) => MapPin.label(
+        text: '$n',
+        size: 32,
+        borderWidth: 2,
         gradient: isNext ? x.avatarGradient : null,
         color: isNext ? null : AppColors.ink,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 5, offset: const Offset(0, 2)),
-        ],
-      ),
-      alignment: Alignment.center,
-      child: Text('$n', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800)),
-    );
-  }
+      );
 }
 
 class _SummaryTile extends StatelessWidget {
@@ -272,7 +285,7 @@ class _StopRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = context.colors;
     final x = context.x;
-    final timeFmt = DateFormat('HH:mm');
+    final timeFmt = AppDate.timeFormat(context);
     final eta = visit.visitDate != null ? timeFmt.format(visit.visitDate!) : '—';
     return IntrinsicHeight(
       child: Row(
@@ -281,7 +294,7 @@ class _StopRow extends StatelessWidget {
           Column(
             children: [
               DecoratedBox(
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(999), boxShadow: isNext ? x.glowBrand : null),
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(Radii.pill), boxShadow: isNext ? x.glowBrand : null),
                 child: Container(
                   width: 32,
                   height: 32,
@@ -304,7 +317,11 @@ class _StopRow extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Padding(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(Radii.sm),
+              onTap: () =>
+                  context.push(AppRoutes.visitDetail(visit.id), extra: visit),
+              child: Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -320,30 +337,46 @@ class _StopRow extends StatelessWidget {
                       if (isNext)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                          decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(999)),
+                          decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(Radii.pill)),
                           child: Text(context.s.routeNextStop,
                               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: cs.onPrimaryContainer)),
                         ),
                     ],
                   ),
                   const SizedBox(height: 4),
+                  // Flexible + ellipsis on both labels: "09:30 · Start point"
+                  // plus "25 min drive" already exceeds a 320dp row at the
+                  // 1.25 text-scale cap, and Arabic runs longer still.
                   Row(
                     children: [
                       Icon(Symbols.schedule, size: 14, color: x.textTertiary),
                       const SizedBox(width: 4),
-                      Text(index == 0 ? '$eta · ${context.s.routeStartPoint}' : eta,
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: x.textTertiary)),
+                      Flexible(
+                        child: Text(
+                          index == 0 ? '$eta · ${context.s.routeStartPoint}' : eta,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: x.textTertiary),
+                        ),
+                      ),
                       if (driveMinutes != null) ...[
                         const SizedBox(width: 10),
                         Icon(Symbols.directions_car, size: 14, color: x.textTertiary),
                         const SizedBox(width: 4),
-                        Text(context.s.routeDriveMinutes(driveMinutes!),
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: x.textTertiary)),
+                        Flexible(
+                          child: Text(
+                            context.s.routeDriveMinutes(driveMinutes!),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: x.textTertiary),
+                          ),
+                        ),
                       ],
                     ],
                   ),
                 ],
               ),
+            ),
             ),
           ),
         ],

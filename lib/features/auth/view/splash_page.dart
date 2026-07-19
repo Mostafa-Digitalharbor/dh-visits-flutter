@@ -62,7 +62,7 @@ class _SplashPageState extends State<SplashPage>
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = context.isDark;
 
     return Scaffold(
       body: Container(
@@ -128,11 +128,13 @@ class _SplashPageState extends State<SplashPage>
                               ],
                             ),
                             padding: const EdgeInsets.all(18),
-                            child: ClipOval(
-                              child: Image.asset(
-                                AppAssets.logo,
-                                fit: BoxFit.contain,
-                              ),
+                            // The plate-less mark, not the full logo: the white
+                            // circle above already supplies the shape. No
+                            // ClipOval — the glyph is transparent and inscribed,
+                            // so clipping would only shave its corners.
+                            child: Image.asset(
+                              AppAssets.logoMark,
+                              fit: BoxFit.contain,
                             ),
                           ),
                         ],

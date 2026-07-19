@@ -63,6 +63,22 @@
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="visit_events" />
 
+        <!-- Status-bar icon for OS-rendered (background/terminated) pushes.
+             Without this FCM falls back to the launcher icon, and because
+             Android throws away the small icon's colour channels and keeps only
+             its alpha, a full-bleed launcher icon renders as a featureless
+             blob. ic_notification is a white-on-transparent silhouette of the
+             brand mark, generated per-density by tool/generate_icons.ps1.
+             The foreground path sets the same icon in PushNotificationService —
+             change both together. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <!-- Tints that silhouette with the brand cyan instead of system grey. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_accent" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

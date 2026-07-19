@@ -166,7 +166,7 @@ Run through this every time you cut a release:
 | Item                                 | Status      | Notes |
 | ------------------------------------ | ----------- | ----- |
 | Privacy policy URL                   | **TODO**    | `docs/PRIVACY_POLICY.md` ready — host before submission. |
-| App icon (1024×1024 PNG)             | Recommended | Currently regenerated from `logo.jpg`. For best quality replace with a high-res PNG and re-run `dart run flutter_launcher_icons`. |
+| App icon (1024×1024 PNG)             | Recommended | Regenerated from `assets/icon/visit-logo-master.png`. To replace: drop in a higher-res master, then run `pwsh tool/generate_icons.ps1` followed by `dart run flutter_launcher_icons`. |
 | Crash reporting (Crashlytics/Sentry) | Not added   | Strongly recommended before first public release. |
 | Cert pinning                         | Not added   | Optional hardening for v1.1. |
 | Real foreground service for bg track | Not added   | V1 ships foreground-only by design. To add real background tracking later, integrate `flutter_foreground_task` and re-add `ACCESS_BACKGROUND_LOCATION` + `FOREGROUND_SERVICE_LOCATION` in `AndroidManifest.xml` and `UIBackgroundModes=location` in `Info.plist`. |

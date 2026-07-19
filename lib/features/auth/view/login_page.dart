@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../app/theme.dart';
+import '../../../core/di/service_locator.dart';
+import '../../../core/settings/settings_repository.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../bloc/auth_bloc.dart';
 import 'auth_chrome.dart';
@@ -19,7 +21,18 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _loginCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  bool _remember = true;
+  final _settings = sl<SettingsRepository>();
+  late bool _remember;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill the identifier the user last signed in with (only if they asked
+    // us to remember it). The password is never stored.
+    final remembered = _settings.readRememberedLogin();
+    _remember = remembered != null;
+    if (remembered != null) _loginCtrl.text = remembered;
+  }
 
   @override
   void dispose() {
@@ -31,9 +44,16 @@ class _LoginPageState extends State<LoginPage> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     HapticFeedback.lightImpact();
+    final login = _loginCtrl.text.trim();
+    // Persist (or forget) the identifier for the next sign-in.
+    if (_remember) {
+      _settings.writeRememberedLogin(login);
+    } else {
+      _settings.clearRememberedLogin();
+    }
     context.read<AuthBloc>().add(
           AuthLoginRequested(
-            login: _loginCtrl.text.trim(),
+            login: login,
             password: _passwordCtrl.text,
           ),
         );
@@ -146,7 +166,7 @@ class _RememberRow extends StatelessWidget {
                 height: 20,
                 decoration: BoxDecoration(
                   color: remember ? cs.primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(Radii.badge),
                   border: Border.all(
                     color: remember ? cs.primary : x.outlineVariant,
                     width: 1.5,
@@ -166,13 +186,32 @@ class _RememberRow extends StatelessWidget {
         ),
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () {},
+          onTap: () => _showForgotPasswordHelp(context),
           child: Text(
             context.s.loginForgotPassword,
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: cs.primary),
           ),
         ),
       ],
+    );
+  }
+
+  /// No self-service reset exists (Odoo admins manage credentials), so tapping
+  /// "Forgot password?" explains who to contact instead of dead-ending.
+  void _showForgotPasswordHelp(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Symbols.lock_reset, size: 32),
+        title: Text(dialogContext.s.loginForgotPasswordTitle),
+        content: Text(dialogContext.s.loginForgotPasswordBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(dialogContext.s.commonClose),
+          ),
+        ],
+      ),
     );
   }
 }

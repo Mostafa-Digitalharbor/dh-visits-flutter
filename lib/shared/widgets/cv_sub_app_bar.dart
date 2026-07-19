@@ -113,13 +113,13 @@ class _Chip extends StatelessWidget {
     final x = context.x;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(Radii.sm),
       child: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
           color: cs.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(Radii.sm),
           border: Border.all(color: x.outlineVariant),
           boxShadow: x.elev1,
         ),

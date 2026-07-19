@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/design/app_dimens.dart';
 
 class AppCard extends StatefulWidget {
   final Widget child;
@@ -30,7 +31,7 @@ class _AppCardState extends State<AppCard>
   AnimationController _ensureCtrl() {
     return _ctrl ??= AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 120),
+      duration: AppDurations.fast,
       reverseDuration: const Duration(milliseconds: 180),
       value: 1.0,
       lowerBound: 0.96,

@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
+import '../../../app/routes.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../core/utils/app_date.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/empty_view.dart';
 import '../../../shared/widgets/error_view.dart';
 import '../../visits/data/models/visit_activity.dart';
 import '../../visits/data/visits_repository.dart';
 import '../bloc/notifications_cubit.dart';
+import '../../../shared/widgets/app_refresh_indicator.dart';
 
 class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
@@ -44,11 +46,11 @@ class _NotificationsView extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
           if (state.activities.isEmpty) {
-            return RefreshIndicator(
+            return AppRefreshIndicator(
               onRefresh: () => context.read<NotificationsCubit>().load(),
               child: ListView(
                 children: [
-                  SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                  SizedBox(height: MediaQuery.sizeOf(context).height * 0.25),
                   EmptyView(
                     icon: Icons.notifications_none_rounded,
                     message: context.s.wfNotificationsEmpty,
@@ -57,7 +59,7 @@ class _NotificationsView extends StatelessWidget {
               ),
             );
           }
-          return RefreshIndicator(
+          return AppRefreshIndicator(
             onRefresh: () => context.read<NotificationsCubit>().load(),
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -86,7 +88,7 @@ class _ActivityTile extends StatelessWidget {
     };
     final deadline = activity.deadline;
     final due = deadline != null
-        ? context.s.wfNotificationsDue(DateFormat('MMM d').format(deadline))
+        ? context.s.wfNotificationsDue(AppDate.dayMonth(context, deadline))
         : null;
 
     return ListTile(
@@ -104,7 +106,7 @@ class _ActivityTile extends StatelessWidget {
       onTap: activity.visitId == 0
           ? null
           : () async {
-              await context.push('/visits/${activity.visitId}');
+              await context.push(AppRoutes.visitDetail(activity.visitId));
               if (context.mounted) {
                 // Refresh: the activity is likely cleared after acting.
                 context.read<NotificationsCubit>().load();

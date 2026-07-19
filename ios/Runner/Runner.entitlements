@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Grants the app the APNs entitlement. Without this key the app has no
+	     Push Notifications capability: registerForRemoteNotifications() fails on
+	     device, firebase_messaging never receives an APNs token, getToken()
+	     throws, and the device is never registered with the backend — i.e. no
+	     push at all, on device and TestFlight alike.
+
+	     "development" is correct to keep checked in. Xcode substitutes the value
+	     the provisioning profile grants when signing, so an App Store archive is
+	     signed with "production" automatically — do not hand-edit this to
+	     production for a store build. -->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

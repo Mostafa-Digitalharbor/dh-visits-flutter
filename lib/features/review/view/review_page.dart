@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../../app/routes.dart';
 import '../../../app/theme.dart';
+import '../../../core/utils/app_date.dart';
 import '../../../core/api/api_exceptions.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/utils/user_time.dart';
@@ -14,6 +16,7 @@ import '../../visits/bloc/visits_list_bloc.dart';
 import '../../visits/data/models/visit.dart';
 import '../../visits/data/visits_repository.dart';
 import '../../visits/view/action_sheets.dart';
+import '../../../core/utils/duration_format.dart';
 
 /// Manager review queue (design screen 09). Lists every visit in the
 /// `under_review` lifecycle as an approve/reject card. Approving writes
@@ -50,6 +53,10 @@ class _ReviewPageState extends State<ReviewPage> {
       );
     } on ApiException catch (e) {
       if (mounted) context.showSnack(e.localize(context), kind: SnackKind.error);
+    } catch (_) {
+      if (mounted) {
+        context.showSnack(context.s.errActionFailed, kind: SnackKind.error);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -67,6 +74,17 @@ class _ReviewPageState extends State<ReviewPage> {
         builder: (context, state) {
           final pending =
               state.items.where((v) => v.isAwaitingApproval).toList();
+          // Check failure before empty: otherwise a failed fetch renders
+          // "nothing to approve" and the manager closes the app while visits
+          // sit waiting. Wrong information is worse than none.
+          if (state.status == VisitsListStatus.failure) {
+            return ErrorView(
+              message: state.error?.localize(context) ?? context.s.errUnknown,
+              onRetry: () => context
+                  .read<VisitsListBloc>()
+                  .add(const VisitsListLoadRequested()),
+            );
+          }
           if (pending.isEmpty) {
             return EmptyView(
               icon: Symbols.task_alt,
@@ -110,7 +128,7 @@ class _PendingChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       decoration: BoxDecoration(
         color: x.warningContainer,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(Radii.pill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -133,14 +151,26 @@ class _ReviewCard extends StatelessWidget {
   const _ReviewCard(
       {required this.visit, required this.busy, required this.onApprove, required this.onReject});
 
-  // The new workflow enforces geofence server-side; no client range flag.
-  bool get _flagged => false;
+  // TODO(backend): surface the mock-location flag on this card once `dh.visit`
+  // has a real indexed `is_mocked` column.
+  //
+  // There used to be a `_flagged` getter hard-wired to `false` here, plus a
+  // full warning banner and a red card border behind it — code that could never
+  // run but read as a live feature, which is worse than not having it.
+  //
+  // Nothing on `dh.visit` stores a geofence verdict and nothing rejects an
+  // out-of-range check-in; the 200m ring in `visit_map_card` is drawn and then
+  // discarded. The mock-location verdict IS recorded (see
+  // `VisitsRepository.hasMockLocationFlag`) and rendered on the visit *detail*
+  // page — but this is a list, and the flag lives on the chatter, so showing it
+  // per card would cost one round trip per row. The column is the outstanding
+  // backend ask that makes it a single query.
 
   @override
   Widget build(BuildContext context) {
     final cs = context.colors;
     final x = context.x;
-    final timeFmt = DateFormat('HH:mm');
+    final timeFmt = AppDate.timeFormat(context);
     final arrival =
         visit.checkInTime != null ? timeFmt.format(context.toUserTime(visit.checkInTime!)) : '—';
     final departure =
@@ -156,94 +186,110 @@ class _ReviewCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(Radii.lg),
-        border: Border.all(color: _flagged ? cs.error.withValues(alpha: 0.5) : x.outlineVariant),
+        border: Border.all(color: x.outlineVariant),
         boxShadow: x.elev1,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_flagged)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: cs.error.withValues(alpha: 0.10),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(Radii.lg)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Symbols.warning, fill: 1, size: 15, color: cs.error),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(context.s.reviewOutOfRangeBanner,
-                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: cs.error)),
-                  ),
-                ],
-              ),
-            ),
           Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Identity
-                Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        gradient: x.avatarGradient,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(Symbols.business, fill: 1, size: 24, color: Colors.white),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                // Identity + meta — tapping opens the full visit detail so the
+                // manager can review everything before deciding.
+                InkWell(
+                  borderRadius: BorderRadius.circular(Radii.sm),
+                  onTap: () => context.push(
+                    AppRoutes.visitDetail(visit.id),
+                    extra: visit,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
                         children: [
-                          Text(visit.customerName ?? '#${visit.id}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppType.cardTitle.copyWith(color: cs.onSurface)),
-                          const SizedBox(height: 2),
-                          Text(
-                              '${visit.name ?? '#${visit.id}'}${visit.visitTypeName != null ? ' · ${visit.visitTypeName}' : ''}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: x.textTertiary)),
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              gradient: x.avatarGradient,
+                              borderRadius: BorderRadius.circular(Radii.btn),
+                            ),
+                            child: const Icon(Symbols.business,
+                                fill: 1, size: 24, color: Colors.white),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(visit.customerName ?? '#${visit.id}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppType.cardTitle
+                                        .copyWith(color: cs.onSurface)),
+                                const SizedBox(height: 2),
+                                Text(
+                                    '${visit.name ?? '#${visit.id}'}${visit.visitTypeName != null ? ' · ${visit.visitTypeName}' : ''}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: x.textTertiary)),
+                              ],
+                            ),
+                          ),
+                          if (visit.visitDuration != null)
+                            _DurationChip(duration: visit.visitDuration!),
+                          const SizedBox(width: 4),
+                          Icon(
+                            context.isRtl
+                                ? Icons.chevron_left
+                                : Icons.chevron_right,
+                            size: 18,
+                            color: x.textTertiary,
+                          ),
                         ],
                       ),
-                    ),
-                    if (visit.visitDuration != null) _DurationChip(duration: visit.visitDuration!),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                // Meta strip
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainer,
-                    borderRadius: BorderRadius.circular(Radii.sm),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Symbols.person, size: 15, color: x.textTertiary),
-                      const SizedBox(width: 5),
-                      Expanded(
-                        child: Text(visit.employeeName ?? '-',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: cs.onSurfaceVariant)),
+                      const SizedBox(height: 12),
+                      // Meta strip
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainer,
+                          borderRadius: BorderRadius.circular(Radii.sm),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Symbols.person, size: 15, color: x.textTertiary),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(visit.employeeName ?? '-',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: cs.onSurfaceVariant)),
+                            ),
+                            Icon(Symbols.check_circle,
+                                fill: 1, size: 14, color: onTimeColor),
+                            const SizedBox(width: 4),
+                            Text('$arrival ~ $departure',
+                                style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: onTimeColor,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures()
+                                    ])),
+                          ],
+                        ),
                       ),
-                      Icon(Symbols.check_circle, fill: 1, size: 14, color: onTimeColor),
-                      const SizedBox(width: 4),
-                      Text('$arrival ~ $departure',
-                          style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w800,
-                              color: onTimeColor,
-                              fontFeatures: const [FontFeature.tabularFigures()])),
                     ],
                   ),
                 ),
@@ -290,20 +336,18 @@ class _DurationChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final x = context.x;
-    final h = duration.inHours.toString().padLeft(2, '0');
-    final m = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
         color: context.colors.surfaceContainer,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(Radii.pill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Symbols.timer, size: 13, color: x.textTertiary),
           const SizedBox(width: 4),
-          Text('$h:$m',
+          Text(duration.clock,
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -343,7 +387,13 @@ class _ActionButton extends StatelessWidget {
               children: [
                 Icon(icon, fill: 1, size: 18, color: fg),
                 const SizedBox(width: 6),
-                Text(label, style: AppType.button.copyWith(fontWeight: FontWeight.w800, color: fg)),
+                Flexible(
+                  child: Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppType.button
+                          .copyWith(fontWeight: FontWeight.w800, color: fg)),
+                ),
               ],
             ),
           ),

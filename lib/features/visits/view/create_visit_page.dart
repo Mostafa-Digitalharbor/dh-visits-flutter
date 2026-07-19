@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
+import '../../../app/routes.dart';
+import '../../../core/constants.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../core/utils/app_date.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/picker_bottom_sheet.dart';
@@ -53,7 +55,7 @@ class _CreateVisitView extends StatelessWidget {
           } catch (_) {}
           final id = state.createdVisitId;
           if (id != null) {
-            context.go('/visits/$id');
+            context.go(AppRoutes.visitDetail(id));
           } else {
             context.pop();
           }
@@ -103,14 +105,26 @@ class _CreateVisitView extends StatelessWidget {
               ),
               if (state.customerName != null)
                 Padding(
-                  padding: const EdgeInsets.only(left: 12, top: 2),
+                  // Directional: this indents under the picker tile above it,
+                  // so in Arabic it must indent from the start edge too.
+                  padding: const EdgeInsetsDirectional.only(start: 12, top: 2),
                   child: Row(
                     children: [
                       Icon(Icons.business,
                           size: 15, color: context.colors.onSurfaceVariant),
                       const SizedBox(width: 4),
-                      Text('${context.s.wfFieldCustomer}: ${state.customerName}',
-                          style: context.text.bodySmall),
+                      // Expanded + ellipsis: the customer auto-fills from the
+                      // linked project/opportunity and Odoo company names run
+                      // long (more so in Arabic) — unbounded it overflows the
+                      // row.
+                      Expanded(
+                        child: Text(
+                          '${context.s.wfFieldCustomer}: ${state.customerName}',
+                          style: context.text.bodySmall,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -120,7 +134,7 @@ class _CreateVisitView extends StatelessWidget {
               _PickerTile(
                 label: context.s.wfFieldSchedule,
                 value: state.scheduled != null
-                    ? DateFormat('EEE, MMM d • HH:mm').format(state.scheduled!)
+                    ? AppDate.weekdayDateTime(context, state.scheduled!)
                     : null,
                 icon: Icons.event,
                 onTap: () => _pickSchedule(context, bloc, state.scheduled),
@@ -217,8 +231,8 @@ class _CreateVisitView extends StatelessWidget {
     final date = await showDatePicker(
       context: context,
       initialDate: base,
-      firstDate: now.subtract(const Duration(days: 1)),
-      lastDate: now.add(const Duration(days: 365)),
+      firstDate: now.subtract(AppConstants.visitSchedulePastGrace),
+      lastDate: now.add(AppConstants.visitScheduleMaxAhead),
     );
     if (date == null || !context.mounted) return;
     final time = await showTimePicker(

@@ -59,6 +59,18 @@ class PendingAction {
 ///   while we were offline (e.g. admin already marked the visit
 ///   done), our queued write may fail with a 4xx. We drop it from
 ///   the queue and surface the error rather than try to merge.
+/// A queued offline action the server refused, so the UI can explain the loss
+/// instead of letting the work disappear.
+class DroppedAction {
+  final int visitId;
+
+  /// Why it was refused. Localize with `ApiExceptionL10n.localize` before
+  /// showing it — never render this raw.
+  final ApiException error;
+
+  const DroppedAction({required this.visitId, required this.error});
+}
+
 class PendingActionsQueue {
   static const _prefsKey = 'pending_visit_actions_v1';
 
@@ -77,6 +89,16 @@ class PendingActionsQueue {
   /// the list pages can refresh their data.
   final StreamController<int> _synced = StreamController<int>.broadcast();
   Stream<int> get onSynced => _synced.stream;
+
+  /// Fires when a queued action is abandoned because the server rejected it.
+  ///
+  /// This matters: the user was told "saved, will sync" when they queued an
+  /// offline check-in. If the replay is then refused — the visit moved on, a
+  /// permission changed — dropping it silently loses GPS-stamped field work
+  /// they believe is recorded. Whoever listens must tell them.
+  final StreamController<DroppedAction> _dropped =
+      StreamController<DroppedAction>.broadcast();
+  Stream<DroppedAction> get onDropped => _dropped.stream;
 
   PendingActionsQueue({
     required this.prefs,
@@ -156,14 +178,19 @@ class PendingActionsQueue {
             break;
           }
           // 4xx / server errors (e.g. the visit's state moved on server-side
-          // while we were offline) → drop the action; the user will see the
-          // real state on next refresh.
+          // while we were offline) → drop the action, but announce it: the
+          // user was promised this work was saved.
           debugPrint(
               '[PendingActionsQueue] dropping visit ${a.visitId}: '
               '${e.code} ${e.serverMessage}');
+          _dropped.add(DroppedAction(visitId: a.visitId, error: e));
         } catch (e) {
           debugPrint(
               '[PendingActionsQueue] dropping visit ${a.visitId}: $e');
+          _dropped.add(DroppedAction(
+            visitId: a.visitId,
+            error: ApiException.unexpected(e),
+          ));
         }
       }
       await _writeAll(survivors);
@@ -179,15 +206,26 @@ class PendingActionsQueue {
     final type = a.payload['type']?.toString();
     final lat = (a.payload['latitude'] as num?)?.toDouble();
     final lng = (a.payload['longitude'] as num?)?.toDouble();
+    final location = a.payload['location']?.toString();
+    // Carried through the queue so an offline start is exactly as accountable
+    // as a live one. Without this, "go into airplane mode first" would be a
+    // way to strip the spoofing verdict off a fake check-in.
+    final isMocked = a.payload['is_mocked'] == true;
     switch (type) {
       case 'start':
-        await repository.start(a.visitId, latitude: lat, longitude: lng);
+        await repository.start(a.visitId,
+            latitude: lat,
+            longitude: lng,
+            location: location,
+            isMocked: isMocked);
       case 'end':
         await repository.end(
           a.visitId,
           outcome: a.payload['outcome']?.toString() ?? '',
           latitude: lat,
           longitude: lng,
+          location: location,
+          isMocked: isMocked,
         );
       default:
         // Unknown / legacy payload — nothing we can replay; let it drain.
@@ -222,6 +260,7 @@ class PendingActionsQueue {
   void dispose() {
     _ticker?.cancel();
     _synced.close();
+    _dropped.close();
     pendingCount.dispose();
   }
 }

@@ -1,22 +1,16 @@
 part of 'customers_bloc.dart';
 
-enum CustomersStatus { initial, loading, success, failure }
-
-class CustomersState extends Equatable {
-  final CustomersStatus status;
-  final List<Customer> items;
-  final String? search;
-  final ApiException? error;
-
+class CustomersState extends SearchableListState<Customer> {
   const CustomersState({
-    this.status = CustomersStatus.initial,
-    this.items = const [],
-    this.search,
-    this.error,
+    super.status,
+    super.items,
+    super.search,
+    super.error,
   });
 
-  CustomersState copyWith({
-    CustomersStatus? status,
+  @override
+  CustomersState copyWithBase({
+    ListStatus? status,
     List<Customer>? items,
     String? search,
     ApiException? error,
@@ -27,7 +21,4 @@ class CustomersState extends Equatable {
         search: search ?? this.search,
         error: error,
       );
-
-  @override
-  List<Object?> get props => [status, items, search, error];
 }

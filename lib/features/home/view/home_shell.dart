@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../app/routes.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../core/network/pending_actions_queue.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../analytics/view/analytics_page.dart';
@@ -13,6 +18,7 @@ import '../../auth/bloc/auth_bloc.dart';
 import '../../visits/data/visits_repository.dart';
 import '../../dashboard/view/dashboard_page.dart';
 import '../../live_location/bloc/live_location_bloc.dart';
+import '../../live_location/view/live_location_banner.dart';
 import '../../route/view/route_page.dart';
 import '../../settings/view/settings_page.dart';
 import '../../visits/bloc/visit_bloc.dart';
@@ -34,13 +40,44 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
+  StreamSubscription<int>? _syncedSub;
+  StreamSubscription<DroppedAction>? _droppedSub;
+
   @override
   void initState() {
     super.initState();
+    final queue = sl<PendingActionsQueue>();
+
+    // A queued offline action finally reached the server — pull the real state
+    // back so the list stops showing the optimistic local one.
+    _syncedSub = queue.onSynced.listen((_) {
+      if (!mounted) return;
+      context.read<VisitsListBloc>().add(const VisitsListLoadRequested());
+    });
+
+    // The server refused it. The user was told this was saved, so say plainly
+    // that it wasn't and what to do — silence here loses GPS-stamped work.
+    _droppedSub = queue.onDropped.listen((dropped) {
+      if (!mounted) return;
+      context.showSnack(
+        context.s.offlineActionDropped(dropped.error.localize(context)),
+        kind: SnackKind.error,
+      );
+      context.read<VisitsListBloc>().add(const VisitsListLoadRequested());
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final user = context.read<AuthBloc>().state.user;
       final isManager = user?.canEditVisits ?? false;
+      // Their permissions never loaded, so the workflow buttons won't appear.
+      // Say why — otherwise the app just looks broken or their account revoked.
+      if (user?.profileIncomplete == true) {
+        context.showSnack(
+          context.s.errProfileIncomplete,
+          kind: SnackKind.error,
+        );
+      }
       context
           .read<LiveLocationBloc>()
           .add(const LiveLocationStartRequested());
@@ -55,6 +92,13 @@ class _HomeShellState extends State<HomeShell> {
                 isManager ? VisitListScope.pending : VisitListScope.mine,
           ));
     });
+  }
+
+  @override
+  void dispose() {
+    _syncedSub?.cancel();
+    _droppedSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _confirmExit(BuildContext context) async {
@@ -81,8 +125,8 @@ class _HomeShellState extends State<HomeShell> {
         _confirmExit(context);
       },
       child: isManager
-          ? _ManagerShell(state: this)
-          : _UserShell(state: this),
+          ? const _ManagerShell()
+          : const _UserShell(),
     );
   }
 }
@@ -90,8 +134,7 @@ class _HomeShellState extends State<HomeShell> {
 /// Employee layout: three-tab shell {زياراتي · مسار اليوم · الإعدادات}
 /// (design flows §3). The persistent active-visit bar floats above the nav.
 class _UserShell extends StatefulWidget {
-  final _HomeShellState state;
-  const _UserShell({required this.state});
+  const _UserShell();
 
   @override
   State<_UserShell> createState() => _UserShellState();
@@ -117,6 +160,7 @@ class _UserShellState extends State<_UserShell> {
       body: Column(
         children: [
           const OfflineBanner(),
+          const LiveLocationBanner(),
           Expanded(
             child: IndexedStack(
               index: _tab,
@@ -130,7 +174,7 @@ class _UserShellState extends State<_UserShell> {
       floatingActionButton: _tab == 0
           ? FloatingActionButton.extended(
               heroTag: 'create-visit-user-hero',
-              onPressed: () => context.push('/visits/create'),
+              onPressed: () => context.push(AppRoutes.createVisit),
               icon: const Icon(Symbols.add),
               label: Text(context.s.createVisitTooltip),
             )
@@ -138,7 +182,14 @@ class _UserShellState extends State<_UserShell> {
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const PersistentVisitBar(onTap: _noop),
+          PersistentVisitBar(
+            onTap: () {
+              final active = context.read<VisitBloc>().state.activeVisit;
+              if (active != null) {
+                context.push(AppRoutes.visitDetail(active.id), extra: active);
+              }
+            },
+          ),
           NavigationBar(
             selectedIndex: _tab,
             onDestinationSelected: (i) {
@@ -167,16 +218,13 @@ class _UserShellState extends State<_UserShell> {
       ),
     );
   }
-
-  static void _noop() {}
 }
 
 /// Manager layout: three-tab shell {لوحة التحكم · زيارات الفريق · التحليلات}
 /// with a FAB to create visits on the visits tab, and groups/settings action
 /// chips in the app bar.
 class _ManagerShell extends StatefulWidget {
-  final _HomeShellState state;
-  const _ManagerShell({required this.state});
+  const _ManagerShell();
 
   @override
   State<_ManagerShell> createState() => _ManagerShellState();
@@ -203,6 +251,7 @@ class _ManagerShellState extends State<_ManagerShell> {
       body: Column(
         children: [
           const OfflineBanner(),
+          const LiveLocationBanner(),
           Expanded(
             child: IndexedStack(
               index: _tabIndex,
@@ -234,7 +283,7 @@ class _ManagerShellState extends State<_ManagerShell> {
       floatingActionButton: isVisits
           ? FloatingActionButton.extended(
               heroTag: 'create-visit-hero',
-              onPressed: () => context.push('/visits/create'),
+              onPressed: () => context.push(AppRoutes.createVisit),
               icon: const Icon(Symbols.add),
               label: Text(context.s.createVisitTooltip),
             )
@@ -323,11 +372,11 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
                 height: 40,
                 decoration: BoxDecoration(
                   gradient: x.avatarGradient,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(Radii.sm),
                   boxShadow: x.elev1,
                 ),
                 alignment: Alignment.center,
-                child: Image.asset(AppAssets.logoMarkD,
+                child: Image.asset(AppAssets.logoMark,
                     width: 24, height: 24, color: Colors.white),
               ),
               const SizedBox(width: 12),
@@ -362,7 +411,7 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
                 _ActionChip(
                   icon: Symbols.groups,
                   tooltip: context.s.customersTitle,
-                  onTap: () => context.push('/customers'),
+                  onTap: () => context.push(AppRoutes.customers),
                 ),
                 const SizedBox(width: 8),
               ],
@@ -372,7 +421,7 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
                 _ActionChip(
                   icon: Symbols.settings,
                   tooltip: context.s.settingsTitle,
-                  onTap: () => context.push('/settings'),
+                  onTap: () => context.push(AppRoutes.settings),
                 ),
             ],
           ),
@@ -432,20 +481,22 @@ class _NotificationChipState extends State<_NotificationChip>
           icon: Symbols.notifications,
           tooltip: context.s.wfNotificationsTitle,
           onTap: () async {
-            await context.push('/notifications');
+            await context.push(AppRoutes.notifications);
             _load();
           },
         ),
         if (_count > 0)
-          Positioned(
-            right: -2,
+          // PositionedDirectional so the unread badge mirrors in Arabic, the
+          // way it already does on the settings and analytics screens.
+          PositionedDirectional(
+            end: -2,
             top: -2,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
               decoration: BoxDecoration(
                 color: cs.error,
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: BorderRadius.circular(Radii.pill),
                 border: Border.all(color: cs.surfaceContainerLowest, width: 1.5),
               ),
               alignment: Alignment.center,
@@ -478,13 +529,13 @@ class _ActionChip extends StatelessWidget {
       message: tooltip,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Radii.sm),
         child: Container(
           width: 40,
           height: 40,
           decoration: BoxDecoration(
             color: cs.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(Radii.sm),
             border: Border.all(color: x.outlineVariant),
             boxShadow: x.elev1,
           ),

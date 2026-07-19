@@ -39,3 +39,8 @@ class NearbyRadiusChanged extends NearbyEvent {
   @override
   List<Object?> get props => [radius];
 }
+
+/// Clear all user-scoped data back to the initial state (dispatched on logout).
+class NearbyReset extends NearbyEvent {
+  const NearbyReset();
+}

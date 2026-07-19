@@ -1,22 +1,16 @@
 part of 'employees_bloc.dart';
 
-enum EmployeesStatus { initial, loading, success, failure }
-
-class EmployeesState extends Equatable {
-  final EmployeesStatus status;
-  final List<Employee> items;
-  final String? search;
-  final ApiException? error;
-
+class EmployeesState extends SearchableListState<Employee> {
   const EmployeesState({
-    this.status = EmployeesStatus.initial,
-    this.items = const [],
-    this.search,
-    this.error,
+    super.status,
+    super.items,
+    super.search,
+    super.error,
   });
 
-  EmployeesState copyWith({
-    EmployeesStatus? status,
+  @override
+  EmployeesState copyWithBase({
+    ListStatus? status,
     List<Employee>? items,
     String? search,
     ApiException? error,
@@ -27,7 +21,4 @@ class EmployeesState extends Equatable {
         search: search ?? this.search,
         error: error,
       );
-
-  @override
-  List<Object?> get props => [status, items, search, error];
 }

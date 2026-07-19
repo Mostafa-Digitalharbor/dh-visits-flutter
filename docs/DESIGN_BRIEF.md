@@ -33,7 +33,9 @@ Two roles drive the UI:
 - **Light AND dark theme** both required.
 - **No new packages / no new architecture.** Stick to Flutter Material 3 + the packages
   already in the project (listed below). Do not introduce another UI kit or design library.
-- Logo asset lives at `assets/images/logo.jpg` (used in app bar + login header + splash).
+- Logo assets live at `assets/images/visit-logo.png` (full logo on its navy plate) and
+  `assets/images/visit-logo-mark.png` (plate-less glyph, used in the app bar + login
+  header + splash, where the surface already supplies its own shape).
 
 **Packages already available (use only these):**
 `flutter_bloc`, `equatable`, `dio`, `flutter_secure_storage`, `shared_preferences`,

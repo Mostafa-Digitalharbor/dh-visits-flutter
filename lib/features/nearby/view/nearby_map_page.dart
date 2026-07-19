@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../app/design/app_colors.dart';
 import '../../../core/constants.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
-import '../../auth/bloc/auth_bloc.dart';
 import '../../customers/data/models/customer.dart';
 import '../bloc/nearby_bloc.dart';
 import '../data/models/nearby_employee.dart';
+import '../../../app/design/app_dimens.dart';
+import 'nearby_bottom_panel.dart';
 
 class NearbyMapPage extends StatefulWidget {
   final int customerId;
@@ -70,7 +71,7 @@ class _NearbyMapPageState extends State<NearbyMapPage>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = context.isDark;
     return Scaffold(
       appBar: AppBar(
         title: Text(context.s.nearbyTitle),
@@ -127,9 +128,7 @@ class _NearbyMapPageState extends State<NearbyMapPage>
               // white squares.
               Positioned.fill(
                 child: Container(
-                  color: isDark
-                      ? const Color(0xFF1A1A1A)
-                      : const Color(0xFFE5E5E5),
+                  color: AppColors.mapBackground(isDark),
                 ),
               ),
               FlutterMap(
@@ -137,18 +136,16 @@ class _NearbyMapPageState extends State<NearbyMapPage>
                 options: MapOptions(
                   initialCenter: center,
                   initialZoom: AppConstants.defaultMapZoom,
-                  maxZoom: 22,
-                  minZoom: 3,
-                  backgroundColor: isDark
-                      ? const Color(0xFF1A1A1A)
-                      : const Color(0xFFE5E5E5),
+                  maxZoom: AppConstants.mapMaxZoom,
+                  minZoom: AppConstants.mapMinZoom,
+                  backgroundColor: AppColors.mapBackground(isDark),
                 ),
                 children: [
                   // Pre-load tiles in a wider ring around the viewport so
                   // panning/zooming doesn't expose blank squares while new
                   // tiles download. Dark-mode tiles get a tint via tileBuilder.
                   AppMapTileLayer(
-                    maxZoom: 22,
+                    maxZoom: AppConstants.mapMaxZoom,
                     panBuffer: 2,
                     keepBuffer: 5,
                     tileBuilder: isDark ? _darkTileBuilder : null,
@@ -232,7 +229,7 @@ class _NearbyMapPageState extends State<NearbyMapPage>
                 left: 12,
                 right: 12,
                 bottom: 12,
-                child: _BottomPanel(state: state),
+                child: NearbyBottomPanel(state: state),
               ),
             ],
           );
@@ -259,34 +256,18 @@ class _CustomerPin extends StatelessWidget {
   const _CustomerPin({required this.color});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
+  Widget build(BuildContext context) => MapPin.icon(
+        icon: Icons.business_rounded,
+        size: 54,
+        // Thicker ring than an employee pin: this is the anchor of the screen
+        // and has to stay readable under the pulsing radar ring.
+        borderWidth: 3.5,
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            color,
-            Color.lerp(color, Colors.black, 0.25) ?? color,
-          ],
+          colors: [color, Color.lerp(color, Colors.black, 0.25) ?? color],
         ),
-        border: Border.all(color: Colors.white, width: 3.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 12,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: const Icon(
-        Icons.business_rounded,
-        color: Colors.white,
-        size: 26,
-      ),
-    );
-  }
+      );
 }
 
 class _EmployeePin extends StatelessWidget {
@@ -294,41 +275,17 @@ class _EmployeePin extends StatelessWidget {
   const _EmployeePin({required this.employee});
 
   @override
-  Widget build(BuildContext context) {
-    final initial =
-        employee.name.isNotEmpty ? employee.name[0].toUpperCase() : '?';
-    return Tooltip(
-      message:
-          '${employee.name} • ${employee.distanceMeters.toStringAsFixed(1)}م',
-      child: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Colors.redAccent, Colors.red.shade800],
-          ),
-          border: Border.all(color: Colors.white, width: 2.8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
+  Widget build(BuildContext context) => MapPin.label(
+        text: InitialAvatar.initialOf(employee.name),
+        tooltip: '${employee.name} • '
+            '${context.s.unitMeters(employee.distanceMeters.toStringAsFixed(1))}',
+        borderWidth: 2.8,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.redAccent, Colors.red.shade800],
         ),
-        alignment: Alignment.center,
-        child: Text(
-          initial,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-            fontSize: 16,
-          ),
-        ),
-      ),
-    );
-  }
+      );
 }
 
 class _MapFab extends StatelessWidget {
@@ -355,275 +312,33 @@ class _MapFab extends StatelessWidget {
   }
 }
 
-class _BottomPanel extends StatelessWidget {
-  final NearbyState state;
-  const _BottomPanel({required this.state});
-
-  @override
-  Widget build(BuildContext context) {
-    final tf = DateFormat('HH:mm:ss');
-    final canEdit =
-        context.watch<AuthBloc>().state.user?.canEditVisits ?? false;
-    return AppCard(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: context.colors.primaryContainer,
-                ),
-                alignment: Alignment.center,
-                child: Icon(Icons.business_rounded,
-                    size: 18, color: context.colors.onPrimaryContainer),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      state.customer?.name ?? '-',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.text.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      context.s.nearbyRadiusLabel(
-                          state.radius.toStringAsFixed(0)),
-                      style: context.text.bodySmall?.copyWith(
-                        color: context.colors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (state.lastRefresh != null)
-                Row(
-                  children: [
-                    Icon(Icons.access_time,
-                        size: 13, color: context.colors.onSurfaceVariant),
-                    const SizedBox(width: 4),
-                    Text(
-                      tf.format(state.lastRefresh!),
-                      style: context.text.labelSmall?.copyWith(
-                        color: context.colors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-          if (canEdit) ...[
-            const SizedBox(height: 6),
-            _RadiusSlider(currentRadius: state.radius),
-          ],
-          const SizedBox(height: 12),
-          if (state.employees.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                children: [
-                  Icon(
-                      state.error != null
-                          ? Icons.info_outline_rounded
-                          : Icons.person_off_outlined,
-                      size: 18,
-                      color: context.colors.onSurfaceVariant),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      state.error != null
-                          ? state.error!.localize(context)
-                          : state.status == NearbyStatus.success
-                              ? context.s.nearbyEmpty
-                              : context.s.commonLoading,
-                      style: TextStyle(
-                          color: context.colors.onSurfaceVariant),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            SizedBox(
-              height: 86,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: state.employees.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, i) =>
-                    _EmployeeCard(employee: state.employees[i]),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Manager-only slider for the search radius. Uses local draft state during
-/// the drag so the bloc only refetches when the user releases the thumb
-/// (otherwise we'd spam `/nearby-employees` on every pixel of movement).
-class _RadiusSlider extends StatefulWidget {
-  final double currentRadius;
-  const _RadiusSlider({required this.currentRadius});
-
-  @override
-  State<_RadiusSlider> createState() => _RadiusSliderState();
-}
-
-class _RadiusSliderState extends State<_RadiusSlider> {
-  static const double _min = 5;
-  static const double _max = 200;
-
-  double? _draft;
-
-  @override
-  Widget build(BuildContext context) {
-    final value = (_draft ?? widget.currentRadius).clamp(_min, _max);
-    return Row(
-      children: [
-        Icon(Icons.adjust_rounded,
-            size: 16, color: context.colors.onSurfaceVariant),
-        const SizedBox(width: 6),
-        Text(
-          context.s.unitMeters(value.toStringAsFixed(0)),
-          style: context.text.labelMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        Expanded(
-          child: SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 3,
-              overlayShape:
-                  const RoundSliderOverlayShape(overlayRadius: 16),
-            ),
-            child: Slider(
-              min: _min,
-              max: _max,
-              value: value,
-              divisions: ((_max - _min) ~/ 5),
-              label:
-                  context.s.unitMeters(value.toStringAsFixed(0)),
-              onChanged: (v) => setState(() => _draft = v),
-              onChangeEnd: (v) {
-                setState(() => _draft = null);
-                context.read<NearbyBloc>().add(NearbyRadiusChanged(v));
-              },
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _EmployeeCard extends StatelessWidget {
-  final NearbyEmployee employee;
-  const _EmployeeCard({required this.employee});
-
-  @override
-  Widget build(BuildContext context) {
-    final tf = DateFormat('HH:mm:ss');
-    final initial =
-        employee.name.isNotEmpty ? employee.name[0].toUpperCase() : '?';
-    return Container(
-      width: 180,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: context.colors.errorContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.redAccent,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              initial,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  employee.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.titleSmall?.copyWith(
-                    color: context.colors.onErrorContainer,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  context.s.unitMeters(
-                      employee.distanceMeters.toStringAsFixed(1)),
-                  style: context.text.bodySmall?.copyWith(
-                    color: context.colors.onErrorContainer,
-                  ),
-                ),
-                if (employee.lastUpdate != null)
-                  Text(
-                    tf.format(employee.lastUpdate!),
-                    style: context.text.labelSmall?.copyWith(
-                      color: context.colors.onErrorContainer
-                          .withValues(alpha: 0.8),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _NearbyMapSkeleton extends StatelessWidget {
   const _NearbyMapSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    return AppShimmer(
-      child: Stack(
-        children: [
-          Container(color: Colors.white),
-          Positioned(
-            left: 12,
-            right: 12,
-            bottom: 12,
+    // The backdrop stands in for the map, so it uses the same colour the real
+    // map does — a hardcoded white flashed as a bright sheet before the tiles
+    // loaded in dark mode. The panel placeholder stays white on purpose: the
+    // shimmer paints over it, exactly like every other SkeletonBox.
+    return Stack(
+      children: [
+        Container(color: AppColors.mapBackground(context.isDark)),
+        Positioned(
+          left: 12,
+          right: 12,
+          bottom: 12,
+          child: AppShimmer(
             child: Container(
               height: 160,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(Radii.sm),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

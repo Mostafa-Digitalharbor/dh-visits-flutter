@@ -4,11 +4,13 @@ import 'dart:math';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../app/design/app_assets.dart';
 import '../../firebase_options.dart';
+import '../../l10n/generated/app_localizations.dart';
 import 'push_repository.dart';
 
 /// Handles a push received while the app is in the background or terminated.
@@ -48,14 +50,50 @@ class PushNotificationService {
   static const _deviceIdKey = 'push_device_id';
   static const _lastTokenKey = 'push_last_token';
 
-  /// Android channel for visit events. Must be created up front (Android 8+)
-  /// and its id must match the one we pass to [_local.show].
-  static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
-    'visit_events',
-    'Visit updates',
-    description: 'Approvals, reschedules and status changes for your visits.',
-    importance: Importance.high,
-  );
+  /// Android channel id for visit events. Must match the id we pass to
+  /// [_local.show] and the `default_notification_channel_id` in the manifest.
+  static const String _channelId = 'visit_events';
+
+  /// Accent Android tints the status-bar silhouette and header with.
+  ///
+  /// Must stay in sync with `@color/notification_accent`
+  /// (`android/app/src/main/res/values/colors.xml`), which the manifest points
+  /// `default_notification_color` at for the pushes the OS renders itself.
+  /// Both paths have to agree or a foreground notification looks like a
+  /// different app's than the same message received in the background.
+  static const Color _accent = Color(0xFF0CACEA);
+
+  /// The channel's name and description are user-visible — Android lists them
+  /// under Settings → Notifications — so they are localized like any other
+  /// string. There's no BuildContext here, so the locale comes from the same
+  /// preference the app itself reads, via [lookupAppLocalizations].
+  ///
+  /// Re-created (same id) on locale change so the OS picks up the new labels;
+  /// Android updates an existing channel's name/description in place.
+  AndroidNotificationChannel _buildChannel() {
+    final s = lookupAppLocalizations(_currentLocale());
+    return AndroidNotificationChannel(
+      _channelId,
+      s.pushChannelName,
+      description: s.pushChannelDescription,
+      importance: Importance.high,
+    );
+  }
+
+  Locale _currentLocale() {
+    final code = prefs.getString('pref_locale');
+    return Locale(code == null || code.isEmpty ? 'en' : code);
+  }
+
+  /// (Re)registers the Android channel with labels in the current language.
+  /// Call after the user switches languages so Settings → Notifications stops
+  /// showing the previous one.
+  Future<void> refreshChannel() async {
+    await _local
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(_buildChannel());
+  }
 
   // Single-subscription (not broadcast) on purpose: it buffers events emitted
   // before the app attaches its listener, so a tap that launched the app from a
@@ -78,7 +116,8 @@ class PushNotificationService {
 
     // 1. Local notifications — used to show a heads-up while the app is in the
     //    foreground (FCM does not auto-display in that case).
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit =
+        AndroidInitializationSettings(AppAssets.androidNotificationIcon);
     const iosInit = DarwinInitializationSettings(
       // firebase_messaging.requestPermission() handles the iOS prompt below,
       // so the local plugin must not ask again.
@@ -93,10 +132,7 @@ class PushNotificationService {
         if (id != null) _visitTaps.add(id);
       },
     );
-    await _local
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(_channel);
+    await refreshChannel();
 
     // 2. Permission (iOS always; Android 13+ POST_NOTIFICATIONS runtime prompt).
     await _fcm.requestPermission(alert: true, badge: true, sound: true);
@@ -182,21 +218,38 @@ class PushNotificationService {
 
   Future<void> _showForeground(RemoteMessage message) async {
     final notification = message.notification;
-    // The documented payload always carries a `notification` block. If a
-    // data-only message arrives with nothing to show, skip silently.
-    if (notification == null) return;
+    // Prefer the `notification` block (the documented contract), but fall back
+    // to `data.title` / `data.body` so a mistakenly data-only message still
+    // shows *something* in the foreground instead of vanishing. (Note: a
+    // data-only message can never be shown by the OS in the background — the
+    // backend MUST include a `notification` block; see
+    // docs/BACKEND_PUSH_NOTIFICATIONS.md.)
+    final title = notification?.title ?? message.data['title'] as String?;
+    final body = notification?.body ?? message.data['body'] as String?;
+    // Genuinely nothing to display (a pure silent data sync) → skip.
+    if (title == null && body == null) return;
+    final channel = _buildChannel();
     await _local.show(
-      notification.hashCode,
-      notification.title,
-      notification.body,
+      notification?.hashCode ?? message.hashCode,
+      title,
+      body,
       NotificationDetails(
         android: AndroidNotificationDetails(
-          _channel.id,
-          _channel.name,
-          channelDescription: _channel.description,
+          channel.id,
+          channel.name,
+          channelDescription: channel.description,
           importance: Importance.high,
           priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
+          // Status-bar silhouette (alpha-only — see [AppAssets]) …
+          icon: AppAssets.androidNotificationIcon,
+          // … plus the full-colour launcher icon in the notification body, so
+          // the brand mark is actually recognisable and not just a monochrome
+          // stamp. Only reachable on this foreground path; the OS renders
+          // background/terminated pushes itself and will only show a large icon
+          // if the backend sends one. See docs/BACKEND_PUSH_NOTIFICATIONS.md.
+          largeIcon: const DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+          color: _accent,
+          colorized: false,
         ),
         iOS: const DarwinNotificationDetails(),
       ),

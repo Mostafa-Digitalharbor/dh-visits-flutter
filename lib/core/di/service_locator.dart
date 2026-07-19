@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
 import '../config/server_config_repository.dart';
+import '../location/location_describe.dart';
 import '../location/location_service.dart';
 import '../network/connectivity_status.dart';
 import '../network/pending_actions_queue.dart';
@@ -45,6 +46,7 @@ Future<void> setupServiceLocator() async {
   ));
   sl.registerSingleton<SessionStorage>(SessionStorage());
   sl.registerSingleton<LocationService>(LocationService());
+  sl.registerSingleton<LocationDescriber>(LocationDescriber());
   sl.registerSingleton<SettingsRepository>(SettingsRepository(prefs: prefs));
 
   sl.registerSingleton<AuthRepository>(AuthRepository(

@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- Adaptive-icon plate. Matches the navy the brand artwork is drawn on, so
+         the launcher's mask crops into solid colour rather than white corners. -->
+    <color name="ic_launcher_background">#091731</color>
+    <!-- Accent applied to the notification silhouette + header text. Brand cyan,
+         which stays legible on both light and dark notification shades. -->
+    <color name="notification_accent">#0CACEA</color>
 </resources>

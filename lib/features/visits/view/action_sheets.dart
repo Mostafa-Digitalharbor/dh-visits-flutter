@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/constants.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/app_button.dart';
 
@@ -62,35 +63,37 @@ Future<T?> _showFormSheet<T>({
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
+    // The keyboard inset lifts the sheet (every form body autofocuses), and
+    // the scroll view absorbs what's left: on a short viewport the title +
+    // multiline field + button exceed the space above the keyboard, and an
+    // unscrollable Column would overflow and block the action outright.
     builder: (ctx) => Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: ctx.text.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: ctx.text.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.of(ctx).pop(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          builder(ctx, (v) => Navigator.of(ctx).pop(v)),
-        ],
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            builder(ctx, (v) => Navigator.of(ctx).pop(v)),
+          ],
+        ),
       ),
     ),
   );
@@ -239,8 +242,8 @@ class _RescheduleBodyState extends State<_RescheduleBody> {
     final date = await showDatePicker(
       context: context,
       initialDate: base,
-      firstDate: now.subtract(const Duration(days: 1)),
-      lastDate: now.add(const Duration(days: 365)),
+      firstDate: now.subtract(AppConstants.visitSchedulePastGrace),
+      lastDate: now.add(AppConstants.visitScheduleMaxAhead),
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(

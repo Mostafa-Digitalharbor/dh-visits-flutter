@@ -1,7 +1,7 @@
 import 'package:intl/intl.dart';
 
 import '../../../core/api/api_client.dart';
-import '../../../core/api/endpoints.dart';
+import '../../../core/api/odoo_rpc.dart';
 import '../../../core/constants.dart';
 import '../../../core/utils/distance.dart';
 import '../../live_location/data/live_location_repository.dart';
@@ -28,32 +28,22 @@ class NearbyRepository {
     double radius = 10,
     DateTime? since,
   }) async {
-    // Default to "seen in the last 5 minutes" so stale employees drop off.
-    final cutoff =
-        (since ?? DateTime.now().toUtc().subtract(const Duration(minutes: 5)))
-            .toUtc();
+    // Default to "seen in the last few minutes" so stale employees drop off.
+    final cutoff = (since ??
+            DateTime.now().toUtc().subtract(AppConstants.nearbyOnlineWindow))
+        .toUtc();
 
-    final result = await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': AppConstants.calendarEventModel,
-        'method': 'search_read',
-        'args': [
-          [
-            ['description', 'like', LiveLocationRepository.presenceMarker],
-            ['write_date', '>=', _odooDateTime.format(cutoff)],
-          ],
-        ],
-        'kwargs': {
-          'fields': ['id', 'user_id', 'description', 'write_date'],
-        },
-      },
+    final rows = await api.searchRead(
+      AppConstants.calendarEventModel,
+      domain: [
+        ['description', 'like', LiveLocationRepository.presenceMarker],
+        ['write_date', '>=', _odooDateTime.format(cutoff)],
+      ],
+      fields: const ['id', 'user_id', 'description', 'write_date'],
     );
-    final rows = result is List ? result : <dynamic>[];
 
     final employees = <NearbyEmployee>[];
-    for (final raw in rows.whereType<Map>()) {
-      final row = Map<String, dynamic>.from(raw);
+    for (final row in rows) {
       final meta = LiveLocationRepository.decodeDescription(row['description']);
       final lat = (meta['lat'] as num?)?.toDouble();
       final lng = (meta['lng'] as num?)?.toDouble();

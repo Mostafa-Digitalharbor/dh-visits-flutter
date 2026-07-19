@@ -1,43 +1,46 @@
+import 'package:flutter/foundation.dart';
+
 /// Build-time configuration sourced from `--dart-define` flags.
 ///
-/// Why: the Odoo backend URL and database name differ per environment
-/// (dev / staging / production) and the previous hard-coded trial URL would
-/// have stopped working when the trial expired. Keeping these as compile-time
-/// constants lets us bake the production URL into the store-released binary
-/// while still allowing devs to point at a local/staging instance.
+/// The app is **multi-tenant**: every company runs its own Odoo server, so the
+/// backend URL and database are normally entered once by the user on the
+/// server-setup screen and persisted via `ServerConfigRepository`. These
+/// `--dart-define`s are only a seed for CI and automated builds.
 ///
 /// Usage:
 ///   flutter run --dart-define=API_BASE_URL=https://odoo.example.com \
 ///               --dart-define=ODOO_DATABASE=prod_db_name
 ///
-/// Defaults match the existing dev/trial instance so local builds keep
-/// working out of the box.
+/// **A release binary never carries a company's URL or database name unless it
+/// was explicitly passed at build time.** A convenience seed still applies to
+/// debug/profile builds so a plain `flutter run` reaches the test backend
+/// without flags — see [_devSeedBaseUrl].
 class AppEnvironment {
   AppEnvironment._();
 
-  /// Optional build-time backend base URL fallback (no trailing slash).
-  ///
-  /// The app is multi-tenant: each company runs its own Odoo server, so the
-  /// base URL is normally entered by the user on the server-setup screen and
-  /// persisted via [ServerConfigRepository]. This `--dart-define` only acts as
-  /// a seed for CI / automated builds; it is intentionally empty by default so
-  /// release binaries never ship a hard-coded company URL.
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    // TESTING: seeded with the dh_visit_management test instance so a plain
-    // `flutter run` (no --dart-define) points at the right backend out of the
-    // box. Revert to '' before a multi-tenant store release.
-    defaultValue: 'https://thedigitalharbor-dh-visits-new.odoo.com',
-  );
+  // Dev-only seeds. Gated behind `kReleaseMode` below rather than used as
+  // `defaultValue`, because a `defaultValue` is compiled into *every* build —
+  // including a store release, which would then ship one customer's server
+  // address to every other customer.
+  static const String _devSeedBaseUrl =
+      'https://thedigitalharbor-dh-visits-new.odoo.com';
+  static const String _devSeedDatabase =
+      'thedigitalharbor-dh-visits-new-main-34241330';
 
-  /// Optional build-time Odoo database fallback. Like [baseUrl], this is
-  /// normally provided per-company on the server-setup screen; the
-  /// `--dart-define` is only a convenience seed for dev/CI builds.
-  static const String database = String.fromEnvironment(
-    'ODOO_DATABASE',
-    // TESTING: real database name of the test instance (see [baseUrl]).
-    defaultValue: 'thedigitalharbor-dh-visits-new-main-34241330',
-  );
+  static const String _definedBaseUrl = String.fromEnvironment('API_BASE_URL');
+  static const String _definedDatabase =
+      String.fromEnvironment('ODOO_DATABASE');
+
+  /// Build-time backend base URL fallback (no trailing slash), or `''` when
+  /// none was supplied — in which case the app asks for it on the setup screen.
+  static String get baseUrl => _definedBaseUrl.isNotEmpty
+      ? _definedBaseUrl
+      : (kReleaseMode ? '' : _devSeedBaseUrl);
+
+  /// Build-time Odoo database fallback, or `''` when none was supplied.
+  static String get database => _definedDatabase.isNotEmpty
+      ? _definedDatabase
+      : (kReleaseMode ? '' : _devSeedDatabase);
 
   /// Build flavour name surfaced in logs / settings screen.
   static const String flavor = String.fromEnvironment(

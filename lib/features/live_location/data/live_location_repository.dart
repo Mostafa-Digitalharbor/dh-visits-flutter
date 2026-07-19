@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:intl/intl.dart';
 
 import '../../../core/api/api_client.dart';
-import '../../../core/api/endpoints.dart';
+import '../../../core/api/odoo_rpc.dart';
 import '../../../core/constants.dart';
 import '../../../core/storage/session_storage.dart';
 
@@ -75,51 +75,34 @@ class LiveLocationRepository {
     final description = encodeDescription(meta);
 
     // Find this user's existing presence record.
-    final existing = await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': AppConstants.calendarEventModel,
-        'method': 'search',
-        'args': [
-          [
-            ['user_id', '=', uid],
-            ['description', 'like', presenceMarker],
-          ],
+    final existing = await api.callMethod(
+      AppConstants.calendarEventModel,
+      'search',
+      args: [
+        [
+          ['user_id', '=', uid],
+          ['description', 'like', presenceMarker],
         ],
-        'kwargs': {'limit': 1},
-      },
+      ],
+      kwargs: {'limit': 1},
     );
     final ids = existing is List ? existing : <dynamic>[];
 
     if (ids.isNotEmpty) {
-      await api.jsonRpc(
-        Endpoints.callKw,
-        params: {
-          'model': AppConstants.calendarEventModel,
-          'method': 'write',
-          'args': [
-            [ (ids.first as num).toInt() ],
-            {'description': description},
-          ],
-          'kwargs': {},
-        },
+      await api.writeRecord(
+        AppConstants.calendarEventModel,
+        [(ids.first as num).toInt()],
+        {'description': description},
       );
     } else {
-      await api.jsonRpc(
-        Endpoints.callKw,
-        params: {
-          'model': AppConstants.calendarEventModel,
-          'method': 'create',
-          'args': [
-            {
-              'name': '📍 $name',
-              'start': _odooDateTime.format(now),
-              'stop': _odooDateTime.format(now.add(const Duration(hours: 1))),
-              'user_id': uid,
-              'description': description,
-            },
-          ],
-          'kwargs': {},
+      await api.createRecord(
+        AppConstants.calendarEventModel,
+        {
+          'name': '📍 $name',
+          'start': _odooDateTime.format(now),
+          'stop': _odooDateTime.format(now.add(const Duration(hours: 1))),
+          'user_id': uid,
+          'description': description,
         },
       );
     }

@@ -22,6 +22,12 @@ class Insets {
 class Radii {
   Radii._();
   static const xs = 8.0, sm = 12.0, md = 16.0, lg = 20.0, xl = 28.0, pill = 999.0, btn = 14.0;
+
+  /// 6dp — small inline badges and thin progress bars.
+  static const badge = 6.0;
+
+  /// 10dp — attachment tiles and inline detail rows.
+  static const tile = 10.0;
 }
 
 class IconSz {
@@ -37,6 +43,15 @@ class AppDurations {
   static const base = Duration(milliseconds: 200);
   static const slow = Duration(milliseconds: 320);
   static const navSlide = Duration(milliseconds: 340);
+
+  /// How long a search field waits after the last keystroke before querying.
+  static const searchDebounce = Duration(milliseconds: 350);
+
+  /// Cross-fade between a list's loading / empty / error / content states.
+  static const listSwitch = Duration(milliseconds: 280);
+
+  /// How long a snackbar stays on screen.
+  static const snack = Duration(seconds: 3);
 }
 
 class AppCurves {

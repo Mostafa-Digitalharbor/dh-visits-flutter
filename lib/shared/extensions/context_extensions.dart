@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/api_exceptions.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../app/design/app_dimens.dart';
 
 /// Visual kind for snackbars — drives the leading icon and accent color
 /// on `context.showSnack`. Defaults to `info` for plain messages and
@@ -14,6 +15,22 @@ extension AppContext on BuildContext {
   ColorScheme get colors => Theme.of(this).colorScheme;
   TextTheme get text => Theme.of(this).textTheme;
   bool get isRtl => Directionality.of(this) == TextDirection.rtl;
+  bool get isDark => Theme.of(this).brightness == Brightness.dark;
+
+  /// Runs an external-launch action (dial / mail / maps) and, if it fails
+  /// (no handler app, or the launch threw), shows a clear localized message
+  /// instead of the tap silently doing nothing.
+  Future<void> openExternal(Future<bool> Function() launch) async {
+    bool ok;
+    try {
+      ok = await launch();
+    } catch (_) {
+      ok = false;
+    }
+    if (!ok && mounted) {
+      showSnack(s.errCannotLaunchApp, kind: SnackKind.error);
+    }
+  }
 
   void showSnack(String message, {SnackKind kind = SnackKind.info}) {
     final scheme = colors;
@@ -41,10 +58,10 @@ extension AppContext on BuildContext {
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(Radii.btn),
         ),
         elevation: 4,
-        duration: const Duration(seconds: 3),
+        duration: AppDurations.snack,
         content: Row(
           children: [
             Icon(icon, color: fg, size: 20),
@@ -92,8 +109,19 @@ extension ApiExceptionL10n on ApiException {
         return s.errCustomerLoadFailed;
       case ApiErrorCode.notSupported:
         return s.errFeatureNotAvailable;
+      case ApiErrorCode.sessionRestoreFailed:
+        return s.errSessionRestoreFailed;
+      case ApiErrorCode.conflict:
+        return serverMessage ?? s.errConflict;
+      case ApiErrorCode.insecureConnection:
+        return s.errInsecureConnection;
       case ApiErrorCode.unknown:
-        return serverMessage ?? s.errNetworkUnknown;
+        // errUnknown, not errNetworkUnknown: this arm catches parse errors,
+        // null casts and unclassified failures as well as network ones, and
+        // "a network error occurred" sends the user off to check their WiFi
+        // over what is usually a bug. `network` / `timeout` already carry the
+        // genuinely connectivity-related cases.
+        return serverMessage ?? s.errUnknown;
     }
   }
 }

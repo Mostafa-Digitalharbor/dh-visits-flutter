@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 
@@ -54,6 +55,10 @@ Future<void> _bootstrap() async {
   // Load the full IANA timezone database so we can render Odoo datetimes
   // in the user's `res.users.tz` regardless of the device's clock.
   tz_data.initializeTimeZones();
+
+  // Load intl's date symbols for every locale we ship. Without this,
+  // `DateFormat(..., 'ar')` throws on first use; see [AppDate].
+  await initializeDateFormatting();
 
   // Firebase + push. initializeApp must run before any FCM use (including the
   // background isolate handler, which we register here at startup). A failure

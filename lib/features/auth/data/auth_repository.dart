@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exceptions.dart';
 import '../../../core/api/endpoints.dart';
+import '../../../core/api/odoo_rpc.dart';
 import '../../../core/config/server_config_repository.dart';
 import '../../../core/constants.dart';
 import '../../../core/storage/session_storage.dart';
@@ -57,10 +58,16 @@ class AuthRepository {
         tz: profile.tz,
         visitRole: profile.visitRole,
         employeeId: profile.employeeId,
+        profileIncomplete: false,
       );
     } catch (e) {
+      // Login itself succeeded, so don't block it — but flag the gap. Without
+      // employeeId the action bar can't match the user to their own visits and
+      // every workflow button vanishes; without tz, visits get stamped against
+      // the device clock. The UI surfaces this instead of looking broken.
       debugPrint('[debug] AuthRepository.login: profile fetch failed ($e) — '
           'falling back to device clock / no visit role');
+      user = user.copyWith(profileIncomplete: true);
     }
 
     await session.saveUser(user.toJson());
@@ -71,22 +78,15 @@ class AuthRepository {
   /// derives the visit role. `tz` is `null` when unset (Odoo serialises `false`).
   Future<({String? tz, VisitRole visitRole, int? employeeId})> _readUserProfile(
       int uid) async {
-    final result = await api.jsonRpc(
-      '/web/dataset/call_kw',
-      params: {
-        'model': AppConstants.usersModel,
-        'method': 'read',
-        'args': [
-          [uid],
-          ['tz', 'group_ids', 'employee_id'],
-        ],
-        'kwargs': {},
-      },
+    final rows = await api.readRecords(
+      AppConstants.usersModel,
+      [uid],
+      const ['tz', 'group_ids', 'employee_id'],
     );
-    if (result is! List || result.isEmpty || result.first is! Map) {
+    if (rows.isEmpty) {
       return (tz: null, visitRole: VisitRole.none, employeeId: null);
     }
-    final row = Map<String, dynamic>.from(result.first as Map);
+    final row = rows.first;
 
     String? tz;
     final rawTz = row['tz'];

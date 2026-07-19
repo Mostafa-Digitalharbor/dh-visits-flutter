@@ -46,6 +46,11 @@ class SentryBlocObserver extends BlocObserver {
       case ApiErrorCode.locationRequired:
       case ApiErrorCode.notFound:
       case ApiErrorCode.notSupported:
+      // Environmental, not a defect: an expired session, a rejected TLS
+      // certificate, or two devices racing on the same visit.
+      case ApiErrorCode.sessionRestoreFailed:
+      case ApiErrorCode.insecureConnection:
+      case ApiErrorCode.conflict:
         return true;
       case ApiErrorCode.server:
       case ApiErrorCode.customerLoadFailed:

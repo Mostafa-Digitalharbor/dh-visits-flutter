@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../app/routes.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../core/config/server_config.dart';
@@ -10,6 +12,7 @@ import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/view/auth_chrome.dart';
+import '../../../app/design/app_dimens.dart';
 
 /// First-run / "change server" screen. Collects the company's backend URL
 /// before letting the user reach login. Shares the login screen's visual
@@ -132,7 +135,7 @@ class _ServerSetupPageState extends State<ServerSetupPage> {
     }
     if (!mounted) return;
     setState(() => _saving = false);
-    context.go('/login');
+    context.go(AppRoutes.login);
   }
 
   @override
@@ -246,7 +249,7 @@ class _HelpHint extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: cs.surfaceContainer,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Radii.sm),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -69,6 +69,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get unitMinShort => 'min';
 
   @override
+  String get relativeNow => 'Now';
+
+  @override
+  String relativeMinutesAgo(int count) {
+    return '${count}m ago';
+  }
+
+  @override
+  String relativeHoursAgo(int count) {
+    return '${count}h ago';
+  }
+
+  @override
+  String relativeDaysAgo(int count) {
+    return '${count}d ago';
+  }
+
+  @override
   String get themeMode => 'Theme';
 
   @override
@@ -178,6 +196,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginForgotPassword => 'Forgot password?';
 
   @override
+  String get loginForgotPasswordTitle => 'Reset your password';
+
+  @override
+  String get loginForgotPasswordBody =>
+      'Password resets are handled by your administrator. Please contact your system administrator to reset your password.';
+
+  @override
   String get loginSecureFooter => 'Secure sign-in · Digital Harbor';
 
   @override
@@ -216,10 +241,100 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enable location services and grant the app permission';
 
   @override
-  String get errUnknown => 'An unknown error occurred';
+  String get errLocationNeededForVisit =>
+      'Your location is required to record this visit. Turn on location services, allow the app to use them, then try again.';
+
+  @override
+  String get errLocationUnavailable =>
+      'Couldn\'t determine your location. Move somewhere with a clearer view of the sky and try again.';
+
+  @override
+  String get errUnknown =>
+      'Something went wrong on our side. Please try again — if it keeps happening, send a screenshot to your administrator.';
+
+  @override
+  String get errSessionRestoreFailed =>
+      'We couldn\'t reopen your saved session. Please sign in again to continue.';
+
+  @override
+  String get errProfileIncomplete =>
+      'We couldn\'t load your permissions, so visit actions are hidden. Sign out and back in — if it persists, ask your administrator to check your visit role.';
+
+  @override
+  String get liveLocationUnsupported =>
+      'Live location sharing isn\'t available on this server — ask your administrator to enable it.';
+
+  @override
+  String get liveLocationPermissionOff =>
+      'Location sharing is off, so your manager can\'t see you on the map. Allow location access to turn it back on.';
+
+  @override
+  String get liveLocationPingFailed =>
+      'Your location isn\'t reaching the server, so your position on the map is out of date.';
+
+  @override
+  String get pushChannelName => 'Visit updates';
+
+  @override
+  String get pushChannelDescription =>
+      'Approvals, reschedules and status changes for your visits.';
+
+  @override
+  String get unitPercent => '%';
+
+  @override
+  String unitBytes(String size) {
+    return '$size B';
+  }
+
+  @override
+  String unitKilobytes(String size) {
+    return '$size KB';
+  }
+
+  @override
+  String unitMegabytes(String size) {
+    return '$size MB';
+  }
+
+  @override
+  String offlineActionDropped(String reason) {
+    return 'Your offline update couldn\'t be saved: $reason Open the visit and record it again.';
+  }
+
+  @override
+  String get errConflict =>
+      'This visit was already updated somewhere else. Pull down to refresh and check its current status before trying again.';
+
+  @override
+  String get errInsecureConnection =>
+      'Couldn\'t open a secure connection to the server. Its security certificate isn\'t trusted — check the server address with your administrator.';
 
   @override
   String get errCustomerLoadFailed => 'Failed to load customer';
+
+  @override
+  String get errAttachmentOpenFailed =>
+      'Couldn\'t open the attachment. Please try again.';
+
+  @override
+  String get errAttachmentUnavailable =>
+      'This attachment is no longer available — pull down to refresh.';
+
+  @override
+  String get errAttachmentsLoadFailed =>
+      'Couldn\'t load attachments. Pull down to try again.';
+
+  @override
+  String get attachmentsEmpty => 'No attachments yet';
+
+  @override
+  String get errCannotLaunchApp =>
+      'Couldn\'t open an app for this action on your device.';
+
+  @override
+  String get errActionFailed =>
+      'The action couldn\'t be completed. Please try again.';
 
   @override
   String get errFeatureNotAvailable =>
@@ -258,6 +373,42 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get customerActionNavigate => 'Navigate';
+
+  @override
+  String get customerActionEmail => 'Email';
+
+  @override
+  String get customerTypeCompany => 'Company';
+
+  @override
+  String get customerTypeIndividual => 'Individual';
+
+  @override
+  String get customerSectionInfo => 'Contact details';
+
+  @override
+  String get customerFieldType => 'Type';
+
+  @override
+  String get customerFieldEmail => 'Email';
+
+  @override
+  String get customerFieldJob => 'Job position';
+
+  @override
+  String get customerFieldParent => 'Related company';
+
+  @override
+  String get customerFieldTags => 'Tags';
+
+  @override
+  String get customerFieldWebsite => 'Website';
+
+  @override
+  String get customerFieldVat => 'Tax ID';
+
+  @override
+  String get customerFieldCoordinates => 'Coordinates';
 
   @override
   String customerActionNearby(String radius) {
@@ -929,6 +1080,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String offlinePendingCount(int count) {
+    return '$count action(s) still pending — check your connection and try again.';
+  }
+
+  @override
   String get offlineCheckInQueued =>
       'Saved locally — will sync when you\'re back online';
 
@@ -1348,7 +1504,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wfEndedLabel => 'Ended';
 
   @override
+  String get wfFieldStartLocation => 'Start location';
+
+  @override
+  String get wfFieldEndLocation => 'End location';
+
+  @override
   String get wfDurationLabel => 'Duration';
+
+  @override
+  String get wfSectionVisitInfo => 'Visit details';
+
+  @override
+  String get wfSectionApproval => 'Team & approval';
+
+  @override
+  String get wfSectionExecution => 'Execution';
+
+  @override
+  String get wfOpenInMaps => 'Open in Maps';
+
+  @override
+  String get wfHoursShort => 'h';
+
+  @override
+  String get wfMinutesShort => 'm';
+
+  @override
+  String get wfDaysShort => 'd';
+
+  @override
+  String get wfShortVisitHint => 'Short visit';
 
   @override
   String get wfNotificationsTitle => 'Notifications';
@@ -1374,4 +1560,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get wfQueuedOffline =>
       'Saved offline — it\'ll sync when you\'re back online';
+
+  @override
+  String get wfMockFlagBannerTitle => 'Fake location recorded on this visit';
+
+  @override
+  String get wfMockFlagBannerBody =>
+      'The device reported a mock (fake) GPS location when this visit was started or ended. Review it before approving.';
 }

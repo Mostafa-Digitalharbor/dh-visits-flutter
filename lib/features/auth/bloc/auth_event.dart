@@ -20,7 +20,15 @@ class AuthLoginRequested extends AuthEvent {
 }
 
 class AuthLogoutRequested extends AuthEvent {
-  const AuthLogoutRequested();
+  /// Why the session ended, when it wasn't the user's own choice — a 401 from
+  /// the server, say. Carried through to the login screen so it can explain
+  /// what happened instead of silently appearing mid-task.
+  final ApiException? reason;
+
+  const AuthLogoutRequested({this.reason});
+
+  @override
+  List<Object?> get props => [reason];
 }
 
 /// Raised when the user saves a (new) backend on the setup screen. Drops any

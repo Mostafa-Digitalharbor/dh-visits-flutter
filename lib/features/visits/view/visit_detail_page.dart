@@ -1,31 +1,18 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
-import 'package:open_filex/open_filex.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../../../core/di/service_locator.dart';
-import '../../../core/location/location_service.dart';
 import '../../../shared/extensions/context_extensions.dart';
-import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/app_refresh_indicator.dart';
 import '../../../shared/widgets/error_view.dart';
-import '../../auth/bloc/auth_bloc.dart';
-import '../../auth/data/models/user.dart';
 import '../bloc/visit_bloc.dart' hide VisitState;
 import '../bloc/visit_detail_cubit.dart';
 import '../data/models/visit.dart';
-import '../data/models/visit_attachment.dart';
-import '../data/models/visit_participant.dart';
 import '../data/visits_repository.dart';
-import 'action_sheets.dart';
-import 'visit_labels.dart';
+import 'visit_action_bar.dart';
+import 'visit_attachments_section.dart';
+import 'visit_detail_sections.dart';
+import 'visit_hero_header.dart';
 import 'visit_map_card.dart';
 
 class VisitDetailPage extends StatelessWidget {
@@ -158,28 +145,44 @@ class _VisitDetailBodyState extends State<_VisitDetailBody> {
     final busy = widget.state.status == VisitDetailStatus.acting;
     return Stack(
       children: [
-        RefreshIndicator(
+        AppRefreshIndicator(
           onRefresh: () => context.read<VisitDetailCubit>().load(),
           child: ListView(
             // Extra breathing room below the last card so it can scroll fully
             // clear of the pinned action bar.
             padding: EdgeInsets.fromLTRB(16, 16, 16, _barHeight + 24),
             children: [
-              _Header(visit: visit),
-              const SizedBox(height: 16),
+              VisitHeroHeader(visit: visit),
+              // Above everything else on purpose: a manager deciding whether to
+              // approve must meet this before the map makes the visit look
+              // legitimate.
+              if (widget.state.mockFlagged) ...[
+                const SizedBox(height: 14),
+                const VisitMockLocationBanner(),
+              ],
+              const SizedBox(height: 14),
               VisitMapCard(visit: visit),
-              const SizedBox(height: 16),
-              _InfoSection(visit: visit),
+              const SizedBox(height: 14),
+              VisitInfoSection(visit: visit),
+              const SizedBox(height: 14),
+              VisitApprovalSection(visit: visit),
+              if (visit.startDatetime != null) ...[
+                const SizedBox(height: 14),
+                VisitExecutionSection(visit: visit),
+              ],
               if (visit.participants.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                _ParticipantsSection(visit: visit),
+                const SizedBox(height: 14),
+                VisitParticipantsSection(visit: visit),
               ],
               if (visit.attachmentCount > 0) ...[
-                const SizedBox(height: 16),
-                _AttachmentsSection(visit: visit),
+                const SizedBox(height: 14),
+                VisitAttachmentsSection(
+                  attachments: widget.state.attachments,
+                  error: widget.state.attachmentsError,
+                ),
               ],
-              const SizedBox(height: 16),
-              _HistorySection(visit: visit),
+              const SizedBox(height: 14),
+              VisitHistorySection(visit: visit),
             ],
           ),
         ),
@@ -196,7 +199,7 @@ class _VisitDetailBodyState extends State<_VisitDetailBody> {
           bottom: 0,
           child: _MeasureHeight(
             onChange: _onBarHeight,
-            child: _ActionBar(visit: visit),
+            child: VisitActionBar(visit: visit),
           ),
         ),
       ],
@@ -224,553 +227,3 @@ class _MeasureHeight extends StatelessWidget {
   }
 }
 
-class _Header extends StatelessWidget {
-  final Visit visit;
-  const _Header({required this.visit});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    visit.partnerName ?? '#${visit.id}',
-                    style: context.text.titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                ),
-                VisitStateBadge(visit.state),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '${visitTypeLabel(context, visit.visitType)}'
-              '${visit.linkedRecordName != null ? ' · ${visit.linkedRecordName}' : ''}',
-              style: context.text.bodyMedium
-                  ?.copyWith(color: context.colors.onSurfaceVariant),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoSection extends StatelessWidget {
-  final Visit visit;
-  const _InfoSection({required this.visit});
-
-  @override
-  Widget build(BuildContext context) {
-    final df = DateFormat('EEE, MMM d • HH:mm');
-    final rows = <(IconData, String, String?)>[
-      (Icons.schedule, context.s.wfFieldSchedule,
-          visit.scheduledDatetime != null
-              ? df.format(visit.scheduledDatetime!.toLocal())
-              : null),
-      (Icons.flag_outlined, context.s.wfFieldPurpose, visit.purpose),
-      (Icons.place_outlined, context.s.wfFieldLocation, visit.location),
-      (Icons.person_outline, context.s.wfFieldResponsible, visit.employeeName),
-      (Icons.badge_outlined, context.s.wfFieldDirectManager,
-          visit.directManagerName),
-      if (visit.outcome != null)
-        (Icons.task_alt, context.s.wfFieldOutcome, visit.outcome),
-      if (visit.startDatetime != null)
-        (Icons.play_circle_outline, context.s.wfStartedLabel,
-            df.format(visit.startDatetime!.toLocal())),
-      if (visit.endDatetime != null)
-        (Icons.stop_circle_outlined, context.s.wfEndedLabel,
-            df.format(visit.endDatetime!.toLocal())),
-    ];
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Column(
-          children: [
-            for (final r in rows)
-              if (r.$3 != null && r.$3!.isNotEmpty)
-                ListTile(
-                  dense: true,
-                  leading: Icon(r.$1, size: 20),
-                  title: Text(r.$2, style: context.text.labelMedium),
-                  subtitle: Text(r.$3!, style: context.text.bodyMedium),
-                ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ParticipantsSection extends StatelessWidget {
-  final Visit visit;
-  const _ParticipantsSection({required this.visit});
-
-  @override
-  Widget build(BuildContext context) {
-    final me = context.read<AuthBloc>().state.user;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(context.s.wfParticipantsSection,
-                style: context.text.titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            for (final p in visit.participants)
-              _ParticipantTile(visit: visit, participant: p, me: me),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ParticipantTile extends StatelessWidget {
-  final Visit visit;
-  final VisitParticipant participant;
-  final AuthUser? me;
-  const _ParticipantTile({
-    required this.visit,
-    required this.participant,
-    required this.me,
-  });
-
-  bool get _canAct {
-    if (participant.approvalState != ParticipantApprovalState.pending) {
-      return false;
-    }
-    // The current backend keeps a visit with pending participants in
-    // `submitted`; older builds used `waiting_participant_manager_approval`.
-    if (visit.state != VisitState.submitted &&
-        visit.state != VisitState.waitingParticipantManagerApproval) {
-      return false;
-    }
-    final u = me;
-    if (u == null) return false;
-    final isTheirManager =
-        u.employeeId != null && u.employeeId == participant.managerId;
-    return isTheirManager || u.canApproveVisits;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final tone = switch (participant.approvalState) {
-      ParticipantApprovalState.approved => Colors.green.shade700,
-      ParticipantApprovalState.rejected => context.colors.error,
-      _ => Colors.orange.shade700,
-    };
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      dense: true,
-      leading: const Icon(Icons.person_outline),
-      title: Text(participant.employeeName ?? '#${participant.employeeId}'),
-      subtitle: Text(
-        participantStateLabel(context, participant.approvalState),
-        style: TextStyle(color: tone, fontWeight: FontWeight.w600),
-      ),
-      trailing: _canAct
-          ? Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: Icon(Icons.check_circle, color: Colors.green.shade700),
-                  tooltip: context.s.wfApproveParticipant,
-                  onPressed: () => context
-                      .read<VisitDetailCubit>()
-                      .approveParticipant(participant.id),
-                ),
-                IconButton(
-                  icon: Icon(Icons.cancel, color: context.colors.error),
-                  tooltip: context.s.wfRejectParticipant,
-                  onPressed: () async {
-                    final reason = await showRejectReasonSheet(context);
-                    if (reason == null || !context.mounted) return;
-                    context
-                        .read<VisitDetailCubit>()
-                        .rejectParticipant(participant.id, reason);
-                  },
-                ),
-              ],
-            )
-          : null,
-    );
-  }
-}
-
-class _AttachmentsSection extends StatelessWidget {
-  final Visit visit;
-  const _AttachmentsSection({required this.visit});
-
-  IconData _iconFor(String? mimetype) {
-    final m = mimetype ?? '';
-    if (m.startsWith('image/')) return Icons.image_outlined;
-    if (m.contains('pdf')) return Icons.picture_as_pdf_outlined;
-    if (m.startsWith('video/')) return Icons.videocam_outlined;
-    if (m.startsWith('audio/')) return Icons.audiotrack_outlined;
-    return Icons.insert_drive_file_outlined;
-  }
-
-  Future<void> _openAttachment(
-      BuildContext context, VisitAttachment a) async {
-    context.showSnack(context.s.commonLoading);
-    try {
-      final b64 = await sl<VisitsRepository>().downloadAttachmentB64(a.id);
-      if (b64 == null || b64.isEmpty) {
-        if (context.mounted) {
-          context.showSnack(context.s.errUnknown, kind: SnackKind.error);
-        }
-        return;
-      }
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/${a.name}');
-      await file.writeAsBytes(base64Decode(b64));
-      await OpenFilex.open(file.path);
-    } catch (e) {
-      if (context.mounted) {
-        context.showSnack(e.toString(), kind: SnackKind.error);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(context.s.wfActionAddAttachment,
-                style: context.text.titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            FutureBuilder<List<VisitAttachment>>(
-              // Re-fetch whenever the count changes (e.g. after an upload).
-              key: ValueKey(visit.attachmentCount),
-              future: sl<VisitsRepository>().readAttachments(visit.id),
-              builder: (context, snap) {
-                if (snap.connectionState != ConnectionState.done) {
-                  return const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: Center(
-                      child: SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                  );
-                }
-                final items = snap.data ?? const [];
-                if (items.isEmpty) {
-                  return Text(context.s.wfNoParticipants,
-                      style: context.text.bodySmall);
-                }
-                return Column(
-                  children: [
-                    for (final a in items)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        leading: Icon(_iconFor(a.mimetype)),
-                        title: Text(a.name,
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
-                        subtitle: Text(a.readableSize),
-                        trailing: const Icon(Icons.download_outlined, size: 20),
-                        onTap: () => _openAttachment(context, a),
-                      ),
-                  ],
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HistorySection extends StatelessWidget {
-  final Visit visit;
-  const _HistorySection({required this.visit});
-
-  @override
-  Widget build(BuildContext context) {
-    final df = DateFormat('MMM d, HH:mm');
-    final entries = <(String, String)>[
-      if (visit.submittedDate != null)
-        (context.s.wfSubmittedOn, df.format(visit.submittedDate!.toLocal())),
-      if (visit.approvedByName != null)
-        (
-          context.s.wfApprovedByOn,
-          '${visit.approvedByName}'
-              '${visit.approvedDate != null ? ' · ${df.format(visit.approvedDate!.toLocal())}' : ''}'
-        ),
-      if (visit.rejectedByName != null)
-        (
-          context.s.wfRejectedByOn,
-          '${visit.rejectedByName}'
-              '${visit.rejectedDate != null ? ' · ${df.format(visit.rejectedDate!.toLocal())}' : ''}'
-        ),
-      if (visit.rejectReason != null)
-        (context.s.wfReason, visit.rejectReason!),
-    ];
-    if (entries.isEmpty) return const SizedBox.shrink();
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(context.s.wfApprovalHistory,
-                style: context.text.titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            for (final e in entries)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('${e.$1}: ',
-                        style: context.text.labelMedium
-                            ?.copyWith(fontWeight: FontWeight.w700)),
-                    Expanded(child: Text(e.$2, style: context.text.bodyMedium)),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Role- and state-aware action buttons pinned to the bottom.
-class _ActionBar extends StatelessWidget {
-  final Visit visit;
-  const _ActionBar({required this.visit});
-
-  Future<(double, double)?> _location(BuildContext context) async {
-    final loc = sl<LocationService>();
-    final ok = await loc.ensurePermission();
-    if (!ok) return null;
-    final pos = await loc.getCurrent();
-    // Anti-spoofing: the OS flags positions coming from a mock provider. We
-    // "allow with a flag" (per the SFA best-practice review) — warn, record it
-    // for review, and let the user decide, rather than hard-blocking.
-    if (pos.isMocked) {
-      unawaited(Sentry.captureMessage(
-        'Mock GPS location used on visit ${visit.name ?? visit.id}',
-        level: SentryLevel.warning,
-      ));
-      if (!context.mounted) return null;
-      final proceed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          icon: Icon(Icons.gpp_maybe_outlined, color: ctx.colors.error),
-          title: Text(ctx.s.wfMockLocationTitle),
-          content: Text(ctx.s.wfMockLocationMessage),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text(ctx.s.commonCancel)),
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text(ctx.s.commonContinue)),
-          ],
-        ),
-      );
-      if (proceed != true) return null;
-    }
-    return (pos.latitude, pos.longitude);
-  }
-
-  Future<void> _pickAndUpload(
-      BuildContext context, VisitDetailCubit cubit) async {
-    final result = await FilePicker.pickFiles(withData: true);
-    if (result == null || result.files.isEmpty) return;
-    final f = result.files.first;
-    final bytes = f.bytes;
-    if (bytes == null) return;
-    await cubit.uploadAttachment(filename: f.name, dataB64: base64Encode(bytes));
-  }
-
-  /// Capture a proof-of-visit photo straight from the camera and upload it as
-  /// an attachment. Downscaled + compressed so the base64 payload stays small.
-  Future<void> _captureAndUpload(
-      BuildContext context, VisitDetailCubit cubit) async {
-    final shot = await ImagePicker().pickImage(
-      source: ImageSource.camera,
-      imageQuality: 70,
-      maxWidth: 1600,
-    );
-    if (shot == null) return;
-    final bytes = await shot.readAsBytes();
-    await cubit.uploadAttachment(
-        filename: shot.name, dataB64: base64Encode(bytes));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final me = context.read<AuthBloc>().state.user;
-    final cubit = context.read<VisitDetailCubit>();
-    final isOwner =
-        me?.employeeId != null && me!.employeeId == visit.employeeId;
-    final canApprove =
-        (me?.canApproveVisits ?? false) && !isOwner && visit.isAwaitingApproval;
-
-    final buttons = <Widget>[];
-
-    if (isOwner && visit.canSubmit) {
-      buttons.add(AppButton(
-        label: context.s.wfActionSubmit,
-        icon: Icons.send_outlined,
-        onPressed: cubit.submit,
-      ));
-    }
-    if (canApprove) {
-      buttons.add(AppButton(
-        label: context.s.wfActionApprove,
-        icon: Icons.check_circle_outline,
-        onPressed: cubit.approve,
-      ));
-      buttons.add(AppButton.destructive(
-        label: context.s.wfActionReject,
-        onPressed: () async {
-          final reason = await showRejectReasonSheet(context);
-          if (reason == null || !context.mounted) return;
-          cubit.reject(reason);
-        },
-      ));
-    }
-    if (isOwner && visit.canStart) {
-      buttons.add(AppButton(
-        label: context.s.wfActionStart,
-        icon: Icons.play_arrow_rounded,
-        onPressed: () async {
-          final ll = await _location(context);
-          if (!context.mounted) return;
-          cubit.start(latitude: ll?.$1, longitude: ll?.$2);
-        },
-      ));
-    }
-    if (isOwner && visit.canEnd) {
-      buttons.add(AppButton(
-        label: context.s.wfActionEnd,
-        icon: Icons.stop_circle_outlined,
-        onPressed: () async {
-          final outcome =
-              await showEndVisitSheet(context, initial: visit.outcome);
-          if (outcome == null || !context.mounted) return;
-          final ll = await _location(context);
-          if (!context.mounted) return;
-          cubit.end(outcome: outcome, latitude: ll?.$1, longitude: ll?.$2);
-        },
-      ));
-    }
-    if (isOwner && (visit.isApproved || visit.isAwaitingApproval)) {
-      buttons.add(AppButton.secondary(
-        label: context.s.wfActionReschedule,
-        icon: Icons.event_repeat,
-        onPressed: () async {
-          final r = await showRescheduleSheet(
-            context,
-            initialSchedule: visit.scheduledDatetime,
-            initialPurpose: visit.purpose,
-            initialLocation: visit.location,
-          );
-          if (r == null || !context.mounted) return;
-          cubit.reschedule(
-            scheduledDatetime: r.scheduled,
-            purpose: r.purpose,
-            location: r.location,
-          );
-        },
-      ));
-    }
-    if ((isOwner || (me?.canApproveVisits ?? false)) &&
-        !visit.isCancelled &&
-        !visit.isRejected) {
-      buttons.add(AppButton.secondary(
-        label: context.s.wfActionTakePhoto,
-        icon: Icons.photo_camera_outlined,
-        onPressed: () => _captureAndUpload(context, cubit),
-      ));
-      buttons.add(AppButton.secondary(
-        label: visit.attachmentCount > 0
-            ? '${context.s.wfActionAddAttachment} (${visit.attachmentCount})'
-            : context.s.wfActionAddAttachment,
-        icon: Icons.attach_file,
-        onPressed: () => _pickAndUpload(context, cubit),
-      ));
-    }
-    if ((isOwner || (me?.canApproveVisits ?? false)) &&
-        !visit.isDone &&
-        !visit.isCancelled &&
-        !visit.isRejected &&
-        visit.state != VisitState.inProgress) {
-      buttons.add(AppButton.secondary(
-        label: context.s.wfActionCancel,
-        icon: Icons.block,
-        onPressed: () async {
-          final ok = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: Text(ctx.s.wfConfirmCancelTitle),
-              content: Text(ctx.s.wfConfirmCancelMessage),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: Text(ctx.s.commonNo)),
-                TextButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: Text(ctx.s.commonYes)),
-              ],
-            ),
-          );
-          if (ok != true || !context.mounted) return;
-          cubit.cancel();
-        },
-      ));
-    }
-
-    if (buttons.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final b in buttons)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: b,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}

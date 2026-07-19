@@ -26,6 +26,13 @@ class NearbyBloc extends Bloc<NearbyEvent, NearbyState> {
     on<NearbyRefreshed>(_onRefreshed);
     on<NearbyStopped>(_onStopped);
     on<NearbyRadiusChanged>(_onRadiusChanged);
+    on<NearbyReset>((_, emit) {
+      // Stop the polling timer too — otherwise it keeps hitting the backend
+      // with the signed-out user's session after logout.
+      _timer?.cancel();
+      _timer = null;
+      emit(const NearbyState());
+    });
   }
 
   Future<void> _onStarted(
@@ -50,6 +57,12 @@ class NearbyBloc extends Bloc<NearbyEvent, NearbyState> {
         await _load(emit);
       } on ApiException catch (e) {
         emit(state.copyWith(status: NearbyStatus.failure, error: e));
+        return;
+      } catch (e) {
+        emit(state.copyWith(
+          status: NearbyStatus.failure,
+          error: ApiException.unexpected(e),
+        ));
         return;
       }
     }
@@ -105,6 +118,13 @@ class NearbyBloc extends Bloc<NearbyEvent, NearbyState> {
     } on ApiException catch (e) {
       emit(state.copyWith(
           status: NearbyStatus.failure, error: e));
+    } catch (e) {
+      // The radar maps raw employee rows client-side; a schema change must
+      // surface as a failure rather than freezing the panel on its skeleton.
+      emit(state.copyWith(
+        status: NearbyStatus.failure,
+        error: ApiException.unexpected(e),
+      ));
     }
   }
 

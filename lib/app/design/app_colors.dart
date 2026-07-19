@@ -25,6 +25,13 @@ class AppColors {
   static const red = Color(0xFFC8364B);
   static const red400 = Color(0xFFFF8A93);
 
+  // ---- map tile placeholder fills (shown behind tiles while they load) ----
+  static const mapBgDark = Color(0xFF1A1A1A);
+  static const mapBgLight = Color(0xFFE5E5E5);
+
+  /// Neutral fill painted behind map tiles for the given theme brightness.
+  static Color mapBackground(bool isDark) => isDark ? mapBgDark : mapBgLight;
+
   static const lightScheme = ColorScheme(
     brightness: Brightness.light,
     primary: navy700, onPrimary: Color(0xFFFFFFFF),

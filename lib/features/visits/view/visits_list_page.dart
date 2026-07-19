@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/routes.dart';
+
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/empty_view.dart';
 import '../../../shared/widgets/error_view.dart';
@@ -11,6 +13,8 @@ import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/data/models/user.dart';
 import '../bloc/visits_list_bloc.dart';
 import '../data/models/visit.dart';
+import '../../../app/design/app_dimens.dart';
+import '../../../shared/widgets/app_refresh_indicator.dart';
 
 /// Primary visits screen. Field users see only their own visits (REST `/my`);
 /// managers get Pending / Team (and Escalated for project managers) tabs read
@@ -114,7 +118,7 @@ class _VisitsListPageState extends State<VisitsListPage> {
                   children: [
                     for (final s in scopes)
                       Padding(
-                        padding: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsetsDirectional.only(end: 8),
                         child: ChoiceChip(
                           label: Text(_scopeLabel(context, s)),
                           selected: state.scope == s,
@@ -134,7 +138,7 @@ class _VisitsListPageState extends State<VisitsListPage> {
                   prefixIcon: const Icon(Icons.search),
                   isDense: true,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(Radii.sm),
                   ),
                 ),
                 onChanged: (q) => bloc.add(VisitsListSearchChanged(q)),
@@ -171,7 +175,7 @@ class _VisitsListPageState extends State<VisitsListPage> {
       );
     }
     final showEmployee = state.scope != VisitListScope.mine;
-    return RefreshIndicator(
+    return AppRefreshIndicator(
       onRefresh: () async => bloc.add(const VisitsListLoadRequested()),
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(12, 4, 12, 90),
@@ -181,7 +185,7 @@ class _VisitsListPageState extends State<VisitsListPage> {
           return VisitCard(
             visit: v,
             showEmployee: showEmployee,
-            onTap: () => ctx.push('/visits/${v.id}', extra: v),
+            onTap: () => ctx.push(AppRoutes.visitDetail(v.id), extra: v),
           );
         },
       ),

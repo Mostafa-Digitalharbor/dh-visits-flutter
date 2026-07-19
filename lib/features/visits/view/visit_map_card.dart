@@ -3,14 +3,16 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../../app/design/app_colors.dart';
 import '../../../core/constants.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/utils/communications.dart';
 import '../../../core/utils/distance.dart';
 import '../../../shared/extensions/context_extensions.dart';
-import '../../../shared/widgets/app_map_tile_layer.dart';
+import '../../../shared/widgets/widgets.dart';
 import '../data/models/visit.dart';
 import '../data/visits_repository.dart';
+import '../../../app/design/app_dimens.dart';
 
 /// A compact geofence map on the visit-detail page.
 ///
@@ -82,13 +84,15 @@ class _VisitMapCardState extends State<VisitMapCard>
     return v.hasEndLocation ? LatLng(v.endLat!, v.endLng!) : null;
   }
 
-  Future<void> _openDirections() async {
+  Future<void> _openDirections(BuildContext context) async {
     final target = _customer ?? _checkIn ?? _checkOut;
     if (target == null) return;
-    await Communications.openInMaps(
-      target.latitude,
-      target.longitude,
-      label: widget.visit.partnerName,
+    await context.openExternal(
+      () => Communications.openInMaps(
+        target.latitude,
+        target.longitude,
+        label: widget.visit.partnerName,
+      ),
     );
   }
 
@@ -103,7 +107,7 @@ class _VisitMapCardState extends State<VisitMapCard>
     if (points.isEmpty) return const SizedBox.shrink();
 
     final primary = context.colors.primary;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = context.isDark;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -116,23 +120,21 @@ class _VisitMapCardState extends State<VisitMapCard>
               children: [
                 Positioned.fill(
                   child: Container(
-                    color: isDark
-                        ? const Color(0xFF1A1A1A)
-                        : const Color(0xFFE5E5E5),
+                    color: AppColors.mapBackground(isDark),
                   ),
                 ),
                 FlutterMap(
                   mapController: _map,
                   options: MapOptions(
                     initialCenter: points.first,
-                    initialZoom: 16,
-                    minZoom: 3,
-                    maxZoom: 22,
+                    initialZoom: AppConstants.mapZoomVisitDetail,
+                    minZoom: AppConstants.mapMinZoom,
+                    maxZoom: AppConstants.mapMaxZoom,
                     initialCameraFit: points.length > 1
                         ? CameraFit.coordinates(
                             coordinates: points,
                             padding: const EdgeInsets.all(48),
-                            maxZoom: 17,
+                            maxZoom: AppConstants.mapZoomVisitFitMax,
                           )
                         : null,
                     interactionOptions: const InteractionOptions(
@@ -142,7 +144,8 @@ class _VisitMapCardState extends State<VisitMapCard>
                     ),
                   ),
                   children: [
-                    const AppMapTileLayer(maxZoom: 22, panBuffer: 2),
+                    const AppMapTileLayer(
+                        maxZoom: AppConstants.mapMaxZoom, panBuffer: 2),
                     // Geofence + pulse ring, only when we know the customer point.
                     if (customer != null) ...[
                       AnimatedBuilder(
@@ -195,9 +198,18 @@ class _VisitMapCardState extends State<VisitMapCard>
                             point: checkIn,
                             width: 40,
                             height: 40,
-                            child: _Pin(
-                              icon: Symbols.login,
-                              color: Colors.green.shade600,
+                            child: GestureDetector(
+                              onTap: () => context.openExternal(
+                                () => Communications.openInMaps(
+                                  checkIn.latitude,
+                                  checkIn.longitude,
+                                  label: widget.visit.startLocation,
+                                ),
+                              ),
+                              child: _Pin(
+                                icon: Symbols.login,
+                                color: Colors.green.shade600,
+                              ),
                             ),
                           ),
                         if (checkOut != null)
@@ -205,22 +217,40 @@ class _VisitMapCardState extends State<VisitMapCard>
                             point: checkOut,
                             width: 40,
                             height: 40,
-                            child: _Pin(
-                              icon: Symbols.logout,
-                              color: Colors.deepOrangeAccent.shade200,
+                            child: GestureDetector(
+                              onTap: () => context.openExternal(
+                                () => Communications.openInMaps(
+                                  checkOut.latitude,
+                                  checkOut.longitude,
+                                  label: widget.visit.endLocation,
+                                ),
+                              ),
+                              child: _Pin(
+                                icon: Symbols.logout,
+                                color: Colors.deepOrangeAccent.shade200,
+                              ),
                             ),
                           ),
                       ],
                     ),
                   ],
                 ),
+                // OSM tiles are always light, so in dark mode they glare out of
+                // an otherwise dark screen. Knock them back with the same tint
+                // the route map uses. IgnorePointer so the pins stay tappable.
+                if (isDark)
+                  IgnorePointer(
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.22),
+                    ),
+                  ),
                 // Directions hand-off.
                 Positioned(
                   right: 12,
                   bottom: 12,
                   child: _MapFab(
                     icon: Symbols.assistant_direction,
-                    onTap: _openDirections,
+                    onTap: () => _openDirections(context),
                   ),
                 ),
               ],
@@ -229,6 +259,7 @@ class _VisitMapCardState extends State<VisitMapCard>
           _RangeFooter(
             customer: customer,
             checkIn: checkIn,
+            checkOut: checkOut,
             address: _partner?.address ?? widget.visit.location,
           ),
         ],
@@ -237,34 +268,34 @@ class _VisitMapCardState extends State<VisitMapCard>
   }
 }
 
-/// The in-range / out-of-range chip + address line under the map. Renders the
-/// range verdict only when both the customer point and a check-in point exist.
+/// The in-range / out-of-range verdicts (for the check-in **and** check-out
+/// points, so a manager can confirm the rep both arrived at and left from the
+/// customer) plus the address line under the map.
 class _RangeFooter extends StatelessWidget {
   final LatLng? customer;
   final LatLng? checkIn;
+  final LatLng? checkOut;
   final String? address;
   const _RangeFooter({
     required this.customer,
     required this.checkIn,
+    required this.checkOut,
     required this.address,
   });
 
+  double? _distance(LatLng? p) {
+    if (customer == null || p == null) return null;
+    return haversineMeters(
+        customer!.latitude, customer!.longitude, p.latitude, p.longitude);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final s = context.s;
-    double? distance;
-    if (customer != null && checkIn != null) {
-      distance = haversineMeters(
-        customer!.latitude,
-        customer!.longitude,
-        checkIn!.latitude,
-        checkIn!.longitude,
-      );
-    }
-    final inRange =
-        distance != null && distance <= AppConstants.checkInRangeMeters;
+    final startDist = _distance(checkIn);
+    final endDist = _distance(checkOut);
+    final hasAddress = address != null && address!.isNotEmpty;
 
-    if (distance == null && (address == null || address!.isEmpty)) {
+    if (startDist == null && endDist == null && !hasAddress) {
       return const SizedBox.shrink();
     }
 
@@ -273,58 +304,68 @@ class _RangeFooter extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (distance != null)
-            Row(
-              children: [
-                Icon(
-                  inRange ? Icons.verified_outlined : Icons.error_outline,
-                  size: 18,
-                  color: inRange ? Colors.green.shade700 : context.colors.error,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    inRange ? s.visitDetailInRange : s.visitDetailOutRange,
-                    style: context.text.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: inRange
-                          ? Colors.green.shade700
-                          : context.colors.error,
+          if (startDist != null)
+            _verdict(context, label: context.s.wfStartedLabel, distance: startDist),
+          if (endDist != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child:
+                  _verdict(context, label: context.s.wfEndedLabel, distance: endDist),
+            ),
+          if (hasAddress)
+            Padding(
+              padding: EdgeInsets.only(top: (startDist != null || endDist != null) ? 8 : 0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.place_outlined,
+                      size: 16, color: context.colors.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      address!,
+                      style: context.text.bodySmall
+                          ?.copyWith(color: context.colors.onSurfaceVariant),
                     ),
                   ),
-                ),
-              ],
-            ),
-          if (distance != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 2, bottom: 2),
-              child: Text(
-                s.visitDetailRangeMeta(
-                  distance.toStringAsFixed(0),
-                  AppConstants.checkInRangeMeters.toStringAsFixed(0),
-                ),
-                style: context.text.bodySmall
-                    ?.copyWith(color: context.colors.onSurfaceVariant),
+                ],
               ),
-            ),
-          if (address != null && address!.isNotEmpty)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.place_outlined,
-                    size: 16, color: context.colors.onSurfaceVariant),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    address!,
-                    style: context.text.bodySmall
-                        ?.copyWith(color: context.colors.onSurfaceVariant),
-                  ),
-                ),
-              ],
             ),
         ],
       ),
+    );
+  }
+
+  Widget _verdict(BuildContext context,
+      {required String label, required double distance}) {
+    final s = context.s;
+    final inRange = distance <= AppConstants.checkInRangeMeters;
+    final tone = inRange ? Colors.green.shade700 : context.colors.error;
+    return Row(
+      children: [
+        Icon(inRange ? Icons.verified_outlined : Icons.error_outline,
+            size: 18, color: tone),
+        const SizedBox(width: 6),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: context.text.bodySmall
+                  ?.copyWith(color: context.colors.onSurfaceVariant),
+              children: [
+                TextSpan(
+                  text: '$label: ',
+                  style: TextStyle(fontWeight: FontWeight.w700, color: tone),
+                ),
+                TextSpan(
+                  text:
+                      '${inRange ? s.visitDetailInRange : s.visitDetailOutRange} · '
+                      '${s.visitDetailRangeMeta(distance.toStringAsFixed(0), AppConstants.checkInRangeMeters.toStringAsFixed(0))}',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -337,24 +378,8 @@ class _Pin extends StatelessWidget {
   const _Pin({required this.icon, required this.color});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 3),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      alignment: Alignment.center,
-      child: Icon(icon, color: Colors.white, size: 20),
-    );
-  }
+  Widget build(BuildContext context) =>
+      MapPin.icon(icon: icon, color: color, borderWidth: 3);
 }
 
 class _MapFab extends StatelessWidget {
@@ -366,10 +391,10 @@ class _MapFab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: context.colors.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.btn)),
       elevation: 3,
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(Radii.btn),
         onTap: onTap,
         child: SizedBox(
           width: 44,

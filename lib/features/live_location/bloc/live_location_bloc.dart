@@ -108,7 +108,7 @@ class LiveLocationBloc extends Bloc<LiveLocationEvent, LiveLocationState>
         error: null,
       ));
     } catch (e) {
-      emit(state.copyWith(error: ApiException.unknown(e.toString())));
+      emit(state.copyWith(error: ApiException.unexpected(e)));
     }
   }
 

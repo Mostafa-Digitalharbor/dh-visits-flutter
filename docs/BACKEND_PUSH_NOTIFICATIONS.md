@@ -117,7 +117,12 @@ class VisitDeviceToken(models.Model):
 - iOS: لازم **APNs Auth Key (.p8)** مرفوع في نفس Firebase project.
 - لكل حدث: هاتوا كل توكنات المستلمين (`dh.visit.device.token` بالـ `user_id`) وابعتوا لكل واحد.
 
-### Payload (data-only مُوصى به عشان التطبيق يتحكم في العرض):
+### الحمولة (Payload) — ⚠️ **لازم** يكون فيها بلوك `notification` **+** بلوك `data` معًا (مش data-only):
+
+> **تصحيح مهم:** أي نسخة قديمة من الكلام ده كانت بتقول "data-only مُوصى به" — **ده غلط
+> ويكسر الإشعارات**. التطبيق في حالة الخلفية/الإنهاء بيعتمد على إن **النظام** يعرض بلوك
+> `notification` تلقائيًا؛ لو بعتّوا `data` بس (من غير `notification`) الإشعار **مش هيظهر خالص**
+> في الخلفية — نفس عرض المشكلة اللي بنحاول نحلها. لازم الاتنين مع بعض زي المثال تحت بالظبط.
 
 ```json
 POST https://fcm.googleapis.com/v1/projects/<PROJECT_ID>/messages:send
@@ -137,6 +142,29 @@ Authorization: Bearer <oauth2-access-token-from-service-account>
     "android": { "priority": "high" },
     "apns": { "headers": { "apns-priority": "10" }, "payload": { "aps": { "sound": "default" } } }
   }
+}
+```
+
+### أيقونة الإشعار
+
+**مش محتاجة أي حاجة من الباك إند** — التطبيق بيحدّد الأيقونة واللون في الـ manifest
+(`default_notification_icon` + `default_notification_color`)، فالنظام بيستخدمهم تلقائيًا
+في إشعارات الخلفية/الإنهاء.
+
+⚠️ **متبعتوش `android.notification.icon` في الحمولة.** لو بعتّوها هتـ override إعداد
+التطبيق، ولازم تكون اسم drawable موجود جوّه الـ APK (`ic_notification`) — أي اسم تاني
+بيخلّي الإشعار يظهر من غير أيقونة خالص.
+
+خلفية مهمة: أندرويد بيرمي ألوان أيقونة شريط الحالة ويستخدم **قناة الشفافية بس**، عشان كده
+الأيقونة لازم تفضل صورة ظلّية بيضاء على خلفية شفافة (`ic_notification`)، واللوجو الملوّن
+بيوصل كـ **large icon** جنب النص.
+
+لو عايزين اللوجو الملوّن يظهر في إشعارات الخلفية كمان، ضيفوا `image` (بيتعرض كصورة كبيرة):
+
+```json
+"android": {
+  "priority": "high",
+  "notification": { "image": "https://<host>/visit-logo.png" }
 }
 ```
 

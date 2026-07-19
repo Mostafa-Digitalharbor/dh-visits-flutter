@@ -1,5 +1,5 @@
 import '../../../core/api/api_client.dart';
-import '../../../core/api/endpoints.dart';
+import '../../../core/api/odoo_rpc.dart';
 import '../../../core/constants.dart';
 import 'models/customer.dart';
 
@@ -25,10 +25,26 @@ class CustomersRepository {
     'partner_longitude',
     'contact_address',
     'phone',
+    'is_company',
+    'email',
+    'function',
+    'street',
+    'city',
+    'zip',
+    'state_id',
+    'country_id',
+    'parent_id',
+    'category_id',
+    'website',
+    'vat',
   ];
 
   /// Maps a `res.partner` row to the JSON shape `Customer.fromJson` expects.
-  Map<String, dynamic> _adaptPartner(Map<String, dynamic> row) {
+  /// [categories] holds pre-resolved tag names (see [getById]).
+  Map<String, dynamic> _adaptPartner(
+    Map<String, dynamic> row, {
+    List<String> categories = const [],
+  }) {
     double? num0(dynamic raw) {
       if (raw is num) return raw.toDouble();
       return null;
@@ -40,6 +56,12 @@ class CustomersRepository {
       return s.isEmpty ? null : s;
     }
 
+    // Unwrap an Odoo many2one (`[id, "Name"]` or `false`) to its name.
+    String? m2oName(dynamic raw) {
+      if (raw is List && raw.length >= 2) return str0(raw[1]);
+      return null;
+    }
+
     return <String, dynamic>{
       'id': row['id'],
       'name': str0(row['name']) ?? '',
@@ -47,7 +69,18 @@ class CustomersRepository {
       'longitude': num0(row['partner_longitude']) ?? 0.0,
       'address': str0(row['contact_address']),
       'phone': str0(row['phone']),
-      'mobile': str0(row['mobile']),
+      'is_company': row['is_company'] == true,
+      'email': str0(row['email']),
+      'job_position': str0(row['function']),
+      'street': str0(row['street']),
+      'city': str0(row['city']),
+      'zip': str0(row['zip']),
+      'state_name': m2oName(row['state_id']),
+      'country_name': m2oName(row['country_id']),
+      'parent_name': m2oName(row['parent_id']),
+      'website': str0(row['website']),
+      'vat': str0(row['vat']),
+      'categories': categories,
     };
   }
 
@@ -68,47 +101,45 @@ class CustomersRepository {
       domain.add(['phone', 'ilike', search]);
     }
 
-    final result = await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': AppConstants.partnerModel,
-        'method': 'search_read',
-        'args': [domain],
-        'kwargs': {
-          'fields': _fields,
-          'limit': limit,
-          'offset': offset,
-          'order': 'name asc',
-        },
-      },
+    final rows = await api.searchRead(
+      AppConstants.partnerModel,
+      domain: domain,
+      fields: _fields,
+      limit: limit,
+      offset: offset,
+      order: 'name asc',
     );
-    final items = result is List ? result : <dynamic>[];
-    return items
-        .whereType<Map>()
-        .map((e) => Customer.fromJson(_adaptPartner(Map<String, dynamic>.from(e))))
-        .toList();
+    return rows.map((e) => Customer.fromJson(_adaptPartner(e))).toList();
   }
 
   Future<Customer> getById(int id) async {
-    final result = await api.jsonRpc(
-      Endpoints.callKw,
-      params: {
-        'model': AppConstants.partnerModel,
-        'method': 'read',
-        'args': [
-          [id],
-          _fields,
-        ],
-        'kwargs': {},
-      },
-    );
-    final rows = result is List ? result : <dynamic>[];
-    if (rows.isEmpty || rows.first is! Map) {
+    final rows = await api.readRecords(AppConstants.partnerModel, [id], _fields);
+    if (rows.isEmpty) {
       // Mirror the old "single record missing" behaviour with a typed error
       // so callers (Nearby map) fall back to the cached customer object.
       return Customer.fromJson(_adaptPartner({'id': id}));
     }
-    return Customer.fromJson(
-        _adaptPartner(Map<String, dynamic>.from(rows.first as Map)));
+    final row = rows.first;
+    // Resolve tag names: `category_id` comes back as bare ids from `read`.
+    final categories = await _resolveCategories(row['category_id']);
+    return Customer.fromJson(_adaptPartner(row, categories: categories));
+  }
+
+  /// Resolves `res.partner.category` ids to their display names (best-effort;
+  /// an empty list on any failure so the detail page still renders).
+  Future<List<String>> _resolveCategories(dynamic categoryIds) async {
+    if (categoryIds is! List) return const [];
+    final ids = categoryIds.whereType<num>().map((n) => n.toInt()).toList();
+    if (ids.isEmpty) return const [];
+    try {
+      final rows = await api
+          .readRecords(AppConstants.partnerCategoryModel, ids, ['name']);
+      return rows
+          .map((c) => c['name']?.toString() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
   }
 }

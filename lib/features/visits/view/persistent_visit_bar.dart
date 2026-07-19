@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../shared/extensions/context_extensions.dart';
 import '../bloc/visit_bloc.dart';
+import '../../../core/utils/duration_format.dart';
 
 /// Slim banner that lives just above the bottom navigation while a visit is
 /// active. Shows the running timer + customer name + a quick check-out
@@ -96,13 +97,6 @@ class _BarContentState extends State<_BarContent>
     super.dispose();
   }
 
-  String _format(Duration d) {
-    final h = d.inHours.toString().padLeft(2, '0');
-    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
-    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
-    return '$h:$m:$s';
-  }
-
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -154,7 +148,7 @@ class _BarContentState extends State<_BarContent>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        _format(_elapsed),
+                        _elapsed.clockWithSeconds,
                         style: context.text.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: accent,

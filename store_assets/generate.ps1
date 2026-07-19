@@ -1,11 +1,12 @@
 # Generates Google Play store graphics from the app logo.
-# Re-run after replacing assets/images/logo.jpg with a higher-res version.
+# Re-run after replacing assets/icon/visit-logo-master.png with a higher-res
+# version (and after re-running tool/generate_icons.ps1).
 Add-Type -AssemblyName System.Drawing
 
 $root = Split-Path -Parent $PSScriptRoot
 $out  = Join-Path $root 'store_assets'
 New-Item -ItemType Directory -Force -Path $out | Out-Null
-$logoPath = Join-Path $root 'assets\images\logo.jpg'
+$logoPath = Join-Path $root 'assets\images\visit-logo.png'
 
 $navy = [System.Drawing.Color]::FromArgb(30, 42, 110)   # #1E2A6E brand navy
 $cyan = [System.Drawing.Color]::FromArgb(63, 191, 217)  # #3FBFD9 brand cyan

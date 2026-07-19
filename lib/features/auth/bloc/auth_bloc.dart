@@ -31,13 +31,25 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   Future<void> _onStarted(AuthStarted event, Emitter<AuthState> emit) async {
     final clock = Stopwatch()..start();
-    final user = await repository.currentUser();
+    AuthUser? user;
+    ApiException? restoreError;
+    try {
+      user = await repository.currentUser();
+    } catch (e) {
+      // Reading the stored session can fail outright — a corrupted Android
+      // keystore after a device restore makes FlutterSecureStorage throw, and a
+      // changed payload shape breaks AuthUser.fromJson. Without this catch no
+      // state is ever emitted and the router pins the user to /splash forever.
+      // Treat it as "no session" and tell them why on the login screen.
+      debugPrint('[debug] AuthBloc._onStarted: session restore failed ($e)');
+      restoreError = ApiException.sessionRestoreFailed(e);
+    }
     final remaining = _minSplashDuration - clock.elapsed;
     if (remaining > Duration.zero) {
       await Future.delayed(remaining);
     }
     if (user == null) {
-      emit(const AuthState.unauthenticated());
+      emit(AuthState.unauthenticated(error: restoreError));
     } else {
       emit(AuthState.authenticated(user));
     }
@@ -67,7 +79,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     } catch (e, st) {
       debugPrint('[debug] AuthBloc: unexpected error: $e\n$st');
       emit(AuthState.unauthenticated(
-          error: ApiException.unknown(e.toString())));
+          error: ApiException.unexpected(e)));
     }
   }
 
@@ -83,7 +95,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
     }
     await repository.logout();
-    emit(const AuthState.unauthenticated());
+    emit(AuthState.unauthenticated(error: event.reason));
   }
 
   Future<void> _onServerChanged(

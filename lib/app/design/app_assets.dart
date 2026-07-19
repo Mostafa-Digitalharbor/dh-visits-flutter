@@ -8,15 +8,31 @@ class AppAssets {
 
   static const String _images = 'assets/images';
 
-  /// Full-color brand logo (used for launcher icon source & splash).
-  static const String logo = '$_images/logo.jpg';
+  /// Full brand logo — artwork on its own navy plate, rounded corners already
+  /// baked in. Use where the logo stands alone on an arbitrary background.
+  static const String logo = '$_images/visit-logo.png';
 
-  /// White/mono "D" mark used on dark surfaces (top bar, auth chrome).
-  static const String logoMarkD = '$_images/logo-d.png';
-
-  /// Standalone logomark.
-  static const String logoMark = '$_images/logomark.png';
+  /// The logo artwork with the navy plate removed. Use when the logo sits on a
+  /// surface that already supplies its own shape (a white circle/tile), or when
+  /// it is flattened to a single colour via `Image.asset(..., color: ...)`.
+  static const String logoMark = '$_images/visit-logo-mark.png';
 
   /// Decorative Cairo map backdrop on the auth screens.
   static const String mapCairo = '$_images/map-cairo.png';
+
+  /// Android status-bar icon for notifications.
+  ///
+  /// Not an `assets/` bundle path — it resolves against `android/app/src/main/
+  /// res/drawable-*`. It lives here anyway because it is referenced from two
+  /// places in the push service, and renaming the drawable without updating
+  /// both silently leaves notifications iconless.
+  ///
+  /// This must stay a dedicated white-on-transparent silhouette and must NOT be
+  /// pointed back at `@mipmap/ic_launcher`: Android discards the small icon's
+  /// colour channels and keeps only its alpha, so a full-bleed launcher icon
+  /// renders as an opaque blob. Regenerate via `tool/generate_icons.ps1`.
+  /// The full-colour logo reaches the notification as the *large* icon instead
+  /// (see [PushNotificationService]) and via the manifest's
+  /// `default_notification_color` accent.
+  static const String androidNotificationIcon = '@drawable/ic_notification';
 }

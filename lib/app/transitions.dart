@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'design/app_dimens.dart';
 
-const _duration = Duration(milliseconds: 320);
+const _duration = AppDurations.slow;
 const _reverseDuration = Duration(milliseconds: 240);
 
 CustomTransitionPage<T> fadeTransition<T>(

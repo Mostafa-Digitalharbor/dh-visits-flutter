@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 import '../../../core/api/api_exceptions.dart';
 import '../data/models/visit.dart';
 import '../data/visits_repository.dart';
+import '../../../core/constants.dart';
 
 part 'visits_list_event.dart';
 part 'visits_list_state.dart';
@@ -21,6 +22,7 @@ class VisitsListBloc extends Bloc<VisitsListEvent, VisitsListState> {
         (e, emit) => emit(state.copyWith(searchQuery: e.query)));
     on<VisitsListStateFilterChanged>((e, emit) => emit(state.copyWith(
         stateFilter: e.state, clearStateFilter: e.state == null)));
+    on<VisitsListReset>((_, emit) => emit(const VisitsListState()));
   }
 
   static const _minSkeleton = Duration(milliseconds: 350);
@@ -53,7 +55,7 @@ class VisitsListBloc extends Bloc<VisitsListEvent, VisitsListState> {
     emit(state.copyWith(status: VisitsListStatus.loading, error: null));
     try {
       final items = switch (scope) {
-        VisitListScope.mine => await repository.myVisits(limit: 200),
+        VisitListScope.mine => await repository.myVisits(limit: AppConstants.visitsPageLimit),
         VisitListScope.pending =>
           await repository.managerList(VisitManagerScope.pending),
         VisitListScope.team =>
@@ -72,7 +74,7 @@ class VisitsListBloc extends Bloc<VisitsListEvent, VisitsListState> {
       await _ensureMinSkeleton(started);
       emit(state.copyWith(
         status: VisitsListStatus.failure,
-        error: ApiException.unknown(e.toString()),
+        error: ApiException.unexpected(e),
       ));
     }
   }

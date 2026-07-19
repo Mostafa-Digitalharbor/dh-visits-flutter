@@ -1,4 +1,6 @@
 import '../../../core/api/api_client.dart';
+import '../../../core/api/odoo_rpc.dart';
+import '../../../core/constants.dart';
 import 'models/employee.dart';
 
 /// Reads standard `res.users` (over generic JSON-RPC) for the Create-Visit /
@@ -25,26 +27,20 @@ class EmployeesRepository {
     if (search != null && search.isNotEmpty) {
       domain.add(['name', 'ilike', search]);
     }
-    // `employee_id` (link to hr.employee) is intentionally NOT requested:
-    // the HR module may not be installed on a vanilla Odoo. We only need the
-    // `res.users` id to assign as the salesperson.
-    final result = await api.jsonRpc(
-      '/web/dataset/call_kw',
-      params: {
-        'model': 'res.users',
-        'method': 'search_read',
-        'args': [domain],
-        'kwargs': {
-          'fields': ['id', 'login', 'name'],
-          'limit': limit,
-          'order': 'name asc',
-        },
-      },
+    // `employee_id` (link to hr.employee) IS requested: the visit backend
+    // (dh_visit_management) always has the HR module installed, and both the
+    // participant picker and "plan for a subordinate" need the `hr.employee`
+    // id — the participant/owner endpoints key off `employee_id`, not the
+    // `res.users` id. Without it, `Employee.hrEmployeeId` is null and the
+    // participant picker (which filters on `hrEmployeeId != null`) shows an
+    // empty list, so no participant can ever be added.
+    final rows = await api.searchRead(
+      AppConstants.usersModel,
+      domain: domain,
+      fields: const ['id', 'login', 'name', 'employee_id'],
+      limit: limit,
+      order: 'name asc',
     );
-    final items = result is List ? result : <dynamic>[];
-    return items
-        .whereType<Map>()
-        .map((e) => Employee.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
+    return rows.map((e) => Employee.fromJson(e)).toList();
   }
 }

@@ -111,7 +111,7 @@ class CreateVisitBloc extends Bloc<CreateVisitEvent, CreateVisitState> {
     } catch (e) {
       emit(state.copyWith(
         status: CreateVisitStatus.failure,
-        error: ApiException.unknown(e.toString()),
+        error: ApiException.unexpected(e),
       ));
     }
   }

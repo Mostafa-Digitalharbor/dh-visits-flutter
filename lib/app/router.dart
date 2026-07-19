@@ -22,6 +22,7 @@ import '../features/settings/view/settings_page.dart';
 import '../features/visits/data/models/visit.dart';
 import '../features/visits/view/create_visit_page.dart';
 import '../features/visits/view/visit_detail_page.dart';
+import 'routes.dart';
 import 'transitions.dart';
 
 GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
@@ -35,66 +36,70 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
       // Gate everything behind server configuration: until the user has saved
       // a backend URL, the only reachable screen is the setup page.
       if (!serverConfigCubit.state.isConfigured) {
-        return loc == '/setup' ? null : '/setup';
+        return loc == AppRoutes.setup ? null : AppRoutes.setup;
       }
 
       if (status == AuthStatus.unknown) {
-        return loc == '/' ? null : '/';
+        return loc == AppRoutes.splash ? null : AppRoutes.splash;
       }
       if (status == AuthStatus.unauthenticated ||
           status == AuthStatus.authenticating) {
-        // On launch, land on the server screen first (it then continues to
-        // /login). /login stays reachable so we don't bounce off it once the
-        // user has moved on from setup.
-        return (loc == '/login' || loc == '/setup') ? null : '/setup';
+        // The server is already configured by this point (the gate above sends
+        // first-launch users to /setup), so a signed-out user belongs on
+        // /login — not back through server setup, which made every sign-out
+        // re-confirm the server URL. /setup stays reachable so they can still
+        // switch backends deliberately.
+        return (loc == AppRoutes.login || loc == AppRoutes.setup)
+            ? null
+            : AppRoutes.login;
       }
       // Note: /setup is intentionally excluded here. While the user is changing
       // the server we clear their session, and we don't want a stale
       // "authenticated" state to bounce them to /home before that completes.
       if (status == AuthStatus.authenticated &&
-          (loc == '/login' || loc == '/')) {
-        return '/home';
+          (loc == AppRoutes.login || loc == AppRoutes.splash)) {
+        return AppRoutes.home;
       }
       return null;
     },
     routes: [
       GoRoute(
-        path: '/',
+        path: AppRoutes.splash,
         pageBuilder: (_, state) =>
             fadeTransition(state, const SplashPage()),
       ),
       GoRoute(
-        path: '/setup',
+        path: AppRoutes.setup,
         pageBuilder: (_, state) =>
             fadeTransition(state, const ServerSetupPage()),
       ),
       GoRoute(
-        path: '/login',
+        path: AppRoutes.login,
         pageBuilder: (_, state) =>
             fadeTransition(state, const LoginPage()),
       ),
       GoRoute(
-        path: '/home',
+        path: AppRoutes.home,
         pageBuilder: (_, state) =>
             fadeTransition(state, const HomeShell()),
       ),
       GoRoute(
-        path: '/settings',
+        path: AppRoutes.settings,
         pageBuilder: (_, state) =>
             slideTransition(state, const SettingsPage()),
       ),
       GoRoute(
-        path: '/review',
+        path: AppRoutes.review,
         pageBuilder: (_, state) =>
             slideTransition(state, const ReviewPage()),
       ),
       GoRoute(
-        path: '/notifications',
+        path: AppRoutes.notifications,
         pageBuilder: (_, state) =>
             slideTransition(state, const NotificationsPage()),
       ),
       GoRoute(
-        path: '/customers',
+        path: AppRoutes.customers,
         pageBuilder: (_, state) => slideTransition(
           state,
           Builder(
@@ -110,7 +115,7 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
         ),
       ),
       GoRoute(
-        path: '/customers/:id',
+        path: AppRoutes.customerDetailPath,
         pageBuilder: (_, state) {
           final id = int.parse(state.pathParameters['id']!);
           final fallback = state.extra is Customer ? state.extra as Customer : null;
@@ -121,7 +126,7 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
         },
       ),
       GoRoute(
-        path: '/customers/:id/nearby',
+        path: AppRoutes.customerNearbyPath,
         pageBuilder: (_, state) {
           final id = int.parse(state.pathParameters['id']!);
           final customer = state.extra is Customer ? state.extra as Customer : null;
@@ -132,7 +137,7 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
         },
       ),
       GoRoute(
-        path: '/visits/create',
+        path: AppRoutes.createVisit,
         pageBuilder: (_, state) {
           final extra =
               state.extra is Map ? state.extra as Map<dynamic, dynamic> : null;
@@ -145,7 +150,7 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
         },
       ),
       GoRoute(
-        path: '/visits/:id',
+        path: AppRoutes.visitDetailPath,
         pageBuilder: (_, state) {
           final id = int.parse(state.pathParameters['id']!);
           final initial = state.extra is Visit ? state.extra as Visit : null;

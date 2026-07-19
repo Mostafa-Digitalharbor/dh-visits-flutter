@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_exceptions.dart';
 import '../extensions/context_extensions.dart';
 import 'empty_view.dart';
 import 'error_view.dart';
 import 'skeleton.dart';
+import '../../app/design/app_dimens.dart';
 
 /// Generic bottom-sheet picker: opens a modal with a search field on top and
 /// a server-loaded list below. Re-queries with debounce on every keystroke.
@@ -82,10 +85,23 @@ class _PickerSheetState<T> extends State<_PickerSheet<T>> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final height = MediaQuery.of(context).size.height * 0.85;
-    return SizedBox(
-      height: height,
-      child: Column(
+    final mq = MediaQuery.of(context);
+    final keyboard = mq.viewInsets.bottom;
+    // The sheet is bottom-anchored, so a height fixed at 85% of the screen
+    // puts the result list *behind* the keyboard that the search field just
+    // raised — leaving the user typing at an invisible list. Lift the sheet
+    // by the keyboard inset and shrink it to what's actually left, with a
+    // floor so it can't collapse on a short landscape viewport.
+    final available = mq.size.height - mq.padding.top;
+    final height = math.max(
+      math.min(available * 0.85, available - keyboard),
+      available * 0.4,
+    );
+    return Padding(
+      padding: EdgeInsets.only(bottom: keyboard),
+      child: SizedBox(
+        height: height,
+        child: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
@@ -128,7 +144,7 @@ class _PickerSheetState<T> extends State<_PickerSheet<T>> {
                 filled: true,
                 fillColor: colors.surfaceContainerHighest,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(Radii.sm),
                   borderSide: BorderSide.none,
                 ),
               ),
@@ -147,8 +163,16 @@ class _PickerSheetState<T> extends State<_PickerSheet<T>> {
                   return const SkeletonList(itemCount: 8);
                 }
                 if (snap.hasError) {
+                  final err = snap.error;
                   return ErrorView(
-                    message: snap.error.toString(),
+                    // Show a friendly localized message (e.g. "no permission"
+                    // when a picker source like crm.lead is access-restricted)
+                    // instead of the raw Odoo traceback — including for a
+                    // non-ApiException, whose toString() is a Dart error the
+                    // user can neither read nor act on.
+                    message: err is ApiException
+                        ? err.localize(context)
+                        : context.s.errUnknown,
                     onRetry: () => setState(() {
                       _future = widget.loader(_searchCtrl.text.isEmpty
                           ? null
@@ -171,7 +195,8 @@ class _PickerSheetState<T> extends State<_PickerSheet<T>> {
               },
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -5,7 +5,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 
+import 'routes.dart';
+
 import '../core/api/api_client.dart';
+import '../core/api/api_exceptions.dart';
 import '../core/config/server_config_cubit.dart';
 import '../core/config/server_config_repository.dart';
 import '../core/di/service_locator.dart';
@@ -29,6 +32,7 @@ import '../features/visits/data/visits_repository.dart';
 import '../l10n/generated/app_localizations.dart';
 import 'router.dart';
 import 'theme.dart';
+import '../shared/bloc/searchable_list_bloc.dart';
 
 class CustomerVisitsApp extends StatefulWidget {
   const CustomerVisitsApp({super.key});
@@ -73,7 +77,10 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
     // router will pick up and redirect to /login.
     _unauthorizedSub = sl<ApiClient>().onUnauthorized.listen((_) {
       if (_authBloc.state.status == AuthStatus.authenticated) {
-        _authBloc.add(const AuthLogoutRequested());
+        // Pass the cause along: without it the user is thrown back to the
+        // login screen mid-task with no idea whether they were signed out,
+        // mis-tapped, or hit a crash.
+        _authBloc.add(AuthLogoutRequested(reason: ApiException.unauthorized()));
       }
     });
 
@@ -110,7 +117,7 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
     // Defer to after the current frame so any auth-driven redirect (→ /home)
     // settles first and the visit page pushes cleanly on top.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _router.push('/visits/$visitId');
+      _router.push(AppRoutes.visitDetail(visitId));
     });
   }
 
@@ -141,10 +148,7 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
               EmployeesBloc(repository: sl<EmployeesRepository>()),
         ),
         BlocProvider(
-          create: (_) => VisitBloc(
-            repository: sl<VisitsRepository>(),
-            locationService: sl<LocationService>(),
-          ),
+          create: (_) => VisitBloc(repository: sl<VisitsRepository>()),
         ),
         BlocProvider(
           create: (_) =>
@@ -163,7 +167,17 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
           ),
         ),
       ],
-      child: BlocBuilder<SettingsCubit, SettingsState>(
+      child: BlocListener<AuthBloc, AuthState>(
+        // Every bloc below lives as long as the app, so a sign-out must wipe
+        // them by hand: otherwise the next account inherits the previous one's
+        // cached lists *and* filters. (A stale `searchQuery` left over from the
+        // signed-out user silently filtered the incoming user's visits down to
+        // an empty list, while the recreated search field looked empty.)
+        listenWhen: (prev, curr) =>
+            prev.status == AuthStatus.authenticated &&
+            curr.status != AuthStatus.authenticated,
+        listener: (context, _) => _resetUserScopedBlocs(context),
+        child: BlocBuilder<SettingsCubit, SettingsState>(
         builder: (context, settings) {
           return MaterialApp.router(
             debugShowCheckedModeBanner: false,
@@ -198,7 +212,21 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
             ],
           );
         },
+        ),
       ),
     );
+  }
+
+  /// Drops every app-scoped bloc that holds user data back to its initial
+  /// state. Called the moment authentication is lost (manual sign-out or a
+  /// 401 from the API) so nothing survives into the next session.
+  void _resetUserScopedBlocs(BuildContext context) {
+    context.read<VisitsListBloc>().add(const VisitsListReset());
+    context.read<VisitBloc>().add(const VisitCleared());
+    context.read<CustomersBloc>().add(const ListReset());
+    context.read<EmployeesBloc>().add(const ListReset());
+    context.read<NearbyBloc>().add(const NearbyReset());
+    // Stop pinging the employee's GPS once they're signed out.
+    context.read<LiveLocationBloc>().add(const LiveLocationStopRequested());
   }
 }

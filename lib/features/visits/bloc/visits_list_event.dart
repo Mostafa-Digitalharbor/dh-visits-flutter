@@ -38,3 +38,12 @@ class VisitsListStateFilterChanged extends VisitsListEvent {
   @override
   List<Object?> get props => [state];
 }
+
+/// Drop every user-scoped value back to the initial state. Dispatched on
+/// logout: this bloc lives for the whole app, so without it the next user
+/// inherits the previous one's items *and* filters — a stale `searchQuery`
+/// silently filtered the incoming user's list down to nothing while the
+/// (recreated, empty-looking) search field gave no hint why.
+class VisitsListReset extends VisitsListEvent {
+  const VisitsListReset();
+}

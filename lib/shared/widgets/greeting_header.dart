@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
 import '../extensions/context_extensions.dart';
+import 'initial_avatar.dart';
 
 /// Brand-gradient greeting/day header used on the manager dashboard and the
 /// employee "my visits" screen. Matches design screens 02 + 10.
@@ -29,7 +30,7 @@ class GreetingHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final x = context.x;
     final pct = total == 0 ? 0.0 : (done / total).clamp(0.0, 1.0);
-    final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?';
+    final initial = InitialAvatar.initialOf(name);
     const white = Colors.white;
 
     return Container(
@@ -102,7 +103,7 @@ class GreetingHeader extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           ClipRRect(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(Radii.pill),
             child: Stack(
               children: [
                 Container(height: 8, color: white.withValues(alpha: 0.20)),
@@ -111,7 +112,7 @@ class GreetingHeader extends StatelessWidget {
                     height: 8,
                     width: c.maxWidth * pct,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: BorderRadius.circular(Radii.pill),
                       gradient: const LinearGradient(
                           colors: [Colors.white, AppColors.cyan400]),
                     ),
@@ -189,7 +190,7 @@ class _RoleChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(Radii.pill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

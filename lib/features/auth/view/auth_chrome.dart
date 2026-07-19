@@ -123,7 +123,7 @@ class _LogoTile extends StatelessWidget {
         ],
         border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1),
       ),
-      child: Image.asset(AppAssets.logoMarkD, fit: BoxFit.contain),
+      child: Image.asset(AppAssets.logoMark, fit: BoxFit.contain),
     );
   }
 }
@@ -140,7 +140,7 @@ class _HeroChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = context.isDark;
     return BlocBuilder<SettingsCubit, SettingsState>(
       builder: (context, state) {
         final isArabic = state.locale.languageCode == 'ar';
@@ -194,7 +194,7 @@ class _GlassChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(999);
+    final radius = BorderRadius.circular(Radii.pill);
     return Material(
       color: Colors.white.withValues(alpha: 0.12),
       borderRadius: radius,
@@ -440,10 +440,15 @@ class AuthSecureFooter extends StatelessWidget {
       children: [
         Icon(icon, size: 14, color: x.textDisabled),
         const SizedBox(width: 6),
-        Text(
-          text,
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: x.textDisabled),
+        Flexible(
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                fontSize: 11.5, fontWeight: FontWeight.w600, color: x.textDisabled),
+          ),
         ),
       ],
     );

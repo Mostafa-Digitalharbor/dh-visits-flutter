@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../constants.dart';
+
 /// Small helpers around `url_launcher` for the two outbound actions the
 /// app needs: calling the customer and opening their coords in the system
 /// maps app. Both return `true` on success so callers can show a snackbar.
@@ -12,6 +14,22 @@ class Communications {
     final cleaned = phone.replaceAll(RegExp(r'\s+'), '');
     final uri = Uri(scheme: 'tel', path: cleaned);
     return _launch(uri);
+  }
+
+  /// Open the mail composer addressed to [email].
+  static Future<bool> mailto(String email) async {
+    final uri = Uri(scheme: 'mailto', path: email.trim());
+    return _launch(uri);
+  }
+
+  /// Open [url] in the browser. Prepends `https://` when the value has no
+  /// scheme so a bare `example.com` still resolves.
+  static Future<bool> openWeb(String url) async {
+    var normalized = url.trim();
+    if (!normalized.startsWith(RegExp(r'https?://'))) {
+      normalized = 'https://$normalized';
+    }
+    return _launch(Uri.parse(normalized));
   }
 
   /// Open the user's preferred maps app at the given coordinates. The
@@ -31,9 +49,7 @@ class Communications {
     if (await canLaunchUrl(geoUri)) {
       return _launch(geoUri);
     }
-    final webUri = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=$query',
-    );
+    final webUri = Uri.parse('${AppConstants.googleMapsSearchUrl}$query');
     return _launch(webUri);
   }
 

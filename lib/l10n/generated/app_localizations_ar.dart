@@ -69,6 +69,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String get unitMinShort => 'د';
 
   @override
+  String get relativeNow => 'الآن';
+
+  @override
+  String relativeMinutesAgo(int count) {
+    return 'من $count د';
+  }
+
+  @override
+  String relativeHoursAgo(int count) {
+    return 'من $count س';
+  }
+
+  @override
+  String relativeDaysAgo(int count) {
+    return 'من $count يوم';
+  }
+
+  @override
   String get themeMode => 'المظهر';
 
   @override
@@ -177,6 +195,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get loginForgotPassword => 'نسيت كلمة السر؟';
 
   @override
+  String get loginForgotPasswordTitle => 'إعادة تعيين كلمة السر';
+
+  @override
+  String get loginForgotPasswordBody =>
+      'إعادة تعيين كلمة السر تتم عن طريق المسؤول. من فضلك تواصل مع مسؤول النظام لإعادة تعيين كلمة السر.';
+
+  @override
   String get loginSecureFooter => 'دخول آمن · Digital Harbor';
 
   @override
@@ -213,10 +238,98 @@ class AppLocalizationsAr extends AppLocalizations {
   String get errLocationPermission => 'فعّل خدمة الموقع وامنح الإذن للتطبيق';
 
   @override
-  String get errUnknown => 'حدث خطأ غير متوقع';
+  String get errLocationNeededForVisit =>
+      'لازم نسجّل موقعك عشان نوثّق الزيارة. فعّل خدمة الموقع واسمح للتطبيق يستخدمها، وبعدين جرّب تاني.';
+
+  @override
+  String get errLocationUnavailable =>
+      'مش قادرين نحدد موقعك دلوقتي. اتحرك لمكان مكشوف وجرّب تاني.';
+
+  @override
+  String get errUnknown =>
+      'حصل خطأ من ناحيتنا. جرّب تاني — ولو الموضوع اتكرر، ابعت صورة للشاشة لمسؤول النظام.';
+
+  @override
+  String get errSessionRestoreFailed =>
+      'مقدرناش نفتح جلستك المحفوظة. سجّل دخولك تاني عشان تكمّل.';
+
+  @override
+  String get errProfileIncomplete =>
+      'مقدرناش نحمّل صلاحياتك، فأزرار الزيارة مخفية. اعمل تسجيل خروج ودخول تاني — ولو الموضوع فضل، اطلب من مسؤول النظام يراجع دورك في الزيارات.';
+
+  @override
+  String get liveLocationUnsupported =>
+      'مشاركة الموقع المباشر مش متاحة على الخادم ده — اطلب من مسؤول النظام يفعّلها.';
+
+  @override
+  String get liveLocationPermissionOff =>
+      'مشاركة الموقع مقفولة، فمديرك مش شايفك على الخريطة. اسمح بالوصول للموقع عشان ترجّعها.';
+
+  @override
+  String get liveLocationPingFailed =>
+      'موقعك مش بيوصل للخادم، فمكانك على الخريطة قديم.';
+
+  @override
+  String get pushChannelName => 'تحديثات الزيارات';
+
+  @override
+  String get pushChannelDescription =>
+      'الموافقات وإعادة الجدولة وتغييرات حالة زياراتك.';
+
+  @override
+  String get unitPercent => '٪';
+
+  @override
+  String unitBytes(String size) {
+    return '$size بايت';
+  }
+
+  @override
+  String unitKilobytes(String size) {
+    return '$size ك.ب';
+  }
+
+  @override
+  String unitMegabytes(String size) {
+    return '$size م.ب';
+  }
+
+  @override
+  String offlineActionDropped(String reason) {
+    return 'التحديث اللي عملته وإنت أوفلاين مااتحفظش: $reason افتح الزيارة وسجّله تاني.';
+  }
+
+  @override
+  String get errConflict =>
+      'الزيارة دي اتغيّرت من مكان تاني. اسحب لتحت عشان تحدّث وتشوف حالتها الحالية قبل ما تجرّب تاني.';
+
+  @override
+  String get errInsecureConnection =>
+      'مقدرناش نعمل اتصال آمن بالخادم. شهادة الأمان بتاعته مش موثوقة — راجع عنوان الخادم مع مسؤول النظام.';
 
   @override
   String get errCustomerLoadFailed => 'تعذر تحميل بيانات العميل';
+
+  @override
+  String get errAttachmentOpenFailed => 'تعذّر فتح المرفق. حاول مرة أخرى.';
+
+  @override
+  String get errAttachmentUnavailable =>
+      'المرفق لم يعد متاحًا — اسحب للأسفل للتحديث.';
+
+  @override
+  String get errAttachmentsLoadFailed =>
+      'تعذّر تحميل المرفقات. اسحب للأسفل للمحاولة مجددًا.';
+
+  @override
+  String get attachmentsEmpty => 'لا توجد مرفقات بعد';
+
+  @override
+  String get errCannotLaunchApp =>
+      'تعذّر فتح تطبيق مناسب لهذا الإجراء على جهازك.';
+
+  @override
+  String get errActionFailed => 'تعذّر إتمام الإجراء. حاول مرة أخرى.';
 
   @override
   String get errFeatureNotAvailable => 'هذه الميزة غير متاحة على هذا السيرفر';
@@ -253,6 +366,42 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get customerActionNavigate => 'اتجاهات';
+
+  @override
+  String get customerActionEmail => 'بريد';
+
+  @override
+  String get customerTypeCompany => 'شركة';
+
+  @override
+  String get customerTypeIndividual => 'فرد';
+
+  @override
+  String get customerSectionInfo => 'بيانات التواصل';
+
+  @override
+  String get customerFieldType => 'النوع';
+
+  @override
+  String get customerFieldEmail => 'البريد الإلكتروني';
+
+  @override
+  String get customerFieldJob => 'المسمى الوظيفي';
+
+  @override
+  String get customerFieldParent => 'الشركة التابع لها';
+
+  @override
+  String get customerFieldTags => 'الوسوم';
+
+  @override
+  String get customerFieldWebsite => 'الموقع الإلكتروني';
+
+  @override
+  String get customerFieldVat => 'الرقم الضريبي';
+
+  @override
+  String get customerFieldCoordinates => 'الإحداثيات';
 
   @override
   String customerActionNearby(String radius) {
@@ -923,6 +1072,11 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String offlinePendingCount(int count) {
+    return 'لا يزال $count إجراء في الانتظار — تحقّق من الاتصال وحاول مجددًا.';
+  }
+
+  @override
   String get offlineCheckInQueued => 'اتحفظ محلياً — هيترفع لما الشبكة ترجع';
 
   @override
@@ -1340,7 +1494,37 @@ class AppLocalizationsAr extends AppLocalizations {
   String get wfEndedLabel => 'انتهت';
 
   @override
+  String get wfFieldStartLocation => 'موقع البدء';
+
+  @override
+  String get wfFieldEndLocation => 'موقع الإنهاء';
+
+  @override
   String get wfDurationLabel => 'المدة';
+
+  @override
+  String get wfSectionVisitInfo => 'معلومات الزيارة';
+
+  @override
+  String get wfSectionApproval => 'الفريق والموافقة';
+
+  @override
+  String get wfSectionExecution => 'التنفيذ';
+
+  @override
+  String get wfOpenInMaps => 'افتح في الخرائط';
+
+  @override
+  String get wfHoursShort => 'س';
+
+  @override
+  String get wfMinutesShort => 'د';
+
+  @override
+  String get wfDaysShort => 'ي';
+
+  @override
+  String get wfShortVisitHint => 'زيارة قصيرة';
 
   @override
   String get wfNotificationsTitle => 'الإشعارات';
@@ -1365,4 +1549,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get wfQueuedOffline => 'اتسجّل أوفلاين — هيتزامن أول ما النت يرجع';
+
+  @override
+  String get wfMockFlagBannerTitle => 'اتسجّل موقع مزيّف على الزيارة دي';
+
+  @override
+  String get wfMockFlagBannerBody =>
+      'الجهاز بلّغ عن موقع GPS وهمي وقت بدء أو إنهاء الزيارة. راجعها كويس قبل الموافقة.';
 }

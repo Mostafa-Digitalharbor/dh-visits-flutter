@@ -206,6 +206,30 @@ abstract class AppLocalizations {
   /// **'min'**
   String get unitMinShort;
 
+  /// No description provided for @relativeNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Now'**
+  String get relativeNow;
+
+  /// No description provided for @relativeMinutesAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}m ago'**
+  String relativeMinutesAgo(int count);
+
+  /// No description provided for @relativeHoursAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}h ago'**
+  String relativeHoursAgo(int count);
+
+  /// No description provided for @relativeDaysAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}d ago'**
+  String relativeDaysAgo(int count);
+
   /// No description provided for @themeMode.
   ///
   /// In en, this message translates to:
@@ -410,6 +434,18 @@ abstract class AppLocalizations {
   /// **'Forgot password?'**
   String get loginForgotPassword;
 
+  /// No description provided for @loginForgotPasswordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset your password'**
+  String get loginForgotPasswordTitle;
+
+  /// No description provided for @loginForgotPasswordBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Password resets are handled by your administrator. Please contact your system administrator to reset your password.'**
+  String get loginForgotPasswordBody;
+
   /// No description provided for @loginSecureFooter.
   ///
   /// In en, this message translates to:
@@ -482,17 +518,149 @@ abstract class AppLocalizations {
   /// **'Enable location services and grant the app permission'**
   String get errLocationPermission;
 
+  /// No description provided for @errLocationNeededForVisit.
+  ///
+  /// In en, this message translates to:
+  /// **'Your location is required to record this visit. Turn on location services, allow the app to use them, then try again.'**
+  String get errLocationNeededForVisit;
+
+  /// No description provided for @errLocationUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t determine your location. Move somewhere with a clearer view of the sky and try again.'**
+  String get errLocationUnavailable;
+
   /// No description provided for @errUnknown.
   ///
   /// In en, this message translates to:
-  /// **'An unknown error occurred'**
+  /// **'Something went wrong on our side. Please try again — if it keeps happening, send a screenshot to your administrator.'**
   String get errUnknown;
+
+  /// No description provided for @errSessionRestoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t reopen your saved session. Please sign in again to continue.'**
+  String get errSessionRestoreFailed;
+
+  /// No description provided for @errProfileIncomplete.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t load your permissions, so visit actions are hidden. Sign out and back in — if it persists, ask your administrator to check your visit role.'**
+  String get errProfileIncomplete;
+
+  /// No description provided for @liveLocationUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Live location sharing isn\'t available on this server — ask your administrator to enable it.'**
+  String get liveLocationUnsupported;
+
+  /// No description provided for @liveLocationPermissionOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Location sharing is off, so your manager can\'t see you on the map. Allow location access to turn it back on.'**
+  String get liveLocationPermissionOff;
+
+  /// No description provided for @liveLocationPingFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your location isn\'t reaching the server, so your position on the map is out of date.'**
+  String get liveLocationPingFailed;
+
+  /// No description provided for @pushChannelName.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit updates'**
+  String get pushChannelName;
+
+  /// No description provided for @pushChannelDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Approvals, reschedules and status changes for your visits.'**
+  String get pushChannelDescription;
+
+  /// No description provided for @unitPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'%'**
+  String get unitPercent;
+
+  /// No description provided for @unitBytes.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} B'**
+  String unitBytes(String size);
+
+  /// No description provided for @unitKilobytes.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} KB'**
+  String unitKilobytes(String size);
+
+  /// No description provided for @unitMegabytes.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} MB'**
+  String unitMegabytes(String size);
+
+  /// No description provided for @offlineActionDropped.
+  ///
+  /// In en, this message translates to:
+  /// **'Your offline update couldn\'t be saved: {reason} Open the visit and record it again.'**
+  String offlineActionDropped(String reason);
+
+  /// No description provided for @errConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'This visit was already updated somewhere else. Pull down to refresh and check its current status before trying again.'**
+  String get errConflict;
+
+  /// No description provided for @errInsecureConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open a secure connection to the server. Its security certificate isn\'t trusted — check the server address with your administrator.'**
+  String get errInsecureConnection;
 
   /// No description provided for @errCustomerLoadFailed.
   ///
   /// In en, this message translates to:
   /// **'Failed to load customer'**
   String get errCustomerLoadFailed;
+
+  /// No description provided for @errAttachmentOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the attachment. Please try again.'**
+  String get errAttachmentOpenFailed;
+
+  /// No description provided for @errAttachmentUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This attachment is no longer available — pull down to refresh.'**
+  String get errAttachmentUnavailable;
+
+  /// No description provided for @errAttachmentsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load attachments. Pull down to try again.'**
+  String get errAttachmentsLoadFailed;
+
+  /// No description provided for @attachmentsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No attachments yet'**
+  String get attachmentsEmpty;
+
+  /// No description provided for @errCannotLaunchApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open an app for this action on your device.'**
+  String get errCannotLaunchApp;
+
+  /// No description provided for @errActionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The action couldn\'t be completed. Please try again.'**
+  String get errActionFailed;
 
   /// No description provided for @errFeatureNotAvailable.
   ///
@@ -565,6 +733,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Navigate'**
   String get customerActionNavigate;
+
+  /// No description provided for @customerActionEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get customerActionEmail;
+
+  /// No description provided for @customerTypeCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'Company'**
+  String get customerTypeCompany;
+
+  /// No description provided for @customerTypeIndividual.
+  ///
+  /// In en, this message translates to:
+  /// **'Individual'**
+  String get customerTypeIndividual;
+
+  /// No description provided for @customerSectionInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact details'**
+  String get customerSectionInfo;
+
+  /// No description provided for @customerFieldType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get customerFieldType;
+
+  /// No description provided for @customerFieldEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get customerFieldEmail;
+
+  /// No description provided for @customerFieldJob.
+  ///
+  /// In en, this message translates to:
+  /// **'Job position'**
+  String get customerFieldJob;
+
+  /// No description provided for @customerFieldParent.
+  ///
+  /// In en, this message translates to:
+  /// **'Related company'**
+  String get customerFieldParent;
+
+  /// No description provided for @customerFieldTags.
+  ///
+  /// In en, this message translates to:
+  /// **'Tags'**
+  String get customerFieldTags;
+
+  /// No description provided for @customerFieldWebsite.
+  ///
+  /// In en, this message translates to:
+  /// **'Website'**
+  String get customerFieldWebsite;
+
+  /// No description provided for @customerFieldVat.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax ID'**
+  String get customerFieldVat;
+
+  /// No description provided for @customerFieldCoordinates.
+  ///
+  /// In en, this message translates to:
+  /// **'Coordinates'**
+  String get customerFieldCoordinates;
 
   /// No description provided for @customerActionNearby.
   ///
@@ -1838,6 +2078,12 @@ abstract class AppLocalizations {
   /// **'Syncing {count} pending action(s)…'**
   String offlineSyncing(int count);
 
+  /// No description provided for @offlinePendingCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} action(s) still pending — check your connection and try again.'**
+  String offlinePendingCount(int count);
+
   /// No description provided for @offlineCheckInQueued.
   ///
   /// In en, this message translates to:
@@ -2660,11 +2906,71 @@ abstract class AppLocalizations {
   /// **'Ended'**
   String get wfEndedLabel;
 
+  /// No description provided for @wfFieldStartLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Start location'**
+  String get wfFieldStartLocation;
+
+  /// No description provided for @wfFieldEndLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'End location'**
+  String get wfFieldEndLocation;
+
   /// No description provided for @wfDurationLabel.
   ///
   /// In en, this message translates to:
   /// **'Duration'**
   String get wfDurationLabel;
+
+  /// No description provided for @wfSectionVisitInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit details'**
+  String get wfSectionVisitInfo;
+
+  /// No description provided for @wfSectionApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'Team & approval'**
+  String get wfSectionApproval;
+
+  /// No description provided for @wfSectionExecution.
+  ///
+  /// In en, this message translates to:
+  /// **'Execution'**
+  String get wfSectionExecution;
+
+  /// No description provided for @wfOpenInMaps.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in Maps'**
+  String get wfOpenInMaps;
+
+  /// No description provided for @wfHoursShort.
+  ///
+  /// In en, this message translates to:
+  /// **'h'**
+  String get wfHoursShort;
+
+  /// No description provided for @wfMinutesShort.
+  ///
+  /// In en, this message translates to:
+  /// **'m'**
+  String get wfMinutesShort;
+
+  /// No description provided for @wfDaysShort.
+  ///
+  /// In en, this message translates to:
+  /// **'d'**
+  String get wfDaysShort;
+
+  /// No description provided for @wfShortVisitHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Short visit'**
+  String get wfShortVisitHint;
 
   /// No description provided for @wfNotificationsTitle.
   ///
@@ -2707,6 +3013,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saved offline — it\'ll sync when you\'re back online'**
   String get wfQueuedOffline;
+
+  /// No description provided for @wfMockFlagBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fake location recorded on this visit'**
+  String get wfMockFlagBannerTitle;
+
+  /// No description provided for @wfMockFlagBannerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The device reported a mock (fake) GPS location when this visit was started or ended. Review it before approving.'**
+  String get wfMockFlagBannerBody;
 }
 
 class _AppLocalizationsDelegate

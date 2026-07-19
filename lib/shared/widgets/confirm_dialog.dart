@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../extensions/context_extensions.dart';
+import '../../app/design/app_dimens.dart';
 
 /// Generic Yes/No confirmation dialog. The confirm button is rendered as a
 /// destructive (red) filled button to discourage accidental taps.
@@ -48,8 +49,13 @@ class ConfirmDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.lg)),
+      // Scrollable because this is a bare Dialog, not an AlertDialog (which
+      // scrolls its content for you): icon + title + a long message + two
+      // buttons exceeds a landscape viewport at the 1.25 text-scale cap, and
+      // an overflowing confirm dialog can hide the very buttons it's asking
+      // the user to choose between.
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -88,7 +94,7 @@ class ConfirmDialog extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(Radii.sm)),
                     ),
                     onPressed: () => Navigator.of(context).pop(false),
                     child: Text(cancelLabel ?? context.s.commonNo),
@@ -102,7 +108,7 @@ class ConfirmDialog extends StatelessWidget {
                       foregroundColor: colors.onError,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(Radii.sm)),
                     ),
                     onPressed: () => Navigator.of(context).pop(true),
                     child: Text(confirmLabel ?? context.s.commonYes),

@@ -32,6 +32,7 @@ dependencies:
 
   # Location & permissions
   geolocator: ^13.0.2
+  geocoding: ^3.0.0
   permission_handler: ^11.3.1
 
   # Map
@@ -50,6 +51,9 @@ dependencies:
 
   # Utilities
   intl: ^0.20.1
+  # Direct (not just transitive) because we use p.basename to sanitise
+  # server-supplied attachment filenames before writing them to temp.
+  path: ^1.9.0
   path_provider: ^2.1.5
   url_launcher: ^6.3.1
   timezone: ^0.9.4
@@ -79,28 +83,39 @@ dev_dependencies:
   flutter_native_splash: ^2.4.3
 
 # ─── Launcher icons ────────────────────────────────────────────────────────────
-# Run after editing:  dart run flutter_launcher_icons
+# Sources under assets/icon/ are build-time only and deliberately NOT listed
+# under flutter.assets below — they must not ship in the app bundle.
+# Regenerate them from the master artwork first, then rebuild the icons:
+#   pwsh tool/generate_icons.ps1
+#   dart run flutter_launcher_icons
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/logo.jpg"
+  # Android legacy (pre-adaptive) icon: the plate with transparent corners.
+  image_path_android: "assets/images/visit-logo.png"
+  # iOS forbids alpha and applies its own squircle mask, so it gets a
+  # full-bleed navy variant with no rounded corners of its own.
+  image_path_ios: "assets/icon/visit-logo-ios.png"
   remove_alpha_ios: true
   min_sdk_android: 23
-  adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/images/logo.jpg"
+  # The launcher masks the foreground to its own shape, so the foreground is
+  # the glyph alone (no plate) over a solid navy background — otherwise the
+  # artwork's rounded square would show nested inside the launcher's circle.
+  adaptive_icon_background: "#091731"
+  adaptive_icon_foreground: "assets/icon/visit-logo-foreground.png"
   web:
     generate: false
 
 # ─── Native splash screen ──────────────────────────────────────────────────────
 # Run after editing:  dart run flutter_native_splash:create
-# This replaces the default white splash with the company logo on a branded
-# background, on both iOS LaunchScreen and Android 12+ splash API.
+# Navy ground with the plate-less glyph, matching the launcher icon so the
+# hand-off from system splash to the in-app splash has no colour flash.
 flutter_native_splash:
-  color: "#FFFFFF"
-  image: assets/images/logo.jpg
+  color: "#091731"
+  image: assets/icon/visit-logo-foreground.png
   android_12:
-    image: assets/images/logo.jpg
-    color: "#FFFFFF"
+    image: assets/icon/visit-logo-foreground.png
+    color: "#091731"
   ios: true
   android: true
   web: false

@@ -3,14 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
+
+import '../../../app/routes.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../app/theme.dart';
+import '../../../core/utils/app_date.dart';
+import '../../../core/utils/relative_time.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../bloc/customers_bloc.dart';
 import '../data/models/customer.dart';
+import '../../../shared/bloc/searchable_list_bloc.dart';
 
 class CustomersListPage extends StatefulWidget {
   const CustomersListPage({super.key});
@@ -20,29 +24,14 @@ class CustomersListPage extends StatefulWidget {
 }
 
 class _CustomersListPageState extends State<CustomersListPage> {
-  Timer? _debounce;
-
   @override
   void initState() {
     super.initState();
-    context.read<CustomersBloc>().add(const CustomersLoadRequested());
-  }
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    super.dispose();
-  }
-
-  void _onSearchChanged(String v) {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 350), () {
-      context.read<CustomersBloc>().add(CustomersSearchChanged(v.trim()));
-    });
+    context.read<CustomersBloc>().add(const ListLoadRequested());
   }
 
   Future<void> _refresh() async {
-    context.read<CustomersBloc>().add(const CustomersLoadRequested());
+    context.read<CustomersBloc>().add(const ListLoadRequested());
   }
 
   @override
@@ -59,63 +48,37 @@ class _CustomersListPageState extends State<CustomersListPage> {
             return _CustomerStatsRow(total: total, active: active);
           },
         ),
-        Padding(
+        DebouncedSearchField(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          child: TextField(
-            onChanged: _onSearchChanged,
-            decoration: InputDecoration(
-              prefixIcon: const Icon(Icons.search),
-              hintText: context.s.customersSearchHint,
-            ),
-          ),
+          hintText: context.s.customersSearchHint,
+          onChanged: (q) =>
+              context.read<CustomersBloc>().add(ListSearchChanged(q)),
         ),
         Expanded(
-          child: BlocBuilder<CustomersBloc, CustomersState>(
-            builder: (context, state) {
-              final isLoading = state.status == CustomersStatus.loading;
-              if (state.status == CustomersStatus.failure &&
-                  state.items.isEmpty) {
-                return ErrorView(
-                  message: state.error?.localize(context) ??
-                      context.s.errUnknown,
-                  onRetry: _refresh,
-                );
-              }
-
-              Widget body;
-              if (isLoading) {
-                body = const SkeletonList(
-                  key: ValueKey('skeleton'),
-                  itemCount: 8,
-                );
-              } else if (state.items.isEmpty) {
-                body = ScaleFadeIn(
-                  key: const ValueKey('empty'),
-                  child: EmptyView(message: context.s.customersEmpty),
-                );
-              } else {
-                body = ListView.separated(
-                  key: const ValueKey('list'),
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
-                  itemCount: state.items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, i) => AnimatedListItem(
-                    index: i,
-                    child: _CustomerTile(customer: state.items[i]),
-                  ),
-                );
-              }
-
-              return AppRefreshIndicator(
-                onRefresh: _refresh,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 280),
-                  switchInCurve: Curves.easeOut,
-                  switchOutCurve: Curves.easeIn,
-                  child: body,
-                ),
-              );
-            },
+          // Listener as well as builder: when a refresh fails while a list is
+          // already on screen, the error view can't take over (items aren't
+          // empty) and the failure would pass in complete silence — spinner
+          // retracts, stale data stays, no explanation.
+          child: BlocConsumer<CustomersBloc, CustomersState>(
+            listenWhen: (prev, curr) =>
+                prev.status != curr.status &&
+                curr.hasError &&
+                curr.items.isNotEmpty,
+            listener: (context, state) => context.showSnack(
+              state.error?.localize(context) ?? context.s.errUnknown,
+              kind: SnackKind.error,
+            ),
+            builder: (context, state) => AsyncListView<Customer>(
+              items: state.items,
+              isLoading: state.isLoading,
+              hasError: state.hasError,
+              errorMessage:
+                  state.error?.localize(context) ?? context.s.errUnknown,
+              onRefresh: _refresh,
+              emptyMessage: context.s.customersEmpty,
+              itemBuilder: (_, customer, __) =>
+                  _CustomerTile(customer: customer),
+            ),
           ),
         ),
       ],
@@ -240,7 +203,7 @@ class _CustomerTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final initial =
-        customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?';
+        InitialAvatar.initialOf(customer.name);
     final isActive = customer.lastVisit?.checkOutTime == null &&
         customer.lastVisit != null;
     final accent = isActive ? Colors.green.shade600 : colors.primary;
@@ -253,7 +216,7 @@ class _CustomerTile extends StatelessWidget {
 
     return AppCard(
       padding: EdgeInsets.zero,
-      onTap: () => context.push('/customers/${customer.id}', extra: customer),
+      onTap: () => context.push(AppRoutes.customerDetail(customer.id), extra: customer),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -442,7 +405,7 @@ class _MetaFooter extends StatelessWidget {
             child: Text(
               isActive
                   ? context.s.visitsHistoryActiveBadge
-                  : _relativeLong(lastVisitTime, context),
+                  : RelativeTime.format(context, lastVisitTime),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: context.text.bodySmall?.copyWith(
@@ -456,15 +419,6 @@ class _MetaFooter extends StatelessWidget {
         ],
       ],
     );
-  }
-
-  String _relativeLong(DateTime when, BuildContext context) {
-    final diff = DateTime.now().difference(when);
-    if (diff.inMinutes < 1) return 'الآن';
-    if (diff.inMinutes < 60) return 'من ${diff.inMinutes} د';
-    if (diff.inHours < 24) return 'من ${diff.inHours} س';
-    if (diff.inDays < 7) return 'من ${diff.inDays} يوم';
-    return DateFormat('yyyy-MM-dd').format(when);
   }
 }
 
@@ -480,14 +434,14 @@ class _LastVisitBadge extends StatelessWidget {
     final label = isActive
         ? context.s.visitsHistoryActiveBadge
         : (lastVisit.checkInTime != null
-            ? _relativeShort(lastVisit.checkInTime!)
+            ? _relativeShort(context, lastVisit.checkInTime!)
             : context.s.visitsHistoryCompletedBadge);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Radii.sm),
         border: Border.all(color: accent.withValues(alpha: 0.35)),
       ),
       child: Row(
@@ -512,12 +466,15 @@ class _LastVisitBadge extends StatelessWidget {
     );
   }
 
-  static String _relativeShort(DateTime when) {
-    final now = DateTime.now();
-    final diff = now.difference(when);
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-    if (diff.inHours < 24) return '${diff.inHours}h';
-    if (diff.inDays < 30) return '${diff.inDays}d';
-    return DateFormat('yyyy-MM-dd').format(when);
+  /// Compact "time since" for the badge — the full [RelativeTime] phrasing
+  /// ("5 minutes ago") doesn't fit at this size, so this keeps the number and
+  /// a localized unit suffix ("5m" / "٥د").
+  static String _relativeShort(BuildContext context, DateTime when) {
+    final diff = DateTime.now().difference(when);
+    final s = context.s;
+    if (diff.inMinutes < 60) return '${diff.inMinutes}${s.wfMinutesShort}';
+    if (diff.inHours < 24) return '${diff.inHours}${s.wfHoursShort}';
+    if (diff.inDays < 30) return '${diff.inDays}${s.wfDaysShort}';
+    return AppDate.isoDate(when);
   }
 }

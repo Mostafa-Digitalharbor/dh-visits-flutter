@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../app/routes.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -81,8 +83,15 @@ class _SettingsViewState extends State<SettingsView> {
     }
     context.showSnack(context.s.offlineSyncing(pending));
     await queue.flush();
-    if (context.mounted) {
+    if (!context.mounted) return;
+    // Honest outcome: if anything is still queued the flush didn't fully
+    // succeed (usually still offline), so don't claim "synced".
+    final remaining = queue.pendingCount.value;
+    if (remaining == 0) {
       context.showSnack(context.s.settingsSynced, kind: SnackKind.success);
+    } else {
+      context.showSnack(context.s.offlinePendingCount(remaining),
+          kind: SnackKind.error);
     }
   }
 
@@ -117,7 +126,7 @@ class _SettingsViewState extends State<SettingsView> {
                   _NavRow(
                     icon: Symbols.groups,
                     label: context.s.customersTitle,
-                    onTap: () => context.push('/customers'),
+                    onTap: () => context.push(AppRoutes.customers),
                   ),
                 ]),
                 const SizedBox(height: 18),
@@ -216,7 +225,7 @@ class _ProfileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = context.colors;
     final x = context.x;
-    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final initial = InitialAvatar.initialOf(name);
     return AppCard(
       child: Row(
         children: [
@@ -269,7 +278,7 @@ class _ProfileCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: cs.primaryContainer,
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(Radii.pill),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,

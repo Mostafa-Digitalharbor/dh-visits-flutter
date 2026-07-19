@@ -8,6 +8,7 @@ import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../visits/bloc/visits_list_bloc.dart';
 import '../../visits/data/models/visit.dart';
+import '../../../core/utils/duration_format.dart';
 
 /// Manager analytics (design screen 03). All metrics are derived from the
 /// existing `VisitsListBloc` items — visits volume, on-time rate, field km
@@ -20,6 +21,17 @@ class AnalyticsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<VisitsListBloc, VisitsListState>(
       builder: (context, state) {
+        // Without this, a failed fetch renders every metric as 0% / 0 km with
+        // confident-looking week-over-week deltas — fabricated analytics the
+        // manager has no reason to distrust.
+        if (state.status == VisitsListStatus.failure && state.items.isEmpty) {
+          return ErrorView(
+            message: state.error?.localize(context) ?? context.s.errUnknown,
+            onRetry: () => context
+                .read<VisitsListBloc>()
+                .add(const VisitsListLoadRequested()),
+          );
+        }
         final visits = state.items;
         final now = DateTime.now();
         final today = DateTime(now.year, now.month, now.day);
@@ -48,7 +60,7 @@ class AnalyticsPage extends StatelessWidget {
                   value: '${cur.onTimePct}%',
                   label: context.s.analyticsOnTime,
                   delta: cur.onTimePct - prev.onTimePct,
-                  deltaUnit: '%',
+                  deltaUnit: context.s.unitPercent,
                 ),
               ),
               const SizedBox(width: 12),
@@ -59,7 +71,7 @@ class AnalyticsPage extends StatelessWidget {
                   value: '${cur.count}',
                   label: context.s.analyticsVisitsThisWeek,
                   delta: _pctDelta(cur.count, prev.count),
-                  deltaUnit: '%',
+                  deltaUnit: context.s.unitPercent,
                 ),
               ),
             ]),
@@ -72,7 +84,7 @@ class AnalyticsPage extends StatelessWidget {
                   value: '${cur.km}',
                   label: context.s.analyticsKm,
                   delta: _pctDelta(cur.km, prev.km),
-                  deltaUnit: '%',
+                  deltaUnit: context.s.unitPercent,
                 ),
               ),
               const SizedBox(width: 12),
@@ -91,7 +103,7 @@ class AnalyticsPage extends StatelessWidget {
             const SizedBox(height: 16),
             _WeeklyChart(visits: visits),
             const SizedBox(height: 18),
-            _SectionHead(icon: Symbols.leaderboard, label: context.s.analyticsByEmployee),
+            SectionHeader(icon: Symbols.leaderboard, label: context.s.analyticsByEmployee),
             const SizedBox(height: 10),
             _ByEmployee(visits: visits),
           ],
@@ -113,11 +125,7 @@ class _Metrics {
   final int avgMin;
   const _Metrics(this.count, this.onTimePct, this.km, this.avgMin);
 
-  String get avgLabel {
-    final h = (avgMin ~/ 60).toString().padLeft(2, '0');
-    final m = (avgMin % 60).toString().padLeft(2, '0');
-    return '$h:$m';
-  }
+  String get avgLabel => Duration(minutes: avgMin).clock;
 
   factory _Metrics.from(List<Visit> visits) {
     final completed = visits.where((v) => v.isDone).toList();
@@ -398,7 +406,12 @@ class _EmpRow extends StatelessWidget {
       3 => const Color(0xFFB87333),
       _ => cs.onSurfaceVariant,
     };
-    final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?';
+    // Ranks 1-3 sit on fixed medal hues that pair with white. Rank 4+ falls
+    // back to the theme-adaptive onSurfaceVariant, which is light in dark mode
+    // — so white text would vanish there. Use the surface tone (its inverse)
+    // for those so the number stays legible in both themes.
+    final medalText = rank <= 3 ? Colors.white : cs.surface;
+    final initial = InitialAvatar.initialOf(name);
     return Row(
       children: [
         Stack(
@@ -425,7 +438,7 @@ class _EmpRow extends StatelessWidget {
                   border: Border.all(color: cs.surfaceContainerLowest, width: 2),
                 ),
                 child: Text('$rank',
-                    style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800)),
+                    style: TextStyle(color: medalText, fontSize: 9, fontWeight: FontWeight.w800)),
               ),
             ),
           ],
@@ -443,7 +456,7 @@ class _EmpRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: AppType.titleSm.copyWith(fontWeight: FontWeight.w700, color: cs.onSurface)),
                   ),
-                  Text('$pct% · $visits',
+                  Text('$pct${context.s.unitPercent} · $visits',
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -453,7 +466,7 @@ class _EmpRow extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               ClipRRect(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(Radii.badge),
                 child: LinearProgressIndicator(
                   minHeight: 6,
                   value: (pct / 100).clamp(0, 1),
@@ -464,24 +477,6 @@ class _EmpRow extends StatelessWidget {
             ],
           ),
         ),
-      ],
-    );
-  }
-}
-
-class _SectionHead extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _SectionHead({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: context.colors.primary),
-        const SizedBox(width: 8),
-        Text(label,
-            style: AppType.titleSm.copyWith(fontWeight: FontWeight.w800, color: context.colors.onSurface)),
       ],
     );
   }

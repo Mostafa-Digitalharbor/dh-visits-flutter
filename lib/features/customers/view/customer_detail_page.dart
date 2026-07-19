@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/routes.dart';
+
 import '../../../core/api/api_exceptions.dart';
 import '../../../core/constants.dart';
 import '../../../core/di/service_locator.dart';
@@ -9,6 +11,7 @@ import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../data/customers_repository.dart';
 import '../data/models/customer.dart';
+import '../../../app/design/app_dimens.dart';
 
 class CustomerDetailPage extends StatefulWidget {
   final int customerId;
@@ -63,7 +66,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
         final msg = e is ApiException
             ? e.localize(context)
             : context.s.errCustomerLoadFailed;
-        context.showSnack(msg);
+        context.showSnack(msg, kind: SnackKind.error);
       }
     } finally {
       if (mounted) setState(() => _refreshing = false);
@@ -82,7 +85,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
             // On the initial open of the page, fall back to the cached
             // Customer (from the list) so the page renders instantly.
             if (widget.fallback != null && !_refreshing) {
-              return RefreshIndicator(
+              return AppRefreshIndicator(
                 onRefresh: _refresh,
                 child: _CustomerBody(customer: widget.fallback!),
               );
@@ -95,7 +98,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               // data we already have from the list. Refresh failures are
               // announced via _refresh()'s snackbar, not from inside the
               // builder (which can rebuild many times and spam snackbars).
-              return RefreshIndicator(
+              return AppRefreshIndicator(
                 onRefresh: _refresh,
                 child: _CustomerBody(customer: widget.fallback!),
               );
@@ -108,7 +111,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
               body: ErrorView(message: message, onRetry: _reload),
             );
           }
-          return RefreshIndicator(
+          return AppRefreshIndicator(
             onRefresh: _refresh,
             child: _CustomerBody(customer: snap.data!),
           );
@@ -156,35 +159,9 @@ class _CustomerBody extends StatelessWidget {
             children: [
               _QuickActionsRow(customer: customer),
               const SizedBox(height: 14),
-              AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (customer.address != null) ...[
-                      InfoRow(
-                          icon: Icons.place_outlined, text: customer.address!),
-                      const SizedBox(height: 4),
-                    ],
-                    if (customer.phone != null) ...[
-                      InfoRow(
-                          icon: Icons.phone_outlined, text: customer.phone!),
-                      const SizedBox(height: 4),
-                    ],
-                    if (customer.mobile != null &&
-                        customer.mobile != customer.phone) ...[
-                      InfoRow(
-                          icon: Icons.smartphone_outlined,
-                          text: customer.mobile!),
-                      const SizedBox(height: 4),
-                    ],
-                    InfoRow(
-                      icon: Icons.my_location,
-                      text: '${customer.latitude.toStringAsFixed(6)}, '
-                          '${customer.longitude.toStringAsFixed(6)}',
-                    ),
-                  ],
-                ),
-              ),
+              _SectionLabel(label: context.s.customerSectionInfo),
+              const SizedBox(height: 6),
+              _CustomerInfoCard(customer: customer),
               if (customer.lastVisit != null) ...[
                 const SizedBox(height: 16),
                 _SectionLabel(label: context.s.customerLastVisit),
@@ -198,6 +175,13 @@ class _CustomerBody extends StatelessWidget {
                     subtitle: Text(customer.lastVisit!.checkOutTime != null
                         ? context.s.wfStateDone
                         : context.s.wfStateInProgress),
+                    trailing: Icon(context.isRtl
+                        ? Icons.chevron_left
+                        : Icons.chevron_right),
+                    onTap: () => context.push(
+                      AppRoutes.visitDetail(customer.lastVisit!.id),
+                      extra: customer.lastVisit,
+                    ),
                   ),
                 ),
               ],
@@ -205,7 +189,7 @@ class _CustomerBody extends StatelessWidget {
               AppButton(
                 label: context.s.wfCreateTitle,
                 icon: Icons.add,
-                onPressed: () => context.push('/visits/create'),
+                onPressed: () => context.push(AppRoutes.createVisit),
               ),
               const SizedBox(height: 10),
               AppButton.secondary(
@@ -214,7 +198,7 @@ class _CustomerBody extends StatelessWidget {
                 ),
                 icon: Icons.map_outlined,
                 onPressed: () => context.push(
-                  '/customers/${customer.id}/nearby',
+                  AppRoutes.customerNearby(customer.id),
                   extra: customer,
                 ),
               ),
@@ -257,14 +241,17 @@ class _CustomerHero extends StatelessWidget {
               color: colors.onPrimary.withValues(alpha: 0.18),
             ),
             alignment: Alignment.center,
-            child: Text(
-              customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?',
-              style: TextStyle(
-                color: colors.onPrimary,
-                fontSize: 32,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            child: customer.isCompany
+                ? Icon(Icons.apartment_rounded,
+                    color: colors.onPrimary, size: 36)
+                : Text(
+                    InitialAvatar.initialOf(customer.name),
+                    style: TextStyle(
+                      color: colors.onPrimary,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
           ),
         ],
       ),
@@ -279,6 +266,7 @@ class _QuickActionsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final phone = customer.phone ?? customer.mobile;
+    final email = customer.email;
     return Row(
       children: [
         Expanded(
@@ -286,20 +274,38 @@ class _QuickActionsRow extends StatelessWidget {
             icon: Icons.phone_rounded,
             label: context.s.customerActionCall,
             color: Colors.green.shade600,
-            onTap: phone == null ? null : () => Communications.dial(phone),
+            onTap: phone == null
+                ? null
+                : () => context.openExternal(() => Communications.dial(phone)),
           ),
         ),
         const SizedBox(width: 10),
+        if (email != null) ...[
+          Expanded(
+            child: _QuickAction(
+              icon: Icons.mail_rounded,
+              label: context.s.customerActionEmail,
+              color: context.colors.tertiary,
+              onTap: () =>
+                  context.openExternal(() => Communications.mailto(email)),
+            ),
+          ),
+          const SizedBox(width: 10),
+        ],
         Expanded(
           child: _QuickAction(
             icon: Icons.directions_rounded,
             label: context.s.customerActionNavigate,
             color: context.colors.primary,
-            onTap: () => Communications.openInMaps(
-              customer.latitude,
-              customer.longitude,
-              label: customer.name,
-            ),
+            onTap: customer.hasCoordinates
+                ? () => context.openExternal(
+                      () => Communications.openInMaps(
+                        customer.latitude,
+                        customer.longitude,
+                        label: customer.name,
+                      ),
+                    )
+                : null,
           ),
         ),
       ],
@@ -329,10 +335,10 @@ class _QuickAction extends StatelessWidget {
       color: enabled
           ? color.withValues(alpha: 0.10)
           : context.colors.surfaceContainerHighest.withValues(alpha: 0.5),
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(Radii.btn),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(Radii.btn),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
           child: Row(
@@ -340,16 +346,176 @@ class _QuickAction extends StatelessWidget {
             children: [
               Icon(icon, size: 20, color: effectiveColor),
               const SizedBox(width: 8),
-              Text(
-                label,
-                style: context.text.titleSmall?.copyWith(
-                  color: effectiveColor,
-                  fontWeight: FontWeight.w700,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: context.text.titleSmall?.copyWith(
+                    color: effectiveColor,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The enriched contact card: a company/individual badge, tags, and every
+/// detail we hold for the customer (address, phone, email, job, related
+/// company, website, tax id) plus the always-shown geo coordinates.
+class _CustomerInfoCard extends StatelessWidget {
+  final Customer customer;
+  const _CustomerInfoCard({required this.customer});
+
+  String? _fullAddress(BuildContext context) {
+    final parts = <String>[
+      if (customer.street != null && customer.street!.isNotEmpty)
+        customer.street!,
+      [
+        if (customer.city != null && customer.city!.isNotEmpty) customer.city!,
+        if (customer.stateName != null && customer.stateName!.isNotEmpty)
+          customer.stateName!,
+        if (customer.zip != null && customer.zip!.isNotEmpty) customer.zip!,
+      ].join(' '),
+      if (customer.countryName != null && customer.countryName!.isNotEmpty)
+        customer.countryName!,
+    ].map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    if (parts.isNotEmpty) return parts.join(context.isRtl ? '، ' : ', ');
+    return customer.address; // fallback to contact_address
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final cs = context.colors;
+    final address = _fullAddress(context);
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Company vs individual badge.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: cs.primaryContainer.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(Radii.pill),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  customer.isCompany
+                      ? Icons.apartment_rounded
+                      : Icons.person_rounded,
+                  size: 17,
+                  color: cs.onPrimaryContainer,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  customer.isCompany
+                      ? s.customerTypeCompany
+                      : s.customerTypeIndividual,
+                  style: context.text.labelLarge?.copyWith(
+                    color: cs.onPrimaryContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (address != null && address.isNotEmpty)
+            InfoRow(icon: Icons.place_outlined, text: address),
+          if (customer.phone != null)
+            InkWell(
+              onTap: () => context
+                  .openExternal(() => Communications.dial(customer.phone!)),
+              child: InfoRow(icon: Icons.phone_outlined, text: customer.phone!),
+            ),
+          if (customer.email != null)
+            InkWell(
+              onTap: () => context
+                  .openExternal(() => Communications.mailto(customer.email!)),
+              child: InfoRow(icon: Icons.mail_outline, text: customer.email!),
+            ),
+          if (customer.jobPosition != null)
+            InfoRow(
+              icon: Icons.work_outline,
+              text: '${s.customerFieldJob}: ${customer.jobPosition!}',
+            ),
+          if (customer.parentCompanyName != null)
+            InfoRow(
+              icon: Icons.business_outlined,
+              text: '${s.customerFieldParent}: ${customer.parentCompanyName!}',
+            ),
+          if (customer.website != null)
+            InkWell(
+              onTap: () => context
+                  .openExternal(() => Communications.openWeb(customer.website!)),
+              child: InfoRow(icon: Icons.link, text: customer.website!),
+            ),
+          if (customer.vat != null)
+            InfoRow(
+              icon: Icons.badge_outlined,
+              text: '${s.customerFieldVat}: ${customer.vat!}',
+            ),
+          // Coordinates: always shown (explicit requirement). Tappable when
+          // present so the user can jump straight into their maps app.
+          if (customer.hasCoordinates)
+            InkWell(
+              onTap: () => context.openExternal(
+                () => Communications.openInMaps(
+                  customer.latitude,
+                  customer.longitude,
+                  label: customer.name,
+                ),
+              ),
+              child: InfoRow(
+                icon: Icons.my_location,
+                text: '${customer.latitude.toStringAsFixed(6)}, '
+                    '${customer.longitude.toStringAsFixed(6)}',
+              ),
+            )
+          else
+            const InfoRow(icon: Icons.my_location, text: '—'),
+          if (customer.categories.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              s.customerFieldTags,
+              style: context.text.labelSmall
+                  ?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final t in customer.categories)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: cs.tertiary.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(Radii.pill),
+                    ),
+                    child: Text(
+                      t,
+                      style: context.text.labelMedium?.copyWith(
+                        color: cs.tertiary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }

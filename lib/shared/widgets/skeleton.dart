@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
+import '../../app/design/app_dimens.dart';
 
 /// Wraps any child with shimmer animation, using theme-appropriate colors.
 class AppShimmer extends StatelessWidget {
@@ -11,7 +12,9 @@ class AppShimmer extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Shimmer.fromColors(
       baseColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE6E6E6),
-      highlightColor: isDark ? const Color(0xFF3A3A3A) : const Color(0xFFF5F5F5),
+      highlightColor: isDark
+          ? const Color(0xFF3A3A3A)
+          : const Color(0xFFF5F5F5),
       period: const Duration(milliseconds: 1400),
       child: child,
     );
@@ -23,12 +26,7 @@ class SkeletonBox extends StatelessWidget {
   final double? width;
   final double height;
   final double radius;
-  const SkeletonBox({
-    super.key,
-    this.width,
-    this.height = 16,
-    this.radius = 8,
-  });
+  const SkeletonBox({super.key, this.width, this.height = 16, this.radius = 8});
 
   @override
   Widget build(BuildContext context) {
@@ -107,29 +105,33 @@ class SkeletonList extends StatelessWidget {
 }
 
 /// Card-shaped skeleton with title + two lines.
+///
+/// Draws no shimmer of its own — like [SkeletonBox] and [SkeletonCircle], it is
+/// a plain shape and the caller wraps a group in a single [AppShimmer]. Cards
+/// used to self-wrap, so a screen showing several ran one animation *per card*;
+/// they drifted out of phase and the sweep read as flicker rather than one
+/// surface loading.
 class SkeletonCard extends StatelessWidget {
   final double height;
   const SkeletonCard({super.key, this.height = 120});
 
   @override
   Widget build(BuildContext context) {
-    return AppShimmer(
-      child: Container(
-        height: height,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: const [
-            SkeletonBox(width: 180, height: 16),
-            SkeletonBox(width: 240, height: 12),
-            SkeletonBox(width: 120, height: 12),
-          ],
-        ),
+    return Container(
+      height: height,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(Radii.sm),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: const [
+          SkeletonBox(width: 180, height: 16),
+          SkeletonBox(width: 240, height: 12),
+          SkeletonBox(width: 120, height: 12),
+        ],
       ),
     );
   }
