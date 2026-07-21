@@ -1,7 +1,41 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
+    <!-- ── Media permissions we deliberately DROP ────────────────────────────
+         `open_filex` declares READ_MEDIA_IMAGES / _VIDEO / _AUDIO and
+         READ_EXTERNAL_STORAGE defensively, so that it can open files living in
+         shared storage. This app never does that, and none of its three media
+         paths needs them:
+
+           * proof-of-visit photo  — image_picker fires the camera via intent
+                                     (ACTION_IMAGE_CAPTURE), which needs no
+                                     read permission;
+           * adding an attachment  — file_picker uses the Storage Access
+                                     Framework document picker, which grants
+                                     per-file access with no permission;
+           * opening an attachment — the file is downloaded into this app's own
+                                     private cache (getTemporaryDirectory) and
+                                     opened from there.
+
+         Shipping them anyway would put the app under Google Play's Photo and
+         Video Permissions policy, forcing a declaration for access it never
+         uses — and would ask users for the whole gallery to do none of it.
+         Removed rather than justified.
+
+         If a future feature really does need to read the user's gallery, delete
+         the matching line here AND complete the Play Console declaration; do
+         not silently re-add the permission. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"
+        tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"
+        tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"
+        tools:node="remove"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        tools:node="remove"/>
 
     <!-- Push notifications: Android 13+ (API 33) requires a runtime prompt to
          post notifications; requested via firebase_messaging on first launch. -->

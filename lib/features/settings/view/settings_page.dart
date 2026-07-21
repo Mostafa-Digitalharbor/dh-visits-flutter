@@ -10,6 +10,7 @@ import '../../../app/theme.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/pending_actions_queue.dart';
 import '../../../core/settings/settings_cubit.dart';
+import '../../../core/utils/relative_time.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../auth/bloc/auth_bloc.dart';
@@ -187,10 +188,7 @@ class _SettingsViewState extends State<SettingsView> {
               const SizedBox(height: 18),
               // ── المزامنة / المساعدة / حول التطبيق ───────────────────────
               _GroupCard(children: [
-                _SyncRow(
-                  subtitle: context.s.settingsSyncedJustNow,
-                  onSync: () => _onSyncNow(context),
-                ),
+                _SyncRow(onSync: () => _onSyncNow(context)),
                 const _RowDivider(),
                 _NavRow(
                   icon: Symbols.info,
@@ -417,18 +415,46 @@ class _SwitchRow extends StatelessWidget {
 }
 
 /// "آخر مزامنة" row — last-sync sub-text + a "مزامنة الآن" action.
+/// "Last sync" row. The subtitle is derived from the live queue — the count of
+/// work still waiting, or when a queued action last actually reached the
+/// server. It is never a fixed string: telling a field employee "synced just
+/// now" while their GPS-stamped check-ins sit unsent is the one lie this row
+/// must not tell.
 class _SyncRow extends StatelessWidget {
-  final String subtitle;
   final VoidCallback onSync;
-  const _SyncRow({required this.subtitle, required this.onSync});
+  const _SyncRow({required this.onSync});
 
   @override
   Widget build(BuildContext context) {
     final cs = context.colors;
+    final queue = sl<PendingActionsQueue>();
     return ListTile(
       leading: Icon(Symbols.sync, color: cs.onSurfaceVariant),
       title: Text(context.s.settingsLastSync, style: AppType.titleSm.copyWith(color: cs.onSurface)),
-      subtitle: Text(subtitle, style: AppType.bodySm.copyWith(color: context.x.textTertiary)),
+      subtitle: ValueListenableBuilder<int>(
+        valueListenable: queue.pendingCount,
+        builder: (context, pending, _) => ValueListenableBuilder<DateTime?>(
+          valueListenable: queue.lastSyncedAt,
+          builder: (context, lastSync, _) {
+            // Outstanding work wins the row — that's what the user must act on.
+            // Otherwise show when a queued action last really reached the
+            // server, or say plainly that there has never been anything to
+            // sync (which is not the same as "synced").
+            final String text;
+            final Color color;
+            if (pending > 0) {
+              text = context.s.settingsSyncPendingCount(pending);
+              color = context.x.warning;
+            } else {
+              text = lastSync == null
+                  ? context.s.settingsSyncNothingPending
+                  : RelativeTime.format(context, lastSync);
+              color = context.x.textTertiary;
+            }
+            return Text(text, style: AppType.bodySm.copyWith(color: color));
+          },
+        ),
+      ),
       trailing: TextButton(
         onPressed: onSync,
         child: Text(context.s.settingsSyncNow),

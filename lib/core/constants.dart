@@ -29,6 +29,10 @@ class AppConstants {
       'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   static const String mapUserAgent = 'com.digitalharbor.location_gps';
 
+  /// Target of the on-map credit badge ([AppMapAttribution]). OSM's ODbL
+  /// licence requires the credit to be visible and to link back here.
+  static const String osmCopyrightUrl = 'https://www.openstreetmap.org/copyright';
+
   /// OSM tiles only exist up to zoom 19; beyond that flutter_map upscales the
   /// last available tile instead of showing blank squares.
   static const int mapMaxNativeZoom = 19;
@@ -136,10 +140,17 @@ class AppConstants {
   // ---- dh_visit_management security groups (res.groups) ----
   // The logged-in user's visit role is derived by matching their `group_ids`
   // against these (highest wins). See AuthUser.visitRole.
-  static const int groupVisitUserId = 41; // dh_visit_management.group_visit_user
-  static const int groupVisitManagerId = 42; // group_visit_manager
-  static const int groupVisitProjectManagerId = 43; // group_visit_project_manager
-  static const int groupVisitAdminId = 44; // group_visit_admin
+  //
+  // Odoo assigns `res.groups` row ids at install time, so they differ per
+  // database — and every company points the app at its own Odoo. The ids are
+  // therefore resolved from these xmlids at login (see VisitGroupIds.resolve);
+  // only the module + record names below are stable across servers.
+  static const String visitGroupModule = 'dh_visit_management';
+  static const String groupVisitUserXmlName = 'group_visit_user';
+  static const String groupVisitManagerXmlName = 'group_visit_manager';
+  static const String groupVisitProjectManagerXmlName =
+      'group_visit_project_manager';
+  static const String groupVisitAdminXmlName = 'group_visit_admin';
 
   // Attendance: the salesperson's check-in / check-out is also mirrored to
   // Odoo's standard `hr.attendance` (with GPS in the native `in_*` / `out_*`

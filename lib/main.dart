@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -15,6 +14,7 @@ import 'core/di/service_locator.dart';
 import 'core/observability/sentry_bloc_observer.dart';
 import 'core/push/push_notification_service.dart';
 import 'firebase_options.dart';
+import 'core/utils/app_log.dart';
 
 Future<void> main() async {
   // Sentry's appRunner wraps everything in a guarded Zone so async errors
@@ -39,7 +39,7 @@ Future<void> main() async {
   } else {
     FlutterError.onError = (details) {
       FlutterError.presentError(details);
-      if (kDebugMode) debugPrint('[FlutterError] ${details.exception}');
+      appLog('[FlutterError] ${details.exception}');
     };
     await _bootstrap();
   }
@@ -70,7 +70,7 @@ Future<void> _bootstrap() async {
     );
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   } catch (e) {
-    if (kDebugMode) debugPrint('[push] Firebase init failed: $e');
+    appLog('[push] Firebase init failed: $e');
   }
 
   await setupServiceLocator();

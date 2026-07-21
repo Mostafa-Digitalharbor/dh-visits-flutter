@@ -7,6 +7,7 @@ import '../../../shared/widgets/app_refresh_indicator.dart';
 import '../../../shared/widgets/error_view.dart';
 import '../bloc/visit_bloc.dart' hide VisitState;
 import '../bloc/visit_detail_cubit.dart';
+import '../bloc/visits_list_bloc.dart';
 import '../data/models/visit.dart';
 import '../data/visits_repository.dart';
 import 'visit_action_bar.dart';
@@ -82,6 +83,20 @@ class _VisitDetailView extends StatelessWidget {
         if (action == null) return;
         context.showSnack(_successMessage(context, action),
             kind: SnackKind.success);
+
+        // Every workflow action changes the visit's state, so the list this
+        // page sits on top of is now stale. It is app-scoped and caches its
+        // rows, so without this it keeps serving the pre-action state — after
+        // ending a visit the user was popped straight back onto a list still
+        // labelling it "Approved", with pull-to-refresh not helping because the
+        // terminal actions never asked for a reload at all.
+        //
+        // Attachment uploads don't alter the list's rendering, so they're the
+        // one action that doesn't need it.
+        if (action != 'upload_attachment') {
+          context.read<VisitsListBloc>().add(const VisitsListLoadRequested());
+        }
+
         // Keep the persistent bar in sync with Start/End.
         if (action == 'start') {
           context.read<VisitBloc>().add(const VisitResumeRequested());
@@ -197,9 +212,17 @@ class _VisitDetailBodyState extends State<_VisitDetailBody> {
           left: 0,
           right: 0,
           bottom: 0,
-          child: _MeasureHeight(
-            onChange: _onBarHeight,
-            child: VisitActionBar(visit: visit),
+          // The bar sits ABOVE the busy scrim in the stack, so the scrim alone
+          // does not stop taps reaching it. Without this guard a double-tap on
+          // Approve fires the workflow call twice; the second hits an
+          // already-approved visit, comes back a UserError, and lands after the
+          // first — so a successful approval ends up showing a red error.
+          child: IgnorePointer(
+            ignoring: busy,
+            child: _MeasureHeight(
+              onChange: _onBarHeight,
+              child: VisitActionBar(visit: visit),
+            ),
           ),
         ),
       ],

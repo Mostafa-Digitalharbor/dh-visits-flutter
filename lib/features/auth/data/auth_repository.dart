@@ -9,6 +9,7 @@ import '../../../core/config/server_config_repository.dart';
 import '../../../core/constants.dart';
 import '../../../core/storage/session_storage.dart';
 import 'models/user.dart';
+import '../../../core/utils/app_log.dart';
 
 class AuthRepository {
   final ApiClient api;
@@ -30,8 +31,10 @@ class AuthRepository {
     // Database is taken from the user's per-company server config; fall back to
     // the build-time default for dev/CI builds that ship one.
     final db = serverConfig.read().database ?? AppConstants.database;
-    debugPrint('[debug] AuthRepository.login: db=$db '
-        'url=${api.baseUrl}${Endpoints.authenticate}');
+    if (kDebugMode) {
+      appLog('[debug] AuthRepository.login: db=$db '
+          'url=${api.baseUrl}${Endpoints.authenticate}');
+    }
     final result = await api.jsonRpc(
       Endpoints.authenticate,
       params: {
@@ -40,9 +43,9 @@ class AuthRepository {
         'password': password,
       },
     );
-    debugPrint('[debug] AuthRepository.login: result type=${result.runtimeType} '
-        'value=$result');
-
+    // Never log `result` itself: it is the session payload (session id, user
+    // context). debugPrint survives release builds, so that would write live
+    // credentials to logcat on every login.
     if (result is! Map || result['uid'] == null) {
       throw ApiException(code: ApiErrorCode.invalidCredentials);
     }
@@ -65,8 +68,10 @@ class AuthRepository {
       // employeeId the action bar can't match the user to their own visits and
       // every workflow button vanishes; without tz, visits get stamped against
       // the device clock. The UI surfaces this instead of looking broken.
-      debugPrint('[debug] AuthRepository.login: profile fetch failed ($e) — '
-          'falling back to device clock / no visit role');
+      if (kDebugMode) {
+        appLog('[debug] AuthRepository.login: profile fetch failed ($e) — '
+            'falling back to device clock / no visit role');
+      }
       user = user.copyWith(profileIncomplete: true);
     }
 
@@ -74,17 +79,71 @@ class AuthRepository {
     return user;
   }
 
-  /// Reads `res.users.tz` + `group_ids` for the given uid via `call_kw` and
+  /// Asks Odoo whether [uid] is in one specific `dh_visit_management` group.
+  ///
+  /// `res.users.has_group` takes the **xmlid**, so nothing per-database is
+  /// hardcoded, and it runs with elevated rights inside Odoo so an ordinary
+  /// salesperson can ask about their own membership.
+  Future<bool> _hasGroup(int uid, String recordName) async {
+    final result = await api.jsonRpc(
+      Endpoints.callKw,
+      params: {
+        'model': AppConstants.usersModel,
+        'method': 'has_group',
+        'args': [
+          [uid],
+          '${AppConstants.visitGroupModule}.$recordName',
+        ],
+        'kwargs': const {},
+      },
+    );
+    return result == true;
+  }
+
+  /// Resolves the user's visit-group memberships.
+  ///
+  /// The four questions are asked concurrently, so this costs one round-trip of
+  /// latency rather than four.
+  ///
+  /// This deliberately does NOT go through `ir.model.data` to turn the xmlids
+  /// into `res.groups` ids first. That model is readable only by the *Access
+  /// Rights* group, so for every ordinary user the lookup raised AccessError,
+  /// the whole profile read failed, and the role fell back to
+  /// [VisitRole.none] — silently demoting every manager to a field rep with no
+  /// approval buttons. Verified against the live server: `ir.model.data` is
+  /// denied for all three test accounts, while `has_group` answers for each.
+  Future<VisitGroupMemberships> _resolveVisitGroups(int uid) async {
+    final results = await Future.wait([
+      _hasGroup(uid, AppConstants.groupVisitUserXmlName),
+      _hasGroup(uid, AppConstants.groupVisitManagerXmlName),
+      _hasGroup(uid, AppConstants.groupVisitProjectManagerXmlName),
+      _hasGroup(uid, AppConstants.groupVisitAdminXmlName),
+    ]);
+    return VisitGroupMemberships(
+      user: results[0],
+      manager: results[1],
+      projectManager: results[2],
+      admin: results[3],
+    );
+  }
+
+  /// Reads `res.users.tz` + `employee_id` for the given uid via `call_kw` and
   /// derives the visit role. `tz` is `null` when unset (Odoo serialises `false`).
   Future<({String? tz, VisitRole visitRole, int? employeeId})> _readUserProfile(
       int uid) async {
+    // Fired alongside the profile read rather than before it — neither depends
+    // on the other, so they share one round-trip instead of stacking two.
+    final groupsFuture = _resolveVisitGroups(uid);
     final rows = await api.readRecords(
       AppConstants.usersModel,
       [uid],
-      const ['tz', 'group_ids', 'employee_id'],
+      const ['tz', 'employee_id'],
     );
+    final groups = await groupsFuture;
     if (rows.isEmpty) {
-      return (tz: null, visitRole: VisitRole.none, employeeId: null);
+      // No profile row, but the group answers are still authoritative — the
+      // role must not be thrown away just because tz/employee_id are missing.
+      return (tz: null, visitRole: groups.role, employeeId: null);
     }
     final row = rows.first;
 
@@ -95,10 +154,6 @@ class AuthRepository {
       if (s.isNotEmpty && s != 'false') tz = s;
     }
 
-    final groupIds = (row['group_ids'] is List)
-        ? (row['group_ids'] as List).whereType<num>().map((n) => n.toInt())
-        : const <int>[];
-
     // `employee_id` on res.users is a many2one → `[id, name]` or `false`.
     int? employeeId;
     final emp = row['employee_id'];
@@ -106,11 +161,7 @@ class AuthRepository {
       employeeId = (emp.first as num).toInt();
     }
 
-    return (
-      tz: tz,
-      visitRole: visitRoleFromGroupIds(groupIds),
-      employeeId: employeeId,
-    );
+    return (tz: tz, visitRole: groups.role, employeeId: employeeId);
   }
 
   Future<AuthUser?> currentUser() async {

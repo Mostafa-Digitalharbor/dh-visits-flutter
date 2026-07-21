@@ -1,22 +1,54 @@
 import 'package:equatable/equatable.dart';
 
-import '../../../../core/constants.dart';
-
 /// The user's role inside the `dh_visit_management` module, derived from their
 /// Odoo security-group membership (highest wins). Drives which visit screens,
 /// list tabs and action buttons the app exposes.
 enum VisitRole { none, user, manager, projectManager, admin }
 
-/// Maps a user's `res.users.group_ids` onto a [VisitRole] (highest match wins).
-VisitRole visitRoleFromGroupIds(Iterable<int> groupIds) {
-  final ids = groupIds.toSet();
-  if (ids.contains(AppConstants.groupVisitAdminId)) return VisitRole.admin;
-  if (ids.contains(AppConstants.groupVisitProjectManagerId)) {
-    return VisitRole.projectManager;
+/// Which of the four `dh_visit_management` security groups the signed-in user
+/// belongs to, as answered by Odoo's `res.users.has_group`.
+///
+/// Membership is asked for **by xmlid**, never by `res.groups` row id. Odoo
+/// numbers those rows in install order and every company runs its own Odoo, so
+/// the id identifying a "visit manager" on one database identifies something
+/// unrelated on the next. (Measured on the live test server: the id for
+/// `group_visit_project_manager` had already drifted from 43 to 45.)
+///
+/// `has_group` is also the only portable way to ask. Resolving the xmlids
+/// through `ir.model.data` first looks equivalent, but that model is readable
+/// only by the *Access Rights* group — so for every ordinary user the lookup
+/// raised AccessError, the profile read failed, and the role silently fell back
+/// to [VisitRole.none]. Every manager was demoted to a field rep and lost the
+/// approval UI. `has_group` runs with elevated rights inside Odoo and answers
+/// for any user.
+class VisitGroupMemberships {
+  final bool user;
+  final bool manager;
+  final bool projectManager;
+  final bool admin;
+
+  const VisitGroupMemberships({
+    this.user = false,
+    this.manager = false,
+    this.projectManager = false,
+    this.admin = false,
+  });
+
+  /// No membership anywhere — a valid answer (an Odoo user outside the visits
+  /// module), not a failed lookup. A lookup that *fails* throws instead, so the
+  /// caller can mark the profile incomplete rather than quietly downgrade.
+  static const VisitGroupMemberships none = VisitGroupMemberships();
+
+  bool get isEmpty => !user && !manager && !projectManager && !admin;
+
+  /// Highest membership wins.
+  VisitRole get role {
+    if (admin) return VisitRole.admin;
+    if (projectManager) return VisitRole.projectManager;
+    if (manager) return VisitRole.manager;
+    if (user) return VisitRole.user;
+    return VisitRole.none;
   }
-  if (ids.contains(AppConstants.groupVisitManagerId)) return VisitRole.manager;
-  if (ids.contains(AppConstants.groupVisitUserId)) return VisitRole.user;
-  return VisitRole.none;
 }
 
 VisitRole _visitRoleFromName(dynamic raw) {

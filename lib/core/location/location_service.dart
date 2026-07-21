@@ -13,9 +13,16 @@ class LocationService {
   Future<LocationOutcome> acquire({
     LocationAccuracy accuracy = LocationAccuracy.high,
   }) async {
-    final permitted = await ensurePermission();
-    if (!permitted) return const LocationPermissionDenied();
+    // The permission call is inside the try, not before it. `requestPermission`
+    // throws `PermissionRequestInProgressException` when a request is already
+    // in flight — which is what a double-tap on Start produces — and both it
+    // and `isLocationServiceEnabled` can raise `PlatformException`. Left
+    // outside, that throw escapes into the async `onPressed` and the button
+    // silently does nothing: exactly the failure this method exists to convert
+    // into a handled outcome.
     try {
+      final permitted = await ensurePermission();
+      if (!permitted) return const LocationPermissionDenied();
       return LocationOk.from(await getCurrent(accuracy: accuracy));
     } catch (e) {
       return LocationUnavailable(e);

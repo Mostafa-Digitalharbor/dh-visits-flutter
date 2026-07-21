@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
@@ -14,6 +13,7 @@ import 'models/visit.dart';
 import 'models/visit_activity.dart';
 import 'models/visit_attachment.dart';
 import 'models/visit_participant.dart';
+import '../../../core/utils/app_log.dart';
 
 /// Which slice of visits a manager is looking at. Backing domains are applied
 /// on top of Odoo record rules (which already scope to the manager's
@@ -179,7 +179,7 @@ class VisitsRepository {
       try {
         await attendance?.checkIn(latitude: latitude, longitude: longitude);
       } catch (e) {
-        debugPrint('[VisitsRepository] attendance check-in failed: $e');
+        appLog('[VisitsRepository] attendance check-in failed: $e');
       }
     }
     return (result is Map ? result['state']?.toString() : null);
@@ -216,7 +216,7 @@ class VisitsRepository {
       try {
         await attendance?.checkOut(latitude: latitude, longitude: longitude);
       } catch (e) {
-        debugPrint('[VisitsRepository] attendance check-out failed: $e');
+        appLog('[VisitsRepository] attendance check-out failed: $e');
       }
     }
     return (result is Map ? result['state']?.toString() : null);
@@ -321,14 +321,14 @@ class VisitsRepository {
             {'body': html},
           );
         } catch (e) {
-          debugPrint('[VisitsRepository] spoof-note markup upgrade failed: $e');
+          appLog('[VisitsRepository] spoof-note markup upgrade failed: $e');
         }
       }
     } catch (e) {
       // Most likely cause is `_mail_post_access` requiring write permission the
       // field employee does not have on their own visit. Losing the note must
       // not lose the visit, but we must know it happened.
-      debugPrint('[VisitsRepository] spoof-attempt note failed: $e');
+      appLog('[VisitsRepository] spoof-attempt note failed: $e');
       unawaited(Sentry.captureException(
         e,
         stackTrace: StackTrace.current,
@@ -455,7 +455,7 @@ class VisitsRepository {
       );
       return rows.isNotEmpty;
     } catch (e) {
-      debugPrint('[VisitsRepository] mock-flag lookup failed: $e');
+      appLog('[VisitsRepository] mock-flag lookup failed: $e');
       return false;
     }
   }
@@ -494,7 +494,7 @@ class VisitsRepository {
         {'reject_reason': reason},
       );
     } catch (e) {
-      debugPrint('[VisitsRepository] participant reason write failed: $e');
+      appLog('[VisitsRepository] participant reason write failed: $e');
     }
     await _participantAction('action_reject', participantId);
   }

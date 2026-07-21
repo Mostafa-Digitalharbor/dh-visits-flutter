@@ -205,6 +205,9 @@ class _NearbyMapPageState extends State<NearbyMapPage>
                       ),
                     ],
                   ),
+                  // Top-left: NearbyBottomPanel covers the whole bottom edge
+                  // and the zoom controls own the top-right.
+                  const AppMapAttribution(alignment: Alignment.topLeft),
                 ],
               ),
               // Right-side map controls

@@ -396,9 +396,10 @@
   "settingsLastSync": "آخر مزامنة",
   "settingsSyncNow": "مزامنة الآن",
   "settingsSynced": "تمت المزامنة",
-  "settingsSyncedJustNow": "منذ لحظات",
+  "settingsSyncNothingPending": "لا يوجد شيء في الانتظار",
+  "settingsSyncPendingCount": "{count} في انتظار المزامنة",
+  "@settingsSyncPendingCount": { "placeholders": { "count": { "type": "int" } } },
   "settingsHelp": "المساعدة والدعم",
-  "settingsComingSoon": "قريبًا",
 
   "confirmLogoutTitle": "تسجيل الخروج",
   "confirmLogoutMessage": "هل تريد تسجيل الخروج من التطبيق؟",

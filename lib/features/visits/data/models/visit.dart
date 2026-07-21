@@ -233,6 +233,23 @@ class Visit extends Equatable {
   bool get isCancelled => state == VisitState.cancelled;
   bool get isRejected => state == VisitState.rejected;
 
+  /// States from which the backend accepts `action_cancel`.
+  ///
+  /// Deliberately an allow-list. The action bar used to gate Cancel on a
+  /// deny-list (`!done && !cancelled && !rejected && != inProgress`), which
+  /// meant [VisitState.unknown] — anything a newer server sends that this build
+  /// doesn't recognise — fell through and was offered a Cancel the backend may
+  /// well refuse. An unrecognised state gets no destructive action.
+  bool get canCancel => const {
+        VisitState.draft,
+        VisitState.submitted,
+        VisitState.waitingParticipantManagerApproval,
+        VisitState.waitingDirectManagerApproval,
+        VisitState.escalated,
+        VisitState.approved,
+        VisitState.rescheduleRequested,
+      }.contains(state);
+
   /// Best timestamp representing when the visit happened/will happen, for
   /// list grouping: end → start → scheduled.
   DateTime? get effectiveDate => endDatetime ?? startDatetime ?? scheduledDatetime;
@@ -268,7 +285,19 @@ class Visit extends Equatable {
   // for the "customer location" the old screens (Route map, geofence) expect.
   double? get customerLatitude => latitude;
   double? get customerLongitude => longitude;
-  bool get hasCustomerLocation => latitude != null && longitude != null;
+
+  /// Whether the visit carries a usable planned coordinate.
+  ///
+  /// `0,0` counts as absent, not as a location. Odoo leaves `latitude` and
+  /// `longitude` at `0.0` on every visit that was never geocoded — which is all
+  /// of them on the live server — and a plain null-check treats that as a real
+  /// fix. The Route map would then plot the day's stops in the Gulf of Guinea
+  /// and compute the drive between them. `PartnerLocation` already applies this
+  /// same 0-means-absent rule; this getter was the one place that didn't.
+  bool get hasCustomerLocation =>
+      latitude != null &&
+      longitude != null &&
+      !(latitude == 0 && longitude == 0);
   String? get visitTypeName => linkedRecordName;
 
   /// Scheduled day has passed and the visit isn't completed/running/closed.

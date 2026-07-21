@@ -187,6 +187,7 @@ class _RouteMap extends StatelessWidget {
                     child: _NumberPin(n: i + 1, isNext: i == nextIndex, x: x),
                   ),
               ]),
+              const AppMapAttribution(),
             ],
           ),
           if (isDark)

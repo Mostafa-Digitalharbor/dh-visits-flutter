@@ -83,7 +83,10 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? params,
   }) async {
-    debugPrint('[debug] ApiClient.jsonRpc -> POST $path');
+    // Request/response tracing is deliberately left to PrettyLogInterceptor,
+    // which is registered only under kDebugMode. `debugPrint` is NOT stripped
+    // from release builds, so logging bodies here would ship session cookies
+    // and record payloads to the device log on every user's phone.
     try {
       final response = await dio.post(
         path,
@@ -95,18 +98,22 @@ class ApiClient {
       );
 
       final body = response.data;
-      debugPrint('[debug] ApiClient.jsonRpc <- status=${response.statusCode} '
-          'bodyType=${body.runtimeType}');
       // Got a response from the server — we're online, even if the
       // response itself is a server-side error.
       connectivity?.markOnline();
+      // Odoo's own error block first: it carries a real message, which beats
+      // the generic transport codes below.
       if (body is Map && body['error'] != null) {
-        debugPrint('[debug] ApiClient.jsonRpc Odoo error block: ${body['error']}');
         throw ApiException.fromJson(Map<String, dynamic>.from(body));
       }
+      // Then the same transport guards `_unwrap` applies to get/post. This call
+      // used to skip them entirely and hand `body['result']` straight back, so
+      // an un-deployed `/api/visit/*` route (Odoo answers 200 + website HTML)
+      // arrived as a String, callers degraded it to "no visits", and a 403
+      // never reached `onUnauthorized` so the auto-logout never fired.
+      _guardTransport(response);
       return body is Map ? body['result'] : body;
     } on DioException catch (e) {
-      debugPrint('[debug] ApiClient.jsonRpc DioException: ${e.type} ${e.message}');
       throw _mapDioError(e);
     } on ApiException catch (e) {
       _notifyIfUnauthorized(e);
@@ -147,7 +154,10 @@ class ApiClient {
     }
   }
 
-  dynamic _unwrap(Response response) {
+  /// Transport-level checks that apply to every response regardless of which
+  /// envelope (JSON-RPC or REST) the body uses. Shared by [jsonRpc] and
+  /// [_unwrap] so neither can drift into trusting a body the other rejects.
+  void _guardTransport(Response response) {
     final body = response.data;
     if (response.statusCode == 401 || response.statusCode == 403) {
       throw ApiException.unauthorized();
@@ -169,9 +179,9 @@ class ApiClient {
       );
     }
     // `validateStatus` lets everything under 500 through, so an error status
-    // with a non-Odoo body would otherwise fall to `return body['data']` below
-    // and be handed to the caller as if it were successful data — surfacing
-    // later as a confusing parse failure instead of a real message.
+    // with a non-Odoo body would otherwise be handed to the caller as if it
+    // were successful data — surfacing later as a confusing parse failure
+    // instead of a real message.
     final status = response.statusCode ?? 0;
     if (status >= 400) {
       if (body is Map && body['status'] == 'error') {
@@ -188,6 +198,11 @@ class ApiClient {
         details: 'HTTP $status for ${response.realUri.path}',
       );
     }
+  }
+
+  dynamic _unwrap(Response response) {
+    _guardTransport(response);
+    final body = response.data;
     if (body is Map) {
       if (body['status'] == 'error') {
         throw ApiException.fromJson(Map<String, dynamic>.from(body));

@@ -5,6 +5,7 @@ import '../../../core/api/endpoints.dart';
 import '../../../core/api/odoo_rpc.dart';
 import '../../../core/constants.dart';
 import '../../../core/storage/session_storage.dart';
+import '../../../core/utils/app_log.dart';
 
 /// Mirrors the salesperson's visit check-in / check-out into Odoo's standard
 /// **`hr.attendance`** so it shows up in the Attendances app, with the phone's
@@ -56,8 +57,10 @@ class AttendanceRepository {
       Endpoints.attendanceSystray,
       params: {'latitude': latitude, 'longitude': longitude},
     );
-    debugPrint('[Attendance] systray ${Endpoints.attendanceSystray} '
-        'raw result (${result.runtimeType}): $result');
+    if (kDebugMode) {
+      appLog('[Attendance] systray ${Endpoints.attendanceSystray} '
+          'raw result (${result.runtimeType}): $result');
+    }
     if (result is Map) return result['attendance_state']?.toString();
     return null;
   }
@@ -72,7 +75,7 @@ class AttendanceRepository {
     final uid = await _uid();
     if (uid == null) return null;
     if (await _hasOpenAttendance(uid)) {
-      debugPrint('[Attendance] already checked in — skipping check-in');
+      appLog('[Attendance] already checked in — skipping check-in');
       return 'checked_in';
     }
     return _toggle(latitude, longitude);
@@ -87,7 +90,7 @@ class AttendanceRepository {
     final uid = await _uid();
     if (uid == null) return null;
     if (!await _hasOpenAttendance(uid)) {
-      debugPrint('[Attendance] no open attendance — skipping check-out');
+      appLog('[Attendance] no open attendance — skipping check-out');
       return 'checked_out';
     }
     return _toggle(latitude, longitude);

@@ -3,7 +3,7 @@ description: "Customer Visits — Field employee check-in/out app with live loca
 publish_to: 'none'
 # Bump versionName (1.0.0) for user-visible releases, versionCode (+N) for every
 # store upload (Play Store requires monotonically increasing versionCode).
-version: 1.0.0+2
+version: 1.0.0+4
 
 environment:
   sdk: ^3.9.2

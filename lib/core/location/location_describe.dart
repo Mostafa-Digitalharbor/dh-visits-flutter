@@ -14,8 +14,8 @@
 // which is exactly when a visit still has to start. So every failure path
 // degrades to the coordinate string rather than throwing: text is evidence, but
 // coordinates are *the* evidence, and they are already on the record.
-import 'package:flutter/foundation.dart';
 import 'package:geocoding/geocoding.dart';
+import '../utils/app_log.dart';
 
 class LocationDescriber {
   /// Reverse-geocode timeout. Deliberately short: this runs inline on the
@@ -48,7 +48,7 @@ class LocationDescriber {
       return label.isEmpty ? fallback : label;
     } catch (e) {
       // Offline, no geocoder backend, or timed out — all expected in the field.
-      debugPrint('[LocationDescriber] reverse geocode failed: $e');
+      appLog('[LocationDescriber] reverse geocode failed: $e');
       return fallback;
     }
   }

@@ -225,11 +225,7 @@ class VisitActionBar extends StatelessWidget {
         onPressed: () => _pickAndUpload(context, cubit),
       ));
     }
-    if ((isOwner || (me?.canApproveVisits ?? false)) &&
-        !visit.isDone &&
-        !visit.isCancelled &&
-        !visit.isRejected &&
-        visit.state != VisitState.inProgress) {
+    if ((isOwner || (me?.canApproveVisits ?? false)) && visit.canCancel) {
       buttons.add(AppButton.secondary(
         label: context.s.wfActionCancel,
         icon: Icons.block,

@@ -124,6 +124,19 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
       // Fall back to the slim REST /api/visit/get payload if the full read
       // returned nothing (e.g. call_kw restricted for this user).
       final slim = await repository.getVisit(visitId);
+      if (slim == null) {
+        // Both reads came back empty. Neither throws on a missing record —
+        // `_rows()` degrades any non-List result to `[]`, and `getVisit`
+        // degrades a non-Map to null — so without this the cubit would emit
+        // `ready` with a null visit and the view would sit on a bare spinner
+        // with no error, no retry and no pull-to-refresh, forever. Reachable
+        // by opening a deleted visit from the notifications feed.
+        _safeEmit(state.copyWith(
+          status: VisitDetailStatus.error,
+          error: ApiException(code: ApiErrorCode.notFound),
+        ));
+        return;
+      }
       _safeEmit(VisitDetailState(
         status: VisitDetailStatus.ready,
         visit: slim,
@@ -142,6 +155,15 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
         }
       } catch (_) {}
       _safeEmit(state.copyWith(status: VisitDetailStatus.error, error: e));
+    } catch (e) {
+      // Never leave the UI stuck on the loading skeleton. A schema change or an
+      // Odoo field serialised as `false` throws a TypeError, not an
+      // ApiException, and would otherwise escape the handler above and freeze
+      // the screen. Every sibling bloc has this arm; this one was the gap.
+      _safeEmit(state.copyWith(
+        status: VisitDetailStatus.error,
+        error: ApiException.unexpected(e),
+      ));
     }
   }
 
@@ -157,7 +179,13 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
     }
   }
 
+  /// True while a workflow action is already in flight. Every action is
+  /// fire-and-forget from an `onPressed`, so without this a second tap starts a
+  /// second request — and the loser of that race overwrites the winner's state.
+  bool get _busy => state.status == VisitDetailStatus.acting;
+
   Future<bool> _run(String action, Future<void> Function() body) async {
+    if (_busy) return false;
     _safeEmit(state.copyWith(status: VisitDetailStatus.acting, error: null));
     try {
       await body();
@@ -306,6 +334,7 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
     Map<String, dynamic> payload,
     Future<void> Function() body,
   ) async {
+    if (_busy) return false;
     _safeEmit(state.copyWith(status: VisitDetailStatus.acting, error: null));
     try {
       await body();
@@ -326,9 +355,46 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
       return true;
     } on ApiException catch (e) {
       if (e.code == ApiErrorCode.network || e.code == ApiErrorCode.timeout) {
-        await sl<PendingActionsQueue>().enqueue(visitId, payload);
+        // The enqueue needs its own guard: it sits inside a catch block, so a
+        // SharedPreferences write failure (storage full, channel error) would
+        // escape _runQueueable entirely, leaving status stuck on `acting` — the
+        // full-screen busy overlay spinning forever, with the action lost and
+        // nothing said about it.
+        try {
+          await sl<PendingActionsQueue>().enqueue(visitId, payload);
+        } catch (queueError) {
+          final visit = await _safeReload();
+          _safeEmit(VisitDetailState(
+            status: VisitDetailStatus.ready,
+            visit: visit ?? state.visit,
+            error: ApiException.unexpected(queueError),
+            attachments: state.attachments,
+            mockFlagged: state.mockFlagged,
+          ));
+          return false;
+        }
+        // Advance the local state to match what was queued. Without this the
+        // visit still reads `approved` after an offline Start, so the action
+        // bar keeps offering Start and never offers End (`canEnd` requires
+        // `inProgress`) — a rep who starts a visit in a dead zone could not
+        // finish it until connectivity returned, which is the exact situation
+        // the queue exists to cover.
+        final queuedType = payload['type']?.toString();
+        final optimistic = switch (queuedType) {
+          'start' => state.visit?.copyWith(
+              state: VisitState.inProgress,
+              startDatetime: DateTime.now(),
+            ),
+          'end' => state.visit?.copyWith(
+              state: VisitState.done,
+              endDatetime: DateTime.now(),
+              outcome: payload['outcome']?.toString(),
+            ),
+          _ => state.visit,
+        };
         _safeEmit(state.copyWith(
           status: VisitDetailStatus.ready,
+          visit: optimistic,
           lastAction: '${action}_queued',
           // Queued offline: the note has not been posted yet, but the verdict
           // is already known locally, so warn now rather than after the sync.

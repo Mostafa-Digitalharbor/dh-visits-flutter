@@ -12,6 +12,7 @@ import '../../app/design/app_assets.dart';
 import '../../firebase_options.dart';
 import '../../l10n/generated/app_localizations.dart';
 import 'push_repository.dart';
+import '../utils/app_log.dart';
 
 /// Handles a push received while the app is in the background or terminated.
 ///
@@ -174,7 +175,7 @@ class PushNotificationService {
         deviceId: await _deviceId(),
       );
       await prefs.setString(_lastTokenKey, token);
-      debugPrint('[push] token registered');
+      appLog('[push] token registered');
 
       // Keep the server in sync if the token rotates while signed in.
       _tokenRefreshSub ??= _fcm.onTokenRefresh.listen((newToken) async {
@@ -185,14 +186,14 @@ class PushNotificationService {
             deviceId: await _deviceId(),
           );
           await prefs.setString(_lastTokenKey, newToken);
-          debugPrint('[push] token refreshed & re-registered');
+          appLog('[push] token refreshed & re-registered');
         } catch (e) {
-          debugPrint('[push] token refresh registration failed: $e');
+          appLog('[push] token refresh registration failed: $e');
         }
       });
     } catch (e) {
       // Best-effort: a failed registration must never block login.
-      debugPrint('[push] registerToken failed: $e');
+      appLog('[push] registerToken failed: $e');
     }
   }
 
@@ -208,9 +209,9 @@ class PushNotificationService {
       // pushes even if the server call above failed.
       await _fcm.deleteToken();
       await prefs.remove(_lastTokenKey);
-      debugPrint('[push] token unregistered');
+      appLog('[push] token unregistered');
     } catch (e) {
-      debugPrint('[push] unregister failed: $e');
+      appLog('[push] unregister failed: $e');
     }
     await _tokenRefreshSub?.cancel();
     _tokenRefreshSub = null;

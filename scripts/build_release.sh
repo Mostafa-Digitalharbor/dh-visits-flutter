@@ -17,12 +17,26 @@
 #     export API_BASE_URL='https://yourcompany.odoo.com'
 #     export ODOO_DATABASE='yourcompany-main-12345678'
 #
+# Crash reporting:
+#   Sentry is compiled in only when SENTRY_DSN is non-empty (see AppEnvironment),
+#   so the DSN below is what turns crash reporting ON for store builds. A Sentry
+#   DSN is a write-only, client-side ingest key — it is designed to ship inside
+#   the app binary and is not a secret. Override per-build with:
+#     export SENTRY_DSN='https://...'      # different project
+#     export SENTRY_DSN=''                 # disable Sentry for this build
+#
 # Usage:  scripts/build_release.sh [apk|aab]   (default: apk)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 target="${1:-apk}"
+
+# Default production Sentry project (Digital Harbor / visits). `${VAR-default}`
+# (no colon) so an explicitly-exported empty string disables Sentry, while an
+# unset variable still gets the default.
+SENTRY_DSN="${SENTRY_DSN-https://e1c8ae84f3d415fa15d41ec6436c54b5@o4511426995617792.ingest.de.sentry.io/4511485485973584}"
+APP_FLAVOR="${APP_FLAVOR:-production}"
 
 # Pass the backend through only when it was supplied. Absent = the built app
 # starts on the server-setup screen, which is the correct multi-tenant default.
@@ -35,6 +49,26 @@ if [ ${#defines[@]} -gt 0 ]; then
 else
   echo "No backend seeded - the app will open on the server-setup screen."
 fi
+
+# Flavour tags every Sentry event, so keep it alongside the DSN.
+defines+=("--dart-define=APP_FLAVOR=${APP_FLAVOR}")
+if [ -n "${SENTRY_DSN}" ]; then
+  defines+=("--dart-define=SENTRY_DSN=${SENTRY_DSN}")
+  defines+=("--dart-define=SENTRY_TRACES_PERCENT=${SENTRY_TRACES_PERCENT:-10}")
+  echo "Sentry ENABLED (environment=${APP_FLAVOR})."
+else
+  echo "Sentry DISABLED (SENTRY_DSN is empty)."
+fi
+
+# Required, not hygiene. `flutter_native_splash` is a dev_dependency, so its
+# Android module is on the debug classpath but excluded from release builds.
+# GeneratedPluginRegistrant.java left behind by a previous debug build still
+# registers it, and the release compile then dies with the very unhelpful
+#   "package net.jonhanson.flutter_native_splash does not exist".
+# Cleaning forces the registrant to be regenerated for the release variant.
+echo "Cleaning (stale debug plugin registrant breaks release builds)..."
+flutter clean
+flutter pub get
 
 echo "Generating localizations..."
 flutter gen-l10n

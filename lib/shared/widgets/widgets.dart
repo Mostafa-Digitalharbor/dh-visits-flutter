@@ -2,6 +2,7 @@ export 'adaptive_center.dart';
 export 'animated_list_item.dart';
 export 'app_button.dart';
 export 'app_card.dart';
+export 'app_map_attribution.dart';
 export 'app_map_tile_layer.dart';
 export 'app_refresh_indicator.dart';
 export 'confirm_dialog.dart';

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/api/api_exceptions.dart';
 import '../data/auth_repository.dart';
 import '../data/models/user.dart';
+import '../../../core/utils/app_log.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -41,7 +42,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // changed payload shape breaks AuthUser.fromJson. Without this catch no
       // state is ever emitted and the router pins the user to /splash forever.
       // Treat it as "no session" and tell them why on the login screen.
-      debugPrint('[debug] AuthBloc._onStarted: session restore failed ($e)');
+      appLog('[debug] AuthBloc._onStarted: session restore failed ($e)');
       restoreError = ApiException.sessionRestoreFailed(e);
     }
     final remaining = _minSplashDuration - clock.elapsed;
@@ -59,25 +60,33 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthLoginRequested event,
     Emitter<AuthState> emit,
   ) async {
-    debugPrint('[debug] AuthBloc._onLoginRequested: login=${event.login}');
+    // These traces carry the user's login and identity. debugPrint is not
+    // stripped in release builds, so every one of them stays kDebugMode-gated.
+    if (kDebugMode) {
+      appLog('[debug] AuthBloc._onLoginRequested: login=${event.login}');
+    }
     emit(const AuthState.authenticating());
     try {
       final user = await repository.login(
         login: event.login,
         password: event.password,
       );
-      debugPrint(
-          '[debug] AuthBloc: login succeeded uid=${user.uid} '
-          'employeeId=${user.employeeId} '
-          'isAdmin=${user.isAdmin} isManager=${user.isManager} '
-          'canEditVisits=${user.canEditVisits}');
+      if (kDebugMode) {
+        appLog(
+            '[debug] AuthBloc: login succeeded uid=${user.uid} '
+            'employeeId=${user.employeeId} '
+            'isAdmin=${user.isAdmin} isManager=${user.isManager} '
+            'canEditVisits=${user.canEditVisits}');
+      }
       emit(AuthState.authenticated(user));
     } on ApiException catch (e) {
-      debugPrint(
-          '[debug] AuthBloc: ApiException code=${e.code} msg=${e.serverMessage}');
+      if (kDebugMode) {
+        appLog(
+            '[debug] AuthBloc: ApiException code=${e.code} msg=${e.serverMessage}');
+      }
       emit(AuthState.unauthenticated(error: e));
     } catch (e, st) {
-      debugPrint('[debug] AuthBloc: unexpected error: $e\n$st');
+      appLog('[debug] AuthBloc: unexpected error: $e\n$st');
       emit(AuthState.unauthenticated(
           error: ApiException.unexpected(e)));
     }
@@ -91,7 +100,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       try {
         await onBeforeLogout!();
       } catch (e) {
-        debugPrint('[debug] AuthBloc: onBeforeLogout failed: $e');
+        appLog('[debug] AuthBloc: onBeforeLogout failed: $e');
       }
     }
     await repository.logout();

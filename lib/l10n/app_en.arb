@@ -417,9 +417,10 @@
   "settingsLastSync": "Last sync",
   "settingsSyncNow": "Sync now",
   "settingsSynced": "Synced",
-  "settingsSyncedJustNow": "Just now",
+  "settingsSyncNothingPending": "Nothing pending",
+  "settingsSyncPendingCount": "{count} waiting to sync",
+  "@settingsSyncPendingCount": { "placeholders": { "count": { "type": "int" } } },
   "settingsHelp": "Help & support",
-  "settingsComingSoon": "Coming soon",
 
   "confirmLogoutTitle": "Sign out",
   "confirmLogoutMessage": "Are you sure you want to sign out?",

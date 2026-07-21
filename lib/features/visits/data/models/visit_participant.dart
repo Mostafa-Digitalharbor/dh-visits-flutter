@@ -52,12 +52,22 @@ class VisitParticipant extends Equatable {
     return (null, null);
   }
 
+  /// Reads a numeric Odoo scalar. Odoo serialises an unset field as `false`
+  /// (a bool), not null — so a bare `as num?` cast throws a TypeError on it.
+  /// [_m2o] already guards the many2one shape; this covers the scalar one.
+  static int? _nz(dynamic raw) => raw is num ? raw.toInt() : null;
+
   /// From the slim REST `add_participants` payload
   /// (`{id, employee_id, approval_state}`).
   factory VisitParticipant.fromApi(Map<String, dynamic> json) {
     return VisitParticipant(
-      id: (json['id'] as num).toInt(),
-      employeeId: (json['employee_id'] as num?)?.toInt(),
+      // `employee_id` comes back `false` when the participant's hr.employee was
+      // archived between the picker read and the create. Unguarded, that threw
+      // inside CreateVisitBloc._onSubmit *after* the visit had been created —
+      // the form reported failure, the user retried, and a duplicate visit was
+      // filed against the customer.
+      id: _nz(json['id']) ?? 0,
+      employeeId: _nz(json['employee_id']),
       approvalState: participantStateFromWire(json['approval_state']?.toString()),
     );
   }

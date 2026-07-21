@@ -233,6 +233,9 @@ class _VisitMapCardState extends State<VisitMapCard>
                           ),
                       ],
                     ),
+                    // Bottom-left: the recentre/navigate button owns the
+                    // bottom-right corner of this card.
+                    const AppMapAttribution(alignment: Alignment.bottomLeft),
                   ],
                 ),
                 // OSM tiles are always light, so in dark mode they glare out of

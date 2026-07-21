@@ -16,6 +16,14 @@
 #     $env:API_BASE_URL  = 'https://yourcompany.odoo.com'
 #     $env:ODOO_DATABASE = 'yourcompany-main-12345678'
 #
+# Crash reporting:
+#   Sentry is compiled in only when SENTRY_DSN is non-empty (see AppEnvironment),
+#   so the DSN below is what turns crash reporting ON for store builds. A Sentry
+#   DSN is a write-only, client-side ingest key - it is designed to ship inside
+#   the app binary and is not a secret. Override per-build with:
+#     $env:SENTRY_DSN = 'https://...'   # different project
+#     $env:SENTRY_DSN = ''              # disable Sentry for this build
+#
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File scripts/build_release.ps1          # APK
 #   powershell -ExecutionPolicy Bypass -File scripts/build_release.ps1 aab      # App Bundle
@@ -29,6 +37,17 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
+# Default production Sentry project (Digital Harbor / visits). Test for the
+# variable's *existence* rather than truthiness, so setting it to '' explicitly
+# disables Sentry while leaving it unset picks up the default.
+if (Test-Path env:SENTRY_DSN) {
+    $sentryDsn = $env:SENTRY_DSN
+} else {
+    $sentryDsn = 'https://e1c8ae84f3d415fa15d41ec6436c54b5@o4511426995617792.ingest.de.sentry.io/4511485485973584'
+}
+if ($env:APP_FLAVOR) { $appFlavor = $env:APP_FLAVOR } else { $appFlavor = 'production' }
+if ($env:SENTRY_TRACES_PERCENT) { $tracesPct = $env:SENTRY_TRACES_PERCENT } else { $tracesPct = '10' }
+
 # Pass the backend through only when it was supplied. Absent = the built app
 # starts on the server-setup screen, which is the correct multi-tenant default.
 $defines = @()
@@ -40,6 +59,26 @@ if ($defines.Count -gt 0) {
 } else {
     Write-Host "No backend seeded - the app will open on the server-setup screen." -ForegroundColor Yellow
 }
+
+# Flavour tags every Sentry event, so keep it alongside the DSN.
+$defines += "--dart-define=APP_FLAVOR=$appFlavor"
+if ($sentryDsn) {
+    $defines += "--dart-define=SENTRY_DSN=$sentryDsn"
+    $defines += "--dart-define=SENTRY_TRACES_PERCENT=$tracesPct"
+    Write-Host "Sentry ENABLED (environment=$appFlavor)." -ForegroundColor Cyan
+} else {
+    Write-Host "Sentry DISABLED (SENTRY_DSN is empty)." -ForegroundColor Yellow
+}
+
+# Required, not hygiene. `flutter_native_splash` is a dev_dependency, so its
+# Android module is on the debug classpath but excluded from release builds.
+# GeneratedPluginRegistrant.java left behind by a previous debug build still
+# registers it, and the release compile then dies with the very unhelpful
+#   "package net.jonhanson.flutter_native_splash does not exist".
+# Cleaning forces the registrant to be regenerated for the release variant.
+Write-Host "Cleaning (stale debug plugin registrant breaks release builds)..." -ForegroundColor Cyan
+flutter clean
+flutter pub get
 
 Write-Host "Generating localizations..." -ForegroundColor Cyan
 flutter gen-l10n

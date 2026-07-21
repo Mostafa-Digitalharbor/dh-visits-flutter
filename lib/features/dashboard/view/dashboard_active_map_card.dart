@@ -128,6 +128,7 @@ class DashboardActiveMapCard extends StatelessWidget {
                           ),
                       ],
                     ),
+                    const AppMapAttribution(),
                   ],
                 ),
               ),

@@ -2282,23 +2282,23 @@ abstract class AppLocalizations {
   /// **'Synced'**
   String get settingsSynced;
 
-  /// No description provided for @settingsSyncedJustNow.
+  /// No description provided for @settingsSyncNothingPending.
   ///
   /// In en, this message translates to:
-  /// **'Just now'**
-  String get settingsSyncedJustNow;
+  /// **'Nothing pending'**
+  String get settingsSyncNothingPending;
+
+  /// No description provided for @settingsSyncPendingCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} waiting to sync'**
+  String settingsSyncPendingCount(int count);
 
   /// No description provided for @settingsHelp.
   ///
   /// In en, this message translates to:
   /// **'Help & support'**
   String get settingsHelp;
-
-  /// No description provided for @settingsComingSoon.
-  ///
-  /// In en, this message translates to:
-  /// **'Coming soon'**
-  String get settingsComingSoon;
 
   /// No description provided for @confirmLogoutTitle.
   ///

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../api/api_exceptions.dart';
+import '../utils/app_log.dart';
 
 /// Forwards every unhandled BLoC error to Sentry so we don't have to
 /// sprinkle `Sentry.captureException(...)` inside every `catch (e)` branch.
@@ -29,7 +30,7 @@ class SentryBlocObserver extends BlocObserver {
 
     if (kDebugMode) {
       // Mirror to console so devs see it locally without opening Sentry.
-      debugPrint('[Sentry/Bloc] ${bloc.runtimeType}: $error');
+      appLog('[Sentry/Bloc] ${bloc.runtimeType}: $error');
     }
   }
 

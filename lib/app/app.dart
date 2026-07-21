@@ -20,8 +20,6 @@ import '../features/auth/bloc/auth_bloc.dart';
 import '../features/auth/data/auth_repository.dart';
 import '../features/customers/bloc/customers_bloc.dart';
 import '../features/customers/data/customers_repository.dart';
-import '../features/employees/bloc/employees_bloc.dart';
-import '../features/employees/data/employees_repository.dart';
 import '../features/live_location/bloc/live_location_bloc.dart';
 import '../features/live_location/data/live_location_repository.dart';
 import '../features/nearby/bloc/nearby_bloc.dart';
@@ -144,10 +142,6 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
               CustomersBloc(repository: sl<CustomersRepository>()),
         ),
         BlocProvider(
-          create: (_) =>
-              EmployeesBloc(repository: sl<EmployeesRepository>()),
-        ),
-        BlocProvider(
           create: (_) => VisitBloc(repository: sl<VisitsRepository>()),
         ),
         BlocProvider(
@@ -224,7 +218,6 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
     context.read<VisitsListBloc>().add(const VisitsListReset());
     context.read<VisitBloc>().add(const VisitCleared());
     context.read<CustomersBloc>().add(const ListReset());
-    context.read<EmployeesBloc>().add(const ListReset());
     context.read<NearbyBloc>().add(const NearbyReset());
     // Stop pinging the employee's GPS once they're signed out.
     context.read<LiveLocationBloc>().add(const LiveLocationStopRequested());

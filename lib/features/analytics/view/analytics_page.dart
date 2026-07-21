@@ -49,7 +49,18 @@ class AnalyticsPage extends StatelessWidget {
         final cur = _Metrics.from(window(6, 0));
         final prev = _Metrics.from(window(13, 7));
 
-        return ListView(
+        // Pull-to-refresh, matching the Dashboard. Without it this page had no
+        // way to refetch at all — its bloc is built once and kept alive by the
+        // shell's IndexedStack, so stale figures could only be cleared by
+        // restarting the app.
+        return AppRefreshIndicator(
+          onRefresh: () async {
+            final bloc = context.read<VisitsListBloc>();
+            bloc.add(const VisitsListLoadRequested(scope: VisitListScope.team));
+            await bloc.stream
+                .firstWhere((s) => s.status != VisitsListStatus.loading);
+          },
+          child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
           children: [
             Row(children: [
@@ -107,6 +118,7 @@ class AnalyticsPage extends StatelessWidget {
             const SizedBox(height: 10),
             _ByEmployee(visits: visits),
           ],
+          ),
         );
       },
     );

@@ -1182,13 +1182,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsSynced => 'تمت المزامنة';
 
   @override
-  String get settingsSyncedJustNow => 'منذ لحظات';
+  String get settingsSyncNothingPending => 'لا يوجد شيء في الانتظار';
+
+  @override
+  String settingsSyncPendingCount(int count) {
+    return '$count في انتظار المزامنة';
+  }
 
   @override
   String get settingsHelp => 'المساعدة والدعم';
-
-  @override
-  String get settingsComingSoon => 'قريبًا';
 
   @override
   String get confirmLogoutTitle => 'تسجيل الخروج';

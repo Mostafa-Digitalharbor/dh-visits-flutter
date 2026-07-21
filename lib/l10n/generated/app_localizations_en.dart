@@ -1191,13 +1191,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSynced => 'Synced';
 
   @override
-  String get settingsSyncedJustNow => 'Just now';
+  String get settingsSyncNothingPending => 'Nothing pending';
+
+  @override
+  String settingsSyncPendingCount(int count) {
+    return '$count waiting to sync';
+  }
 
   @override
   String get settingsHelp => 'Help & support';
-
-  @override
-  String get settingsComingSoon => 'Coming soon';
 
   @override
   String get confirmLogoutTitle => 'Sign out';

@@ -233,6 +233,44 @@ class _ManagerShell extends StatefulWidget {
 class _ManagerShellState extends State<_ManagerShell> {
   int _tabIndex = 0; // 0 dashboard · 1 visits · 2 analytics
 
+  // Dashboard & Analytics need the FULL team dataset, so they get their own
+  // `team`-scoped blocs — independent of the list tab, whose scope changes as
+  // the manager switches pending/team/escalated chips.
+  //
+  // Held here rather than created inline in the IndexedStack so that switching
+  // tabs can refetch them. The stack builds each child once and keeps it alive,
+  // so a manager who approved a visit on the list tab came back to a Dashboard
+  // still showing the pre-approval counts — and Analytics, which has no
+  // pull-to-refresh, could not be corrected at all without restarting the app.
+  late final VisitsListBloc _dashboardBloc;
+  late final VisitsListBloc _analyticsBloc;
+
+  @override
+  void initState() {
+    super.initState();
+    _dashboardBloc = VisitsListBloc(repository: sl<VisitsRepository>())
+      ..add(const VisitsListLoadRequested(scope: VisitListScope.team));
+    _analyticsBloc = VisitsListBloc(repository: sl<VisitsRepository>())
+      ..add(const VisitsListLoadRequested(scope: VisitListScope.team));
+  }
+
+  @override
+  void dispose() {
+    _dashboardBloc.close();
+    _analyticsBloc.close();
+    super.dispose();
+  }
+
+  /// Refetch the tab being opened, so its numbers reflect any workflow action
+  /// taken while it was off-screen.
+  void _onTabSelected(int i) {
+    HapticFeedback.selectionClick();
+    setState(() => _tabIndex = i);
+    const reload = VisitsListLoadRequested(scope: VisitListScope.team);
+    if (i == 0) _dashboardBloc.add(reload);
+    if (i == 2) _analyticsBloc.add(reload);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isVisits = _tabIndex == 1;
@@ -260,19 +298,13 @@ class _ManagerShellState extends State<_ManagerShell> {
                 // their own `team`-scoped bloc — independent of the list tab,
                 // whose scope changes as the manager switches pending/team/
                 // escalated chips.
-                BlocProvider(
-                  create: (_) =>
-                      VisitsListBloc(repository: sl<VisitsRepository>())
-                        ..add(const VisitsListLoadRequested(
-                            scope: VisitListScope.team)),
+                BlocProvider.value(
+                  value: _dashboardBloc,
                   child: const DashboardPage(),
                 ),
                 const VisitsListPage(),
-                BlocProvider(
-                  create: (_) =>
-                      VisitsListBloc(repository: sl<VisitsRepository>())
-                        ..add(const VisitsListLoadRequested(
-                            scope: VisitListScope.team)),
+                BlocProvider.value(
+                  value: _analyticsBloc,
                   child: const AnalyticsPage(),
                 ),
               ],
@@ -290,10 +322,7 @@ class _ManagerShellState extends State<_ManagerShell> {
           : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tabIndex,
-        onDestinationSelected: (i) {
-          HapticFeedback.selectionClick();
-          setState(() => _tabIndex = i);
-        },
+        onDestinationSelected: _onTabSelected,
         destinations: [
           NavigationDestination(
             icon: const Icon(Symbols.dashboard),

@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../api/api_exceptions.dart';
 import '../../features/visits/data/visits_repository.dart';
 import 'connectivity_status.dart';
+import '../utils/app_log.dart';
 
 /// One queued visit workflow action (currently **Start** / **End**) that we
 /// couldn't send to the server because the network was down. We keep the
@@ -73,6 +74,7 @@ class DroppedAction {
 
 class PendingActionsQueue {
   static const _prefsKey = 'pending_visit_actions_v1';
+  static const _lastSyncKey = 'pending_visit_actions_last_sync_v1';
 
   final SharedPreferences prefs;
   final VisitsRepository repository;
@@ -84,6 +86,14 @@ class PendingActionsQueue {
   /// Broadcast: number of pending actions changed. Listeners can
   /// `setState` to redraw a "pending sync" badge.
   final ValueNotifier<int> pendingCount = ValueNotifier<int>(0);
+
+  /// When a queued action last replayed to the server successfully, or `null`
+  /// if nothing has ever been synced from this device.
+  ///
+  /// Persisted so it survives a restart. The Settings "Last sync" row renders
+  /// this — it must be a real observation, never a stand-in string, or a field
+  /// employee with unsynced check-ins is told their work is already uploaded.
+  final ValueNotifier<DateTime?> lastSyncedAt = ValueNotifier<DateTime?>(null);
 
   /// Fires when a queued action successfully syncs to the server, so
   /// the list pages can refresh their data.
@@ -106,6 +116,7 @@ class PendingActionsQueue {
     required this.connectivity,
   }) {
     pendingCount.value = _readAll().length;
+    lastSyncedAt.value = _readLastSync();
     // Retry queued work whenever connectivity recovers. Cheap — only
     // makes the network round-trip if the queue is non-empty.
     connectivity.addListener(() {
@@ -130,12 +141,21 @@ class PendingActionsQueue {
     _ticker = null;
   }
 
-  /// Save `payload` against `visitId`. If an action for the same
-  /// visit already exists we replace it — the latest user intent
-  /// wins.
+  /// Save `payload` against `visitId`, replacing any queued action of the
+  /// **same type** for that visit.
+  ///
+  /// Deliberately keyed on `(visitId, type)` rather than `visitId` alone. The
+  /// original visit-only key still deduped a double-tapped check-in (that's why
+  /// it exists, and same-type replacement keeps it doing so) — but it also made
+  /// an offline End *overwrite* the offline Start of the same visit. The server
+  /// would then receive an End for a visit it still had as `approved`, refuse
+  /// it, and the rep's entire dead-zone visit would be dropped. Both halves now
+  /// queue and replay in the order they were performed.
   Future<void> enqueue(int visitId, Map<String, dynamic> payload) async {
     final all = _readAll();
-    all.removeWhere((a) => a.visitId == visitId);
+    final type = payload['type']?.toString();
+    all.removeWhere(
+        (a) => a.visitId == visitId && a.payload['type']?.toString() == type);
     all.add(PendingAction(
       visitId: visitId,
       payload: payload,
@@ -165,10 +185,12 @@ class PendingActionsQueue {
       final actions = _readAll();
       if (actions.isEmpty) return;
       final survivors = <PendingAction>[];
+      var syncedAny = false;
       for (var i = 0; i < actions.length; i++) {
         final a = actions[i];
         try {
           await _replay(a);
+          syncedAny = true;
           _synced.add(a.visitId);
         } on ApiException catch (e) {
           if (e.code == ApiErrorCode.network ||
@@ -180,12 +202,12 @@ class PendingActionsQueue {
           // 4xx / server errors (e.g. the visit's state moved on server-side
           // while we were offline) → drop the action, but announce it: the
           // user was promised this work was saved.
-          debugPrint(
+          appLog(
               '[PendingActionsQueue] dropping visit ${a.visitId}: '
               '${e.code} ${e.serverMessage}');
           _dropped.add(DroppedAction(visitId: a.visitId, error: e));
         } catch (e) {
-          debugPrint(
+          appLog(
               '[PendingActionsQueue] dropping visit ${a.visitId}: $e');
           _dropped.add(DroppedAction(
             visitId: a.visitId,
@@ -194,6 +216,9 @@ class PendingActionsQueue {
         }
       }
       await _writeAll(survivors);
+      // Only stamp a sync we actually observed. A flush that replayed nothing
+      // (all still offline) must leave the previous timestamp alone.
+      if (syncedAny) await _writeLastSync(DateTime.now());
     } finally {
       _flushing = false;
     }
@@ -228,27 +253,48 @@ class PendingActionsQueue {
           isMocked: isMocked,
         );
       default:
-        // Unknown / legacy payload — nothing we can replay; let it drain.
-        debugPrint(
-            '[PendingActionsQueue] discarding unknown action "$type" for '
-            'visit ${a.visitId}');
+        // Unknown / legacy payload — we cannot replay it, but it must NOT
+        // return normally: [flush] would then count it as a successful sync,
+        // fire `_synced`, stamp "Last sync = now" and drop it without a word.
+        // The user would be told the work uploaded while it was deleted.
+        // Throwing routes it through flush's drop path, which announces it.
+        throw ApiException.unexpected(
+          StateError('unreplayable queued action "$type" for visit ${a.visitId}'),
+        );
     }
   }
 
   List<PendingAction> _readAll() {
     final raw = prefs.getString(_prefsKey);
     if (raw == null || raw.isEmpty) return [];
+    final List<dynamic> list;
     try {
-      final list = jsonDecode(raw) as List;
-      return list
-          .whereType<Map>()
-          .map((m) => PendingAction.fromJson(Map<String, dynamic>.from(m)))
-          .toList();
+      list = jsonDecode(raw) as List;
     } catch (_) {
-      // Corrupt blob (different schema?) — drop and start fresh
-      // rather than crash on read.
+      // The whole blob is unreadable (not JSON, or not a list) — nothing to
+      // salvage. Start fresh rather than crash on read.
       return [];
     }
+    // Parse entry by entry. This loop used to sit inside the try above, so a
+    // single malformed record — one null `visitId` from a partial write — threw
+    // and discarded EVERY queued action, including the rep's other completed
+    // check-ins. They vanished with pendingCount reading 0, so neither the
+    // offline banner nor Settings showed anything was lost.
+    final actions = <PendingAction>[];
+    var skipped = 0;
+    for (final m in list.whereType<Map>()) {
+      try {
+        actions.add(PendingAction.fromJson(Map<String, dynamic>.from(m)));
+      } catch (e) {
+        skipped++;
+        appLog('[PendingActionsQueue] skipping unreadable queue entry: $e');
+      }
+    }
+    if (skipped > 0) {
+      appLog('[PendingActionsQueue] $skipped unreadable entry/entries '
+          'skipped; ${actions.length} kept');
+    }
+    return actions;
   }
 
   Future<void> _writeAll(List<PendingAction> actions) async {
@@ -257,10 +303,22 @@ class PendingActionsQueue {
     pendingCount.value = actions.length;
   }
 
+  DateTime? _readLastSync() {
+    final raw = prefs.getString(_lastSyncKey);
+    if (raw == null || raw.isEmpty) return null;
+    return DateTime.tryParse(raw);
+  }
+
+  Future<void> _writeLastSync(DateTime when) async {
+    await prefs.setString(_lastSyncKey, when.toIso8601String());
+    lastSyncedAt.value = when;
+  }
+
   void dispose() {
     _ticker?.cancel();
     _synced.close();
     _dropped.close();
     pendingCount.dispose();
+    lastSyncedAt.dispose();
   }
 }

@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 import '../../../core/api/api_exceptions.dart';
 import '../data/models/visit.dart';
 import '../data/visits_repository.dart';
+import '../../../core/utils/app_log.dart';
 
 part 'visit_event.dart';
 part 'visit_state.dart';
@@ -41,6 +42,12 @@ class VisitBloc extends Bloc<VisitEvent, VisitState> {
       ));
     } on ApiException {
       // Silent — recovery is best-effort.
+    } catch (e) {
+      // Also silent, but it must be *caught*: a parse failure here throws a
+      // TypeError rather than an ApiException, which would escape to the bloc
+      // error handler. The rep would lose their running-visit bar (and the
+      // quick path to End) with nothing explaining why.
+      appLog('[VisitBloc] resume failed: $e');
     }
   }
 }

@@ -1,7 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../constants.dart';
+import 'app_log.dart';
 
 /// Small helpers around `url_launcher` for the two outbound actions the
 /// app needs: calling the customer and opening their coords in the system
@@ -60,7 +60,7 @@ class Communications {
         mode: LaunchMode.externalApplication,
       );
     } catch (e) {
-      debugPrint('[debug] Communications.launch failed: $e');
+      appLog('[debug] Communications.launch failed: $e');
       return false;
     }
   }
