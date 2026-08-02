@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/routes.dart';
 
 import '../../../shared/extensions/context_extensions.dart';
+import '../../../shared/widgets/debounced_search_field.dart';
 import '../../../shared/widgets/empty_view.dart';
 import '../../../shared/widgets/error_view.dart';
 import '../../../shared/widgets/skeleton.dart';
@@ -12,8 +13,6 @@ import '../../../shared/widgets/visit_card.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/data/models/user.dart';
 import '../bloc/visits_list_bloc.dart';
-import '../data/models/visit.dart';
-import '../../../app/design/app_dimens.dart';
 import '../../../shared/widgets/app_refresh_indicator.dart';
 
 /// Primary visits screen. Field users see only their own visits (REST `/my`);
@@ -27,8 +26,6 @@ class VisitsListPage extends StatefulWidget {
 }
 
 class _VisitsListPageState extends State<VisitsListPage> {
-  final _searchCtrl = TextEditingController();
-
   @override
   void initState() {
     super.initState();
@@ -42,12 +39,6 @@ class _VisitsListPageState extends State<VisitsListPage> {
         bloc.add(VisitsListLoadRequested(scope: scope));
       }
     });
-  }
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
   }
 
   List<VisitListScope> _scopesFor(AuthUser? user) {
@@ -86,83 +77,69 @@ class _VisitsListPageState extends State<VisitsListPage> {
     }
   }
 
-  List<Visit> _filter(VisitsListState state) {
-    final q = state.searchQuery.trim().toLowerCase();
-    return state.items.where((v) {
-      if (state.stateFilter != null && v.state != state.stateFilter) {
-        return false;
-      }
-      if (q.isEmpty) return true;
-      return (v.partnerName ?? '').toLowerCase().contains(q) ||
-          (v.name ?? '').toLowerCase().contains(q) ||
-          (v.purpose ?? '').toLowerCase().contains(q);
-    }).toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     final user = context.read<AuthBloc>().state.user;
     final scopes = _scopesFor(user);
 
-    return BlocBuilder<VisitsListBloc, VisitsListState>(
-      builder: (context, state) {
-        final bloc = context.read<VisitsListBloc>();
-        final visits = _filter(state);
-        return Column(
-          children: [
-            if (scopes.length > 1)
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                child: Row(
-                  children: [
-                    for (final s in scopes)
-                      Padding(
-                        padding: const EdgeInsetsDirectional.only(end: 8),
-                        child: ChoiceChip(
-                          label: Text(_scopeLabel(context, s)),
-                          selected: state.scope == s,
-                          onSelected: (_) =>
-                              bloc.add(VisitsListScopeChanged(s)),
-                        ),
+    return Column(
+      children: [
+        // Outside the builder below: the chips only depend on `scope`, and the
+        // search box owns a `TextField` whose controller must not be rebuilt
+        // on every list emit.
+        if (scopes.length > 1)
+          BlocSelector<VisitsListBloc, VisitsListState, VisitListScope>(
+            selector: (s) => s.scope,
+            builder: (context, scope) => SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Row(
+                children: [
+                  for (final s in scopes)
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 8),
+                      child: ChoiceChip(
+                        label: Text(_scopeLabel(context, s)),
+                        selected: scope == s,
+                        onSelected: (_) => context
+                            .read<VisitsListBloc>()
+                            .add(VisitsListScopeChanged(s)),
                       ),
-                  ],
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-              child: TextField(
-                controller: _searchCtrl,
-                decoration: InputDecoration(
-                  hintText: context.s.wfSearchHint,
-                  prefixIcon: const Icon(Icons.search),
-                  isDense: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(Radii.sm),
-                  ),
-                ),
-                onChanged: (q) => bloc.add(VisitsListSearchChanged(q)),
+                    ),
+                ],
               ),
             ),
-            Expanded(
-              child: _content(context, state, visits, bloc),
-            ),
-          ],
-        );
-      },
+          ),
+        // Debounced like the customers screen. A raw `onChanged` fired a bloc
+        // event per keystroke, and each emit re-filtered every row and rebuilt
+        // the whole list — the worst typing latency in the app on a slow phone.
+        DebouncedSearchField(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          hintText: context.s.wfSearchHint,
+          onChanged: (q) =>
+              context.read<VisitsListBloc>().add(VisitsListSearchChanged(q)),
+        ),
+        Expanded(
+          child: BlocBuilder<VisitsListBloc, VisitsListState>(
+            builder: (context, state) => _content(context, state),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _content(
-    BuildContext context,
-    VisitsListState state,
-    List<Visit> visits,
-    VisitsListBloc bloc,
-  ) {
-    if (state.status == VisitsListStatus.loading) {
+  Widget _content(BuildContext context, VisitsListState state) {
+    final bloc = context.read<VisitsListBloc>();
+    final visits = state.visible;
+
+    // `&& items.isEmpty` on both guards: a pull-to-refresh over a populated
+    // list used to replace it with a skeleton and then, if the refresh failed,
+    // with a full-screen error — throwing away rows the user was reading. Now
+    // only a first load (nothing to show yet) takes the screen over.
+    if (state.status == VisitsListStatus.loading && state.items.isEmpty) {
       return const SkeletonList(itemCount: 6);
     }
-    if (state.status == VisitsListStatus.failure) {
+    if (state.status == VisitsListStatus.failure && state.items.isEmpty) {
       return ErrorView(
         message: state.error?.localize(context) ?? context.s.errUnknown,
         onRetry: () => bloc.add(const VisitsListLoadRequested()),
@@ -171,7 +148,11 @@ class _VisitsListPageState extends State<VisitsListPage> {
     if (visits.isEmpty) {
       return EmptyView(
         icon: Icons.event_note_outlined,
-        message: _emptyLabel(context, state.scope),
+        // A search that matches nothing is not an empty queue — saying "no
+        // visits assigned to you" there reads as data loss.
+        message: state.searchQuery.trim().isEmpty
+            ? _emptyLabel(context, state.scope)
+            : context.s.wfSearchNoMatch,
       );
     }
     final showEmployee = state.scope != VisitListScope.mine;
@@ -183,6 +164,7 @@ class _VisitsListPageState extends State<VisitsListPage> {
         itemBuilder: (ctx, i) {
           final v = visits[i];
           return VisitCard(
+            key: ValueKey(v.id),
             visit: v,
             showEmployee: showEmployee,
             onTap: () => ctx.push(AppRoutes.visitDetail(v.id), extra: v),

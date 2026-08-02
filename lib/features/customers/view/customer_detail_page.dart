@@ -170,14 +170,18 @@ class _CustomerBody extends StatelessWidget {
                   margin: EdgeInsets.zero,
                   child: ListTile(
                     leading: const Icon(Icons.history),
-                    title: Text(customer.lastVisit!.employeeName ??
-                        '#${customer.lastVisit!.id}'),
-                    subtitle: Text(customer.lastVisit!.checkOutTime != null
-                        ? context.s.wfStateDone
-                        : context.s.wfStateInProgress),
-                    trailing: Icon(context.isRtl
-                        ? Icons.chevron_left
-                        : Icons.chevron_right),
+                    title: Text(
+                      customer.lastVisit!.employeeName ??
+                          '#${customer.lastVisit!.id}',
+                    ),
+                    subtitle: Text(
+                      customer.lastVisit!.checkOutTime != null
+                          ? context.s.wfStateDone
+                          : context.s.wfStateInProgress,
+                    ),
+                    trailing: Icon(
+                      context.isRtl ? Icons.chevron_left : Icons.chevron_right,
+                    ),
                     onTap: () => context.push(
                       AppRoutes.visitDetail(customer.lastVisit!.id),
                       extra: customer.lastVisit,
@@ -197,10 +201,12 @@ class _CustomerBody extends StatelessWidget {
                   AppConstants.defaultRadiusMeters.toStringAsFixed(0),
                 ),
                 icon: Icons.map_outlined,
-                onPressed: () => context.push(
-                  AppRoutes.customerNearby(customer.id),
-                  extra: customer,
-                ),
+                onPressed: customer.hasCoordinates
+                    ? () => context.push(
+                        AppRoutes.customerNearby(customer.id),
+                        extra: customer,
+                      )
+                    : null,
               ),
             ],
           ),
@@ -242,8 +248,11 @@ class _CustomerHero extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: customer.isCompany
-                ? Icon(Icons.apartment_rounded,
-                    color: colors.onPrimary, size: 36)
+                ? Icon(
+                    Icons.apartment_rounded,
+                    color: colors.onPrimary,
+                    size: 36,
+                  )
                 : Text(
                     InitialAvatar.initialOf(customer.name),
                     style: TextStyle(
@@ -299,12 +308,12 @@ class _QuickActionsRow extends StatelessWidget {
             color: context.colors.primary,
             onTap: customer.hasCoordinates
                 ? () => context.openExternal(
-                      () => Communications.openInMaps(
-                        customer.latitude,
-                        customer.longitude,
-                        label: customer.name,
-                      ),
-                    )
+                    () => Communications.openInMaps(
+                      customer.latitude,
+                      customer.longitude,
+                      label: customer.name,
+                    ),
+                  )
                 : null,
           ),
         ),
@@ -434,14 +443,16 @@ class _CustomerInfoCard extends StatelessWidget {
             InfoRow(icon: Icons.place_outlined, text: address),
           if (customer.phone != null)
             InkWell(
-              onTap: () => context
-                  .openExternal(() => Communications.dial(customer.phone!)),
+              onTap: () => context.openExternal(
+                () => Communications.dial(customer.phone!),
+              ),
               child: InfoRow(icon: Icons.phone_outlined, text: customer.phone!),
             ),
           if (customer.email != null)
             InkWell(
-              onTap: () => context
-                  .openExternal(() => Communications.mailto(customer.email!)),
+              onTap: () => context.openExternal(
+                () => Communications.mailto(customer.email!),
+              ),
               child: InfoRow(icon: Icons.mail_outline, text: customer.email!),
             ),
           if (customer.jobPosition != null)
@@ -456,8 +467,9 @@ class _CustomerInfoCard extends StatelessWidget {
             ),
           if (customer.website != null)
             InkWell(
-              onTap: () => context
-                  .openExternal(() => Communications.openWeb(customer.website!)),
+              onTap: () => context.openExternal(
+                () => Communications.openWeb(customer.website!),
+              ),
               child: InfoRow(icon: Icons.link, text: customer.website!),
             ),
           if (customer.vat != null)
@@ -478,7 +490,8 @@ class _CustomerInfoCard extends StatelessWidget {
               ),
               child: InfoRow(
                 icon: Icons.my_location,
-                text: '${customer.latitude.toStringAsFixed(6)}, '
+                text:
+                    '${customer.latitude.toStringAsFixed(6)}, '
                     '${customer.longitude.toStringAsFixed(6)}',
               ),
             )
@@ -488,8 +501,9 @@ class _CustomerInfoCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               s.customerFieldTags,
-              style: context.text.labelSmall
-                  ?.copyWith(color: cs.onSurfaceVariant),
+              style: context.text.labelSmall?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 6),
             Wrap(
@@ -498,8 +512,10 @@ class _CustomerInfoCard extends StatelessWidget {
               children: [
                 for (final t in customer.categories)
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: cs.tertiary.withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(Radii.pill),
@@ -540,7 +556,6 @@ class _SectionLabel extends StatelessWidget {
     );
   }
 }
-
 
 class _DetailSkeleton extends StatelessWidget {
   const _DetailSkeleton();

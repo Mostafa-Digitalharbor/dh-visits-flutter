@@ -92,8 +92,10 @@ class _VisitDetailView extends StatelessWidget {
         // terminal actions never asked for a reload at all.
         //
         // Attachment uploads don't alter the list's rendering, so they're the
-        // one action that doesn't need it.
-        if (action != 'upload_attachment') {
+        // one action that doesn't need it. (This compared against
+        // `'upload_attachment'`, which the cubit never emits — the action is
+        // named `'attachment'` — so every upload refetched the whole list.)
+        if (action != 'attachment') {
           context.read<VisitsListBloc>().add(const VisitsListLoadRequested());
         }
 

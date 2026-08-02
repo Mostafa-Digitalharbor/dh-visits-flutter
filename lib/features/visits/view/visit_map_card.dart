@@ -33,19 +33,13 @@ class VisitMapCard extends StatefulWidget {
   State<VisitMapCard> createState() => _VisitMapCardState();
 }
 
-class _VisitMapCardState extends State<VisitMapCard>
-    with SingleTickerProviderStateMixin {
+class _VisitMapCardState extends State<VisitMapCard> {
   final MapController _map = MapController();
-  late final AnimationController _pulse;
   PartnerLocation? _partner;
 
   @override
   void initState() {
     super.initState();
-    _pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    )..repeat();
     _loadPartner();
   }
 
@@ -58,7 +52,6 @@ class _VisitMapCardState extends State<VisitMapCard>
 
   @override
   void dispose() {
-    _pulse.dispose();
     super.dispose();
   }
 
@@ -148,25 +141,36 @@ class _VisitMapCardState extends State<VisitMapCard>
                         maxZoom: AppConstants.mapMaxZoom, panBuffer: 2),
                     // Geofence + pulse ring, only when we know the customer point.
                     if (customer != null) ...[
-                      AnimatedBuilder(
-                        animation: _pulse,
-                        builder: (_, __) {
-                          final t = _pulse.value;
-                          return CircleLayer(
-                            circles: [
-                              CircleMarker(
-                                point: customer,
-                                radius: AppConstants.checkInRangeMeters *
-                                    (1.0 + t * 0.6),
-                                useRadiusInMeter: true,
-                                color: primary.withValues(alpha: (1 - t) * 0.12),
-                                borderColor:
-                                    primary.withValues(alpha: (1 - t) * 0.35),
-                                borderStrokeWidth: 1.5,
-                              ),
-                            ],
-                          );
-                        },
+                      // AmbientPulse, not a repeating controller: this rebuilds
+                      // a whole flutter_map layer per frame, and it used to do
+                      // so at 60fps for as long as the detail page stayed open.
+                      // The ring already fades to nothing as it expands, so it
+                      // rests invisibly between beats.
+                      AmbientPulse(
+                        period: const Duration(seconds: 2),
+                        rest: const Duration(milliseconds: 1200),
+                        curve: Curves.linear,
+                        builder: (_, beat) => AnimatedBuilder(
+                          animation: beat,
+                          builder: (_, __) {
+                            final t = beat.value;
+                            return CircleLayer(
+                              circles: [
+                                CircleMarker(
+                                  point: customer,
+                                  radius: AppConstants.checkInRangeMeters *
+                                      (1.0 + t * 0.6),
+                                  useRadiusInMeter: true,
+                                  color:
+                                      primary.withValues(alpha: (1 - t) * 0.12),
+                                  borderColor:
+                                      primary.withValues(alpha: (1 - t) * 0.35),
+                                  borderStrokeWidth: 1.5,
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                       ),
                       CircleLayer(
                         circles: [

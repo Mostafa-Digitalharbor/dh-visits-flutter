@@ -45,8 +45,30 @@ Future<void> main() async {
   }
 }
 
+/// Ceiling on Flutter's decoded-image cache.
+///
+/// The default is 100 MiB / 1000 entries, which is sized for a device with
+/// memory to spare. This app's only images are OSM map tiles — 256×256 PNGs
+/// that decode to ~256 KB each in RGBA — plus one logo, and four screens show a
+/// map (dashboard, route, visit detail, nearby radar). The nearby map alone
+/// keeps a 5-tile buffer around the viewport, so a rep who pans around a city
+/// can fill the default cache with tiles they will never look at again and hold
+/// ~100 MB resident. On the 1–2 GB phones this app is deployed to, that is the
+/// difference between staying alive in the background and being killed — which
+/// for a GPS check-in app means losing the visit in progress.
+///
+/// 32 MiB still holds roughly two full screens of tiles, so panning back a
+/// little is instant, while leaving the process footprint somewhere Android's
+/// low-memory killer will tolerate.
+const int _imageCacheBytes = 32 * 1024 * 1024;
+const int _imageCacheEntries = 160;
+
 Future<void> _bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  PaintingBinding.instance.imageCache
+    ..maximumSizeBytes = _imageCacheBytes
+    ..maximumSize = _imageCacheEntries;
   // Route every unhandled BLoC error through Sentry (expected ApiExceptions
   // like network/timeout/permission are filtered out inside the observer).
   if (AppEnvironment.sentryEnabled) {
@@ -56,9 +78,17 @@ Future<void> _bootstrap() async {
   // in the user's `res.users.tz` regardless of the device's clock.
   tz_data.initializeTimeZones();
 
-  // Load intl's date symbols for every locale we ship. Without this,
+  // Load intl's date symbols for the locales we ship. Without this,
   // `DateFormat(..., 'ar')` throws on first use; see [AppDate].
-  await initializeDateFormatting();
+  //
+  // Named explicitly rather than calling the no-arg form: that one deserialises
+  // the symbol *and* pattern data for every locale intl knows about (~180) on
+  // the startup path, to serve an app whose `supportedLocales` is two entries
+  // long. This is measured before the first frame, so it is pure launch cost.
+  await Future.wait([
+    initializeDateFormatting('en'),
+    initializeDateFormatting('ar'),
+  ]);
 
   // Firebase + push. initializeApp must run before any FCM use (including the
   // background isolate handler, which we register here at startup). A failure
@@ -75,9 +105,22 @@ Future<void> _bootstrap() async {
 
   await setupServiceLocator();
 
-  // Wire up FCM handlers (permission, foreground banner, tap → deep link).
-  // Token registration itself happens after login (see app.dart).
-  await sl<PushNotificationService>().initialize();
-
   runApp(const CustomerVisitsApp());
+
+  // Deliberately after `runApp` and deliberately not awaited: this asks the OS
+  // for notification permission and registers platform handlers, none of which
+  // the first frame depends on. Awaiting it kept the native splash up for the
+  // whole round trip — on a cold start on a slow device that is the difference
+  // between the app appearing to launch and appearing to hang.
+  unawaited(_initPush());
+}
+
+Future<void> _initPush() async {
+  try {
+    // Wire up FCM handlers (permission, foreground banner, tap → deep link).
+    // Token registration itself happens after login (see app.dart).
+    await sl<PushNotificationService>().initialize();
+  } catch (e) {
+    appLog('[push] handler setup failed: $e');
+  }
 }

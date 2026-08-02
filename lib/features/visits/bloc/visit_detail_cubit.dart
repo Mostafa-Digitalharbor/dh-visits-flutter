@@ -203,27 +203,31 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
       ));
       return true;
     } on ApiException catch (e) {
-      // Reload so the header stays truthful even after a failed action.
-      final visit = await _safeReload();
-      _safeEmit(VisitDetailState(
-        status: VisitDetailStatus.ready,
-        visit: visit ?? state.visit,
-        error: e,
-        attachments: state.attachments,
-        mockFlagged: state.mockFlagged,
-      ));
+      await _emitFailure(e);
       return false;
     } catch (e) {
-      final visit = await _safeReload();
-      _safeEmit(VisitDetailState(
-        status: VisitDetailStatus.ready,
-        visit: visit ?? state.visit,
-        error: ApiException.unexpected(e),
-        attachments: state.attachments,
-        mockFlagged: state.mockFlagged,
-      ));
+      await _emitFailure(ApiException.unexpected(e));
       return false;
     }
+  }
+
+  /// Settles back to `ready` with [error] attached, after re-reading the visit
+  /// so the header and action bar stay truthful even though the action failed.
+  ///
+  /// Both action runners have an `ApiException` arm and a catch-all arm, and
+  /// each used to spell this state out by hand — four copies of the same
+  /// six-field constructor. They are easy to write *almost* right: dropping
+  /// `mockFlagged` from one of them silently clears a spoofing warning, which
+  /// is exactly the kind of bug a reviewer does not catch by eye.
+  Future<void> _emitFailure(ApiException error) async {
+    final visit = await _safeReload();
+    _safeEmit(VisitDetailState(
+      status: VisitDetailStatus.ready,
+      visit: visit ?? state.visit,
+      error: error,
+      attachments: state.attachments,
+      mockFlagged: state.mockFlagged,
+    ));
   }
 
   /// Re-reads the visit and its attachments together after an action. Uploads
@@ -363,14 +367,7 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
         try {
           await sl<PendingActionsQueue>().enqueue(visitId, payload);
         } catch (queueError) {
-          final visit = await _safeReload();
-          _safeEmit(VisitDetailState(
-            status: VisitDetailStatus.ready,
-            visit: visit ?? state.visit,
-            error: ApiException.unexpected(queueError),
-            attachments: state.attachments,
-            mockFlagged: state.mockFlagged,
-          ));
+          await _emitFailure(ApiException.unexpected(queueError));
           return false;
         }
         // Advance the local state to match what was queued. Without this the
@@ -402,24 +399,10 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
         ));
         return true;
       }
-      final visit = await _safeReload();
-      _safeEmit(VisitDetailState(
-        status: VisitDetailStatus.ready,
-        visit: visit ?? state.visit,
-        error: e,
-        attachments: state.attachments,
-        mockFlagged: state.mockFlagged,
-      ));
+      await _emitFailure(e);
       return false;
     } catch (e) {
-      final visit = await _safeReload();
-      _safeEmit(VisitDetailState(
-        status: VisitDetailStatus.ready,
-        visit: visit ?? state.visit,
-        error: ApiException.unexpected(e),
-        attachments: state.attachments,
-        mockFlagged: state.mockFlagged,
-      ));
+      await _emitFailure(ApiException.unexpected(e));
       return false;
     }
   }

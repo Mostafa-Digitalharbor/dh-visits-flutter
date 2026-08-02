@@ -3,11 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../app/theme.dart';
-import '../../../core/utils/distance.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../visits/bloc/visits_list_bloc.dart';
-import '../../visits/data/models/visit.dart';
+import '../../visits/domain/visit_metrics.dart';
 import '../../../core/utils/duration_format.dart';
 
 /// Manager analytics (design screen 03). All metrics are derived from the
@@ -21,6 +20,14 @@ class AnalyticsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<VisitsListBloc, VisitsListState>(
       builder: (context, state) {
+        // This tab's bloc fetches when the tab is first opened, so the very
+        // first frame has no data. Rendering the metric tiles then would show
+        // a confident "0% on-time · 0 km" for as long as the request takes.
+        if (state.items.isEmpty &&
+            (state.status == VisitsListStatus.loading ||
+                state.status == VisitsListStatus.initial)) {
+          return const _AnalyticsSkeleton();
+        }
         // Without this, a failed fetch renders every metric as 0% / 0 km with
         // confident-looking week-over-week deltas — fabricated analytics the
         // manager has no reason to distrust.
@@ -32,22 +39,13 @@ class AnalyticsPage extends StatelessWidget {
                 .add(const VisitsListLoadRequested()),
           );
         }
-        final visits = state.items;
-        final now = DateTime.now();
-        final today = DateTime(now.year, now.month, now.day);
-        List<Visit> window(int startDaysAgo, int endDaysAgo) {
-          final start = today.subtract(Duration(days: startDaysAgo));
-          final end = today.subtract(Duration(days: endDaysAgo));
-          return visits.where((v) {
-            final d = v.effectiveDate?.toLocal();
-            if (d == null) return false;
-            final day = DateTime(d.year, d.month, d.day);
-            return !day.isBefore(start) && !day.isAfter(end);
-          }).toList();
-        }
-
-        final cur = _Metrics.from(window(6, 0));
-        final prev = _Metrics.from(window(13, 7));
+        // One sweep builds this week's and last week's figures, the weekly
+        // series and the employee table together — see [AnalyticsSummary].
+        // Every tile below used to run its own pass over the full list on each
+        // rebuild.
+        final summary = AnalyticsSummary.from(state.items);
+        final cur = summary.current;
+        final prev = summary.previous;
 
         // Pull-to-refresh, matching the Dashboard. Without it this page had no
         // way to refetch at all — its bloc is built once and kept alive by the
@@ -103,20 +101,20 @@ class AnalyticsPage extends StatelessWidget {
                 child: _MetricTile(
                   icon: Symbols.timelapse,
                   tone: context.colors.tertiary,
-                  value: cur.avgLabel,
+                  value: Duration(minutes: cur.avgMinutes).clock,
                   label: context.s.analyticsAvgDuration,
-                  delta: cur.avgMin - prev.avgMin,
+                  delta: cur.avgMinutes - prev.avgMinutes,
                   deltaUnit: context.s.unitMinShort,
                   invertDelta: true,
                 ),
               ),
             ]),
             const SizedBox(height: 16),
-            _WeeklyChart(visits: visits),
+            _WeeklyChart(summary: summary),
             const SizedBox(height: 18),
             SectionHeader(icon: Symbols.leaderboard, label: context.s.analyticsByEmployee),
             const SizedBox(height: 10),
-            _ByEmployee(visits: visits),
+            _ByEmployee(rows: summary.byEmployee),
           ],
           ),
         );
@@ -124,41 +122,38 @@ class AnalyticsPage extends StatelessWidget {
     );
   }
 
-  static int _pctDelta(num cur, num prev) {
-    if (prev == 0) return cur == 0 ? 0 : 100;
-    return (((cur - prev) / prev) * 100).round();
-  }
+  static int _pctDelta(num cur, num prev) => AnalyticsSummary.pctDelta(cur, prev);
 }
 
-class _Metrics {
-  final int count;
-  final int onTimePct;
-  final int km;
-  final int avgMin;
-  const _Metrics(this.count, this.onTimePct, this.km, this.avgMin);
+/// Matches the real layout's rhythm — two tile rows, the weekly chart, then the
+/// employee table — so the screen doesn't jump when the data lands.
+class _AnalyticsSkeleton extends StatelessWidget {
+  const _AnalyticsSkeleton();
 
-  String get avgLabel => Duration(minutes: avgMin).clock;
-
-  factory _Metrics.from(List<Visit> visits) {
-    final completed = visits.where((v) => v.isDone).toList();
-    final onTime = completed.where((v) => (v.executionDaysDelta ?? 0) == 0).length;
-    final pct = completed.isEmpty ? 0 : (onTime / completed.length * 100).round();
-    // Field km — sum of distances between consecutive check-in points.
-    final pts = visits
-        .where((v) => v.hasCheckInLocation)
-        .toList()
-      ..sort((a, b) => (a.checkInTime ?? DateTime(0)).compareTo(b.checkInTime ?? DateTime(0)));
-    double meters = 0;
-    for (var i = 1; i < pts.length; i++) {
-      meters += haversineMeters(
-          pts[i - 1].checkInLat!, pts[i - 1].checkInLng!, pts[i].checkInLat!, pts[i].checkInLng!);
-    }
-    final durations = completed.where((v) => v.visitDuration != null).toList();
-    final avgMin = durations.isEmpty
-        ? 0
-        : (durations.fold<int>(0, (s, v) => s + v.visitDuration!.inMinutes) / durations.length)
-            .round();
-    return _Metrics(visits.length, pct, (meters / 1000).round(), avgMin);
+  @override
+  Widget build(BuildContext context) {
+    return AppShimmer(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+        children: const [
+          Row(children: [
+            Expanded(child: SkeletonCard(height: 104)),
+            SizedBox(width: 12),
+            Expanded(child: SkeletonCard(height: 104)),
+          ]),
+          SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: SkeletonCard(height: 104)),
+            SizedBox(width: 12),
+            Expanded(child: SkeletonCard(height: 104)),
+          ]),
+          SizedBox(height: 16),
+          SkeletonCard(height: 220),
+          SizedBox(height: 18),
+          SkeletonCard(height: 240),
+        ],
+      ),
+    );
   }
 }
 
@@ -211,16 +206,34 @@ class _MetricTile extends StatelessWidget {
                 child: Icon(icon, fill: 1, size: 20, color: tone),
               ),
               const Spacer(),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(up ? Symbols.trending_up : Symbols.trending_down,
-                      size: 15, color: deltaColor),
-                  const SizedBox(width: 2),
-                  Text('${up ? '+' : ''}$delta$deltaUnit',
-                      style: TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.w700, color: deltaColor)),
-                ],
+              // On a 320dp screen these tiles are ~140dp wide, and a
+              // three-digit delta ("+100%") next to the 38dp icon badge does
+              // not fit: the Spacer collapses to zero and the row overflows.
+              //
+              // `FittedBox`, not an ellipsis. Ellipsising is safe but useless
+              // here — "+…" tells the manager nothing, and a delta that cannot
+              // be read may as well not be drawn. Scaling the whole chip down
+              // keeps the number legible on the phones that need it while
+              // leaving it at full size everywhere else.
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(up ? Symbols.trending_up : Symbols.trending_down,
+                          size: 15, color: deltaColor),
+                      const SizedBox(width: 2),
+                      Text('${up ? '+' : ''}$delta$deltaUnit',
+                          maxLines: 1,
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: deltaColor)),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -238,24 +251,16 @@ class _MetricTile extends StatelessWidget {
 }
 
 class _WeeklyChart extends StatelessWidget {
-  final List<Visit> visits;
-  const _WeeklyChart({required this.visits});
+  final AnalyticsSummary summary;
+  const _WeeklyChart({required this.summary});
 
   @override
   Widget build(BuildContext context) {
     final cs = context.colors;
     final x = context.x;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final days = List.generate(7, (i) => today.subtract(Duration(days: 6 - i)));
-    final counts = days.map((day) {
-      return visits.where((v) {
-        final d = v.effectiveDate?.toLocal();
-        if (d == null) return false;
-        return d.year == day.year && d.month == day.month && d.day == day.day;
-      }).length;
-    }).toList();
-    final maxCount = (counts.isEmpty ? 0 : counts.reduce((a, b) => a > b ? a : b));
+    final days = summary.weeklyDays;
+    final counts = summary.weeklyCounts;
+    final maxCount = summary.weeklyMax;
     // Indexed by DateTime.weekday % 7 (Sun = 0 … Sat = 6), localised via l10n.
     final s = context.s;
     final names = [
@@ -281,10 +286,16 @@ class _WeeklyChart extends StatelessWidget {
                     style: AppType.titleSm.copyWith(fontWeight: FontWeight.w700, color: cs.onSurface)),
               ),
               const SizedBox(width: 8),
-              Text(context.s.analyticsWeeklyCompare,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: x.textTertiary)),
+              // Flexible even though it already ellipsizes: a Row measures its
+              // inflexible children at their intrinsic width first, so on a
+              // narrow card this subtitle claimed more than was left and the
+              // Expanded title above it could not give any more back.
+              Flexible(
+                child: Text(context.s.analyticsWeeklyCompare,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: x.textTertiary)),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -327,25 +338,39 @@ class _Bar extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         Text('$count',
+            maxLines: 1,
             style: TextStyle(
                 fontSize: 12, fontWeight: FontWeight.w800, color: isToday ? cs.primary : x.textTertiary)),
         const SizedBox(height: 6),
-        TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0, end: frac),
-          duration: const Duration(milliseconds: 700),
-          curve: Curves.easeOutCubic,
-          builder: (_, v, __) => Container(
-            width: 16,
-            height: 8 + 80 * v,
-            decoration: BoxDecoration(
-              gradient: isToday ? x.avatarGradient : null,
-              color: isToday ? null : cs.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(8),
+        // The bar takes whatever the two labels leave rather than a hardcoded
+        // 8 + 80·v. Those fixed numbers plus the labels' own line heights added
+        // up to just over the chart's 148dp box — a one-pixel overflow at the
+        // default font scale, and a real clip at 1.25×. Now the column can
+        // never exceed its parent whatever the font metrics do.
+        Expanded(
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: frac),
+            duration: const Duration(milliseconds: 700),
+            curve: Curves.easeOutCubic,
+            builder: (_, v, __) => FractionallySizedBox(
+              alignment: Alignment.bottomCenter,
+              // Floor of 0.09 keeps an empty day visible as a stub rather than
+              // vanishing, which is what the old `8 +` term was for.
+              heightFactor: (0.09 + 0.91 * v).clamp(0.0, 1.0),
+              child: Container(
+                width: 16,
+                decoration: BoxDecoration(
+                  gradient: isToday ? x.avatarGradient : null,
+                  color: isToday ? null : cs.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
             ),
           ),
         ),
         const SizedBox(height: 8),
         Text(label,
+            maxLines: 1,
             style: TextStyle(
                 fontSize: 10,
                 fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
@@ -356,34 +381,23 @@ class _Bar extends StatelessWidget {
 }
 
 class _ByEmployee extends StatelessWidget {
-  final List<Visit> visits;
-  const _ByEmployee({required this.visits});
+  /// Already ranked and truncated — see [AnalyticsSummary].
+  final List<EmployeeOnTime> rows;
+  const _ByEmployee({required this.rows});
 
   @override
   Widget build(BuildContext context) {
-    final completed = visits.where((v) => v.isDone);
-    final byEmp = <String, List<Visit>>{};
-    for (final v in completed) {
-      final name = v.employeeName;
-      if (name == null || name.isEmpty) continue;
-      byEmp.putIfAbsent(name, () => []).add(v);
-    }
-    final rows = byEmp.entries.map((e) {
-      final onTime = e.value.where((v) => (v.executionDaysDelta ?? 0) == 0).length;
-      final pct = (onTime / e.value.length * 100).round();
-      return (name: e.key, pct: pct, visits: e.value.length);
-    }).toList()
-      ..sort((a, b) => b.pct.compareTo(a.pct));
-    final shown = rows.take(5).toList();
+    final shown = rows;
 
     if (shown.isEmpty) {
+      // Was a hand-rolled copy of this row whose Text had no Expanded, so the
+      // Arabic "no data" sentence overflowed the card. [InlineEmptyRow] exists
+      // precisely because four other screens made the same mistake.
       return AppCard(
-        child: Row(children: [
-          Icon(Symbols.inbox, color: context.x.textTertiary, size: 18),
-          const SizedBox(width: 8),
-          Text(context.s.dashboardNoData,
-              style: TextStyle(color: context.colors.onSurfaceVariant)),
-        ]),
+        child: InlineEmptyRow(
+          icon: Symbols.inbox,
+          text: context.s.dashboardNoData,
+        ),
       );
     }
 
@@ -392,7 +406,11 @@ class _ByEmployee extends StatelessWidget {
         children: [
           for (var i = 0; i < shown.length; i++) ...[
             if (i > 0) const SizedBox(height: 14),
-            _EmpRow(rank: i + 1, name: shown[i].name, pct: shown[i].pct, visits: shown[i].visits),
+            _EmpRow(
+                rank: i + 1,
+                name: shown[i].name,
+                pct: shown[i].onTimePct,
+                visits: shown[i].visits),
           ],
         ],
       ),

@@ -1469,6 +1469,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get wfSearchHint => 'ابحث بالعميل أو المرجع أو الغرض…';
 
   @override
+  String get wfSearchNoMatch => 'لا توجد زيارات مطابقة لبحثك';
+
+  @override
   String get wfRescheduleTitle => 'طلب إعادة جدولة';
 
   @override

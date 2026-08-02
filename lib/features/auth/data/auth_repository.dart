@@ -6,6 +6,7 @@ import '../../../core/api/api_exceptions.dart';
 import '../../../core/api/endpoints.dart';
 import '../../../core/api/odoo_rpc.dart';
 import '../../../core/config/server_config_repository.dart';
+import '../../../core/config/server_config.dart';
 import '../../../core/constants.dart';
 import '../../../core/storage/session_storage.dart';
 import 'models/user.dart';
@@ -35,14 +36,24 @@ class AuthRepository {
       appLog('[debug] AuthRepository.login: db=$db '
           'url=${api.baseUrl}${Endpoints.authenticate}');
     }
-    final result = await api.jsonRpc(
-      Endpoints.authenticate,
-      params: {
-        'db': db,
-        'login': login,
-        'password': password,
-      },
-    );
+    dynamic result;
+    try {
+      result = await _authenticate(db, login, password);
+    } on ApiException catch (error) {
+      // Odoo.sh changes the numeric suffix in a database name when an expired
+      // project is restored. Existing app installs still retain the old name
+      // in SharedPreferences, so a perfectly valid review account otherwise
+      // fails with "Database not found". When this is a single-database host,
+      // discover the replacement, persist it, and retry exactly once.
+      if (!_isMissingDatabase(error)) rethrow;
+      final detectedDb = await _detectSingleDatabase();
+      if (detectedDb == null || detectedDb == db) rethrow;
+      final current = serverConfig.read();
+      await serverConfig.save(
+        ServerConfig(baseUrl: current.baseUrl, database: detectedDb),
+      );
+      result = await _authenticate(detectedDb, login, password);
+    }
     // Never log `result` itself: it is the session payload (session id, user
     // context). debugPrint survives release builds, so that would write live
     // credentials to logcat on every login.
@@ -77,6 +88,26 @@ class AuthRepository {
 
     await session.saveUser(user.toJson());
     return user;
+  }
+
+  Future<dynamic> _authenticate(
+    String db,
+    String login,
+    String password,
+  ) =>
+      api.jsonRpc(
+        Endpoints.authenticate,
+        params: {'db': db, 'login': login, 'password': password},
+      );
+
+  static bool _isMissingDatabase(ApiException error) =>
+      error.serverMessage?.trim().toLowerCase() == 'database not found.';
+
+  Future<String?> _detectSingleDatabase() async {
+    final result = await api.jsonRpc(Endpoints.databaseList);
+    if (result is! List || result.length != 1) return null;
+    final db = result.single.toString().trim();
+    return db.isEmpty ? null : db;
   }
 
   /// Asks Odoo whether [uid] is in one specific `dh_visit_management` group.

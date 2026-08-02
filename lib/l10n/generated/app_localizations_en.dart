@@ -1478,6 +1478,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wfSearchHint => 'Search by customer, reference or purpose…';
 
   @override
+  String get wfSearchNoMatch => 'No visits match your search';
+
+  @override
   String get wfRescheduleTitle => 'Request reschedule';
 
   @override

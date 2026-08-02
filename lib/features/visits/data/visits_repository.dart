@@ -9,28 +9,21 @@ import '../../../core/api/odoo_rpc.dart';
 import '../../../core/constants.dart';
 import '../../../core/storage/session_storage.dart';
 import '../../attendance/data/attendance_repository.dart';
+import 'mock_location_note.dart';
 import 'models/visit.dart';
 import 'models/visit_activity.dart';
 import 'models/visit_attachment.dart';
 import 'models/visit_participant.dart';
 import '../../../core/utils/app_log.dart';
 
+// Re-exported so existing importers of this repository keep seeing the marker
+// and the phase enum at their original location.
+export 'mock_location_note.dart' show kMockLocationMarker, SpoofPhase;
+
 /// Which slice of visits a manager is looking at. Backing domains are applied
 /// on top of Odoo record rules (which already scope to the manager's
 /// hierarchy), so these only narrow by state.
 enum VisitManagerScope { team, pending, escalated }
-
-/// Which end of the visit a mock-location verdict belongs to.
-enum _SpoofPhase { start, end }
-
-/// Machine-readable marker embedded in every mock-location chatter note.
-///
-/// Detection keys off this token, never off the prose around it: the note is
-/// bilingual and will be reworded, but this must keep matching. It doubles as
-/// something a manager can paste into Odoo's own message search to pull every
-/// suspect visit — which is the closest thing to a filterable flag we have
-/// until `dh.visit` gains a real `is_mocked` column.
-const String kMockLocationMarker = 'DH-MOCK-GPS';
 
 /// Talks to the `dh_visit_management` Odoo module.
 ///
@@ -170,7 +163,7 @@ class VisitsRepository {
     );
     if (isMocked) {
       await _recordSpoofAttempt(visitId,
-          phase: _SpoofPhase.start,
+          phase: SpoofPhase.start,
           latitude: latitude,
           longitude: longitude,
           location: location);
@@ -207,7 +200,7 @@ class VisitsRepository {
     );
     if (isMocked) {
       await _recordSpoofAttempt(visitId,
-          phase: _SpoofPhase.end,
+          phase: SpoofPhase.end,
           latitude: latitude,
           longitude: longitude,
           location: location);
@@ -223,7 +216,8 @@ class VisitsRepository {
   }
 
   /// Writes a mock-location verdict onto the visit's chatter, permanently and
-  /// visibly to any manager reviewing the record in Odoo.
+  /// visibly to any manager reviewing the record in Odoo. The wording itself
+  /// lives in [MockLocationNote].
   ///
   /// **Why the chatter and not a field.** `dh.visit` has no `is_mocked` column
   /// and adding one needs the backend team, who as of 2026-07-16 still have not
@@ -236,62 +230,22 @@ class VisitsRepository {
   /// a workaround. A real indexed boolean stays the right long-term fix: it is
   /// what makes the signal *filterable* and *exportable*, which chatter is not.
   ///
-  /// **Why the body is bilingual and not localised.** This is a permanent audit
-  /// record read by whoever reviews it later, not UI addressed to the person
-  /// who triggered it. Localising it to the *spoofer's* device language would
-  /// mean an Arabic-phone rep produces a note their English-reading manager
-  /// cannot read — so both languages go in, always.
-  ///
-  /// **Why it posts plain text and then upgrades it.** Odoo 17+ trusts only a
-  /// `markupsafe.Markup` body and HTML-escapes a plain string, which JSON-RPC
-  /// cannot send — verified live 2026-07-18: an HTML body came back stored as
-  /// `&lt;p&gt;&lt;strong&gt;…`, i.e. the manager would read raw tags. Writing
-  /// `mail.message.body` afterwards is not escaped and does produce real
-  /// markup. So the first post carries a body that is already complete and
-  /// readable on its own, and the rewrite is a pure formatting improvement: if
-  /// it fails, the note is still there and still says everything. (Plain
-  /// newlines are not an option — Odoo stores them verbatim inside one `<p>`,
-  /// where HTML collapses them into a single run-on line.)
-  ///
   /// Best-effort: a failure here must never block or reverse a visit action
   /// that the server already accepted. Sentry keeps the developer-visible copy
   /// so a silently failing post is still detectable.
   Future<void> _recordSpoofAttempt(
     int visitId, {
-    required _SpoofPhase phase,
+    required SpoofPhase phase,
     double? latitude,
     double? longitude,
     String? location,
   }) async {
-    final at = phase == _SpoofPhase.start ? 'check-in' : 'check-out';
-    final atAr = phase == _SpoofPhase.start ? 'بدء الزيارة' : 'إنهاء الزيارة';
-    final coords = (latitude != null && longitude != null)
-        ? '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}'
-        : 'unavailable / غير متاح';
-    final where = location != null
-        ? ' • Reported location / الموقع المُبلَّغ: $location'
-        : '';
-
-    // Reads correctly as one flowing line, because this is what survives if the
-    // markup upgrade below never lands.
-    final plain = '⚠ Mock location detected at $at — تم رصد موقع وهمي عند $atAr'
-        ' • The device reported these coordinates came from a fake-GPS app, not'
-        ' the GPS sensor; this visit needs manual review.'
-        ' • أبلغ الجهاز أن هذه الإحداثيات مصدرها تطبيق موقع وهمي وليست من مستشعر'
-        ' GPS، وهذه الزيارة تحتاج مراجعة يدوية.'
-        ' • Coordinates / الإحداثيات: $coords$where'
-        ' • [$kMockLocationMarker]';
-
-    final html = '<p><strong>⚠ Mock location detected at $at '
-        '— تم رصد موقع وهمي عند $atAr</strong></p>'
-        '<p>The device reported that these coordinates came from a mock '
-        'location provider (a fake-GPS app), not the GPS sensor. '
-        'This visit needs manual review.<br/>'
-        'أبلغ الجهاز أن هذه الإحداثيات مصدرها تطبيق موقع وهمي وليست من '
-        'مستشعر GPS. هذه الزيارة تحتاج مراجعة يدوية.</p>'
-        '<ul><li>Coordinates / الإحداثيات: <code>$coords</code></li>'
-        '${location != null ? '<li>Reported location / الموقع المُبلَّغ: $location</li>' : ''}'
-        '</ul><p><code>$kMockLocationMarker</code></p>';
+    final note = MockLocationNote.build(
+      phase: phase,
+      latitude: latitude,
+      longitude: longitude,
+      location: location,
+    );
 
     try {
       final posted = await api.callMethod(
@@ -301,7 +255,7 @@ class VisitsRepository {
           [visitId]
         ],
         kwargs: {
-          'body': plain,
+          'body': note.plain,
           'message_type': 'comment',
           // 'comment' + this subtype is what makes Odoo notify the record's
           // followers (the manager is one) rather than filing a silent log.
@@ -318,7 +272,7 @@ class VisitsRepository {
           await api.writeRecord(
             'mail.message',
             [messageId.toInt()],
-            {'body': html},
+            {'body': note.html},
           );
         } catch (e) {
           appLog('[VisitsRepository] spoof-note markup upgrade failed: $e');
@@ -335,7 +289,7 @@ class VisitsRepository {
         withScope: (scope) => scope.setContexts('mock_location', {
           'visit_id': visitId,
           'phase': phase.name,
-          'coordinates': coords,
+          'coordinates': MockLocationNote.formatCoords(latitude, longitude),
         }),
       ));
     }

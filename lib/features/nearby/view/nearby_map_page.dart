@@ -27,11 +27,9 @@ class NearbyMapPage extends StatefulWidget {
   State<NearbyMapPage> createState() => _NearbyMapPageState();
 }
 
-class _NearbyMapPageState extends State<NearbyMapPage>
-    with SingleTickerProviderStateMixin {
+class _NearbyMapPageState extends State<NearbyMapPage> {
   final MapController _mapController = MapController();
   late final NearbyBloc _nearbyBloc;
-  late final AnimationController _pulseCtrl;
 
   @override
   void initState() {
@@ -44,16 +42,11 @@ class _NearbyMapPageState extends State<NearbyMapPage>
         radius: AppConstants.defaultRadiusMeters,
       ),
     );
-    _pulseCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    )..repeat();
   }
 
   @override
   void dispose() {
     _nearbyBloc.add(const NearbyStopped());
-    _pulseCtrl.dispose();
     super.dispose();
   }
 
@@ -150,25 +143,34 @@ class _NearbyMapPageState extends State<NearbyMapPage>
                     keepBuffer: 5,
                     tileBuilder: isDark ? _darkTileBuilder : null,
                   ),
-                  // Pulsing radar ring (subtle, expanding outwards)
-                  AnimatedBuilder(
-                    animation: _pulseCtrl,
-                    builder: (_, __) {
-                      final t = _pulseCtrl.value;
-                      return CircleLayer(
-                        circles: [
-                          CircleMarker(
-                            point: center,
-                            radius: state.radius * (1.0 + t * 1.8),
-                            useRadiusInMeter: true,
-                            color: primary.withValues(alpha: (1 - t) * 0.18),
-                            borderColor:
-                                primary.withValues(alpha: (1 - t) * 0.45),
-                            borderStrokeWidth: 1.8,
-                          ),
-                        ],
-                      );
-                    },
+                  // Radar ring, expanding outwards and fading as it goes.
+                  //
+                  // A gap between sweeps rather than a continuous one: this
+                  // rebuilds a whole map layer per frame, and a real radar
+                  // pings periodically anyway. See [AmbientPulse].
+                  AmbientPulse(
+                    period: const Duration(milliseconds: 1800),
+                    rest: const Duration(milliseconds: 900),
+                    curve: Curves.linear,
+                    builder: (_, beat) => AnimatedBuilder(
+                      animation: beat,
+                      builder: (_, __) {
+                        final t = beat.value;
+                        return CircleLayer(
+                          circles: [
+                            CircleMarker(
+                              point: center,
+                              radius: state.radius * (1.0 + t * 1.8),
+                              useRadiusInMeter: true,
+                              color: primary.withValues(alpha: (1 - t) * 0.18),
+                              borderColor:
+                                  primary.withValues(alpha: (1 - t) * 0.45),
+                              borderStrokeWidth: 1.8,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
                   ),
                   // Solid 10m boundary — the actual radius the user cares about
                   CircleLayer(

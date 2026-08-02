@@ -25,7 +25,7 @@ class AppEnvironment {
   static const String _devSeedBaseUrl =
       'https://thedigitalharbor-dh-visits-new.odoo.com';
   static const String _devSeedDatabase =
-      'thedigitalharbor-dh-visits-new-main-34241330';
+      'thedigitalharbor-dh-visits-new-main-35787218';
 
   static const String _definedBaseUrl = String.fromEnvironment('API_BASE_URL');
   static const String _definedDatabase =

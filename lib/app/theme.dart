@@ -143,8 +143,18 @@ extension AppXContext on BuildContext {
 class AppTheme {
   AppTheme._();
 
-  static ThemeData light() => _build(AppColors.lightScheme, AppX.light);
-  static ThemeData dark() => _build(AppColors.darkScheme, AppX.dark);
+  // Built once, on first use. `MaterialApp.router(theme: …, darkTheme: …)` sits
+  // inside a `BlocBuilder<SettingsCubit>`, so these were re-running on every
+  // settings emit — and `_build` is not cheap: a full `ThemeData` fills in
+  // dozens of component defaults, and `buildCairoTextTheme` resolves a
+  // google_fonts family for all 15 text styles. Both are pure functions of
+  // compile-time constants, so caching them is behaviour-preserving.
+  static ThemeData? _light;
+  static ThemeData? _dark;
+
+  static ThemeData light() =>
+      _light ??= _build(AppColors.lightScheme, AppX.light);
+  static ThemeData dark() => _dark ??= _build(AppColors.darkScheme, AppX.dark);
 
   static ThemeData _build(ColorScheme scheme, AppX x) {
     final brightness = scheme.brightness;

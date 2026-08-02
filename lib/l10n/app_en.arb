@@ -528,6 +528,7 @@
   "wfEmptyEscalated": "No escalated visits",
 
   "wfSearchHint": "Search by customer, reference or purpose…",
+  "wfSearchNoMatch": "No visits match your search",
   "wfRescheduleTitle": "Request reschedule",
   "wfListTitle": "Visits",
   "wfDetailTitle": "Visit",

@@ -11,7 +11,7 @@ import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../visits/bloc/visits_list_bloc.dart';
-import '../../visits/data/models/visit.dart';
+import '../../visits/domain/visit_metrics.dart';
 import 'dashboard_active_map_card.dart';
 
 /// Admin-only landing screen. Aggregates the existing `VisitsListBloc`
@@ -47,6 +47,10 @@ class DashboardPage extends StatelessWidget {
           );
         }
         final visits = state.items;
+        // One sweep for the whole screen. Every tile below reads a field off
+        // this instead of running its own `visits.where(...)` pass on each
+        // rebuild — see [DashboardSummary].
+        final summary = DashboardSummary.from(visits);
         return AppRefreshIndicator(
           onRefresh: () async {
             final isAdmin =
@@ -59,25 +63,24 @@ class DashboardPage extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             children: [
-              _DashboardGreeting(visits: visits),
+              _DashboardGreeting(summary: summary),
               const SizedBox(height: 16),
-              _KpiGrid(visits: visits),
+              _KpiGrid(summary: summary),
               const SizedBox(height: 16),
-              DashboardActiveMapCard(visits: visits),
+              // The map is the only child that paints continuously (tile
+              // fades, marker layers). Without a boundary its raster is
+              // discarded whenever a sibling KPI number animates.
+              RepaintBoundary(child: DashboardActiveMapCard(visits: visits)),
               const SizedBox(height: 16),
               _LeaderboardCard(
-                visits: visits,
-                nameOf: (v) => v.customerName,
+                entries: summary.topCustomers,
                 title: context.s.dashboardTopCustomers,
                 icon: Icons.business_rounded,
                 color: (c) => c.colors.primary,
               ),
               const SizedBox(height: 16),
               _LeaderboardCard(
-                visits: visits,
-                nameOf: (v) => v.employeeName,
-                // Finished work only — a draft is a commitment, not a delivery.
-                where: (v) => v.isDone,
+                entries: summary.topEmployees,
                 title: context.s.dashboardTopEmployees,
                 icon: Icons.emoji_events_rounded,
                 rowIcon: Icons.person_rounded,
@@ -93,39 +96,27 @@ class DashboardPage extends StatelessWidget {
 
 /// Brand-gradient greeting header at the top of the manager dashboard.
 class _DashboardGreeting extends StatelessWidget {
-  final List<Visit> visits;
-  const _DashboardGreeting({required this.visits});
+  final DashboardSummary summary;
+  const _DashboardGreeting({required this.summary});
 
   @override
   Widget build(BuildContext context) {
     final user = context.read<AuthBloc>().state.user;
-    final today = DateTime.now();
-    bool isToday(DateTime? d) =>
-        d != null && d.year == today.year && d.month == today.month && d.day == today.day;
-    final todays = visits.where((v) => isToday(v.effectiveDate)).toList();
-    final done = todays.where((v) => v.isDone).length;
-    final total = todays.isEmpty ? visits.length : todays.length;
-    // Sum of completed visit durations → field time (hours, 1 decimal).
-    final mins = visits
-        .where((v) => v.visitDuration != null)
-        .fold<int>(0, (s, v) => s + v.visitDuration!.inMinutes);
-    final hours = (mins / 60).toStringAsFixed(mins % 60 == 0 ? 0 : 1);
-
     return GreetingHeader(
       name: user?.displayName ?? context.s.appTitle,
       roleLabel: context.s.roleManager,
       roleIcon: Symbols.shield_person,
-      done: done,
-      total: total,
+      done: summary.todayDone,
+      total: summary.todayTotal,
       stats: [
         GreetingStat(
           icon: Symbols.event_available,
-          value: '${todays.length}',
+          value: '${summary.today}',
           label: context.s.dashboardKpiToday,
         ),
         GreetingStat(
           icon: Symbols.schedule,
-          value: '$hours ${context.s.wfHoursShort}',
+          value: '${summary.fieldHoursLabel} ${context.s.wfHoursShort}',
           label: context.s.dashboardFieldTime,
         ),
       ],
@@ -138,30 +129,31 @@ class _DashboardGreeting extends StatelessWidget {
 /// pre-applied — so "Overdue: 3" → tap → Visits screen filtered to
 /// past-due. Removes the friction of explaining filters to the admin.
 class _KpiGrid extends StatelessWidget {
-  final List<Visit> visits;
-  const _KpiGrid({required this.visits});
+  final DashboardSummary summary;
+  const _KpiGrid({required this.summary});
 
   @override
   Widget build(BuildContext context) {
-    final today = _today();
-    final overdue = visits.where((v) => v.isOverdue).length;
-    final pendingReview = visits
-        .where((v) => v.isAwaitingApproval)
-        .length;
-    final todayCount = visits.where((v) {
-      final d = v.effectiveDate;
-      if (d == null) return false;
-      return _sameDay(d, today);
-    }).length;
-    final activeNow = visits
-        .where((v) => v.isInProgress)
-        .length;
+    final overdue = summary.overdue;
+    final pendingReview = summary.pendingReview;
+    final todayCount = summary.today;
+    final activeNow = summary.activeNow;
+    // Four across on a tablet, two on a phone.
+    //
+    // Not cosmetic: `childAspectRatio` sets height as a fraction of the column
+    // width, so two columns on a ~1070dp tablet gave each tile a ~520dp width
+    // and, at this ratio, a ~360dp height — a mostly empty card with the count
+    // stranded in the middle of it. Nothing overflowed, which is why only
+    // looking at the device caught this. Splitting into four keeps each tile
+    // near its designed phone proportions and uses the extra width for what it
+    // is worth: seeing all four numbers in one glance.
+    final columns = context.isTablet ? 4 : 2;
     // Tiles get taller as the OS font scale grows so the count + 2-line label
     // never clip; wider/narrower phones tweak it slightly via the width scale.
     final aspect = (1.45 / (context.textScale.clamp(1.0, 1.25) * context.widthScale))
         .clamp(1.05, 1.5);
     return GridView.count(
-      crossAxisCount: 2,
+      crossAxisCount: columns,
       mainAxisSpacing: context.r(12),
       crossAxisSpacing: context.r(12),
       shrinkWrap: true,
@@ -225,16 +217,6 @@ class _KpiGrid extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  static DateTime _today() {
-    final n = DateTime.now();
-    return DateTime(n.year, n.month, n.day);
-  }
-
-  static bool _sameDay(DateTime a, DateTime today) {
-    final aDay = DateTime(a.year, a.month, a.day);
-    return aDay.isAtSameMomentAs(today);
   }
 }
 
@@ -313,17 +295,11 @@ class _KpiTile extends StatelessWidget {
 
 /// "Top N by visit count" card. The customers and employees leaderboards were
 /// two classes whose bodies differed only in which field they grouped by, which
-/// visits they counted, and the tint — so they are one widget with those three
-/// as parameters.
+/// visits they counted, and the tint — so they are one widget, and the counting
+/// itself now happens once in [DashboardSummary] rather than per card.
 class _LeaderboardCard extends StatelessWidget {
-  final List<Visit> visits;
-
-  /// The field to group by. Rows with no name are skipped.
-  final String? Function(Visit) nameOf;
-
-  /// Narrows the set before counting — the employee board counts finished work
-  /// only, since a draft is a commitment, not a delivery.
-  final bool Function(Visit)? where;
+  /// Already ranked and truncated — see [DashboardSummary].
+  final List<LeaderboardEntry> entries;
 
   final String title;
   final IconData icon;
@@ -332,48 +308,33 @@ class _LeaderboardCard extends StatelessWidget {
   /// Icon on each row; defaults to the card's own [icon].
   final IconData? rowIcon;
 
-  static const _maxRows = 5;
-
   const _LeaderboardCard({
-    required this.visits,
-    required this.nameOf,
+    required this.entries,
     required this.title,
     required this.icon,
     required this.color,
-    this.where,
     this.rowIcon,
   });
 
   @override
   Widget build(BuildContext context) {
-    final source = where == null ? visits : visits.where(where!);
-    final counts = <String, int>{};
-    for (final v in source) {
-      final name = nameOf(v);
-      if (name == null || name.isEmpty) continue;
-      counts[name] = (counts[name] ?? 0) + 1;
-    }
-    final shown = (counts.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value)))
-        .take(_maxRows)
-        .toList();
     // Guard the divisor, not just the display: an empty board would otherwise
     // divide by zero when computing each row's bar fraction.
-    final maxCount = shown.isEmpty ? 1 : shown.first.value;
+    final maxCount = entries.isEmpty ? 1 : entries.first.count;
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SectionHeader(icon: icon, label: title),
           const SizedBox(height: 10),
-          if (shown.isEmpty)
+          if (entries.isEmpty)
             InlineEmptyRow(text: context.s.dashboardNoData)
           else
-            for (final e in shown)
+            for (final e in entries)
               _LeaderboardRow(
-                name: e.key,
-                count: e.value,
-                fraction: e.value / maxCount,
+                name: e.name,
+                count: e.count,
+                fraction: e.count / maxCount,
                 color: color(context),
                 icon: rowIcon ?? icon,
               ),

@@ -10,12 +10,18 @@ class CountUpText extends StatelessWidget {
   const CountUpText(this.value,
       {super.key, this.style, this.duration = const Duration(milliseconds: 850)});
 
+  // Compiled once at class-load rather than three times per build. These are
+  // on KPI and metric tiles, which rebuild on every bloc emit — and a `RegExp`
+  // literal in `build()` is a fresh compile each time, not a cached constant.
+  static final _simple = RegExp(r'^\d+%?$');
+  static final _digits = RegExp(r'[^\d.]');
+  static final _nonDigits = RegExp(r'[\d.\s]');
+
   @override
   Widget build(BuildContext context) {
-    final isSimple = RegExp(r'^\d+%?$').hasMatch(value);
-    if (!isSimple) return Text(value, style: style);
-    final target = double.tryParse(value.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
-    final tail = value.replaceAll(RegExp(r'[\d.\s]'), '');
+    if (!_simple.hasMatch(value)) return Text(value, style: style);
+    final target = double.tryParse(value.replaceAll(_digits, '')) ?? 0;
+    final tail = value.replaceAll(_nonDigits, '');
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: target),
       duration: duration,

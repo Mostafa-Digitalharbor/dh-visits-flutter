@@ -10,7 +10,8 @@ import 'models/customer.dart';
 /// (`partner_latitude` / `partner_longitude`), which the customer's Odoo
 /// must have populated (Apps → install *Partner Geolocation*, then run
 /// "Geo Localize" on the contacts). Partners without coordinates are
-/// filtered out — the app only plots customers it can place on a map.
+/// still appear in the directory. Map/nearby actions are disabled by the
+/// detail page until a customer has usable coordinates.
 class CustomersRepository {
   final ApiClient api;
   CustomersRepository({required this.api});
@@ -89,11 +90,10 @@ class CustomersRepository {
     int limit = 50,
     int offset = 0,
   }) async {
-    // Only partners we can place on a map (non-zero coordinates).
-    final domain = <dynamic>[
-      ['partner_latitude', '!=', 0],
-      ['partner_longitude', '!=', 0],
-    ];
+    // The customer directory must not disappear just because geocoding has not
+    // been run on this database. Customer.hasCoordinates controls the map-only
+    // actions separately on the detail page.
+    final domain = <dynamic>[];
     if (search != null && search.isNotEmpty) {
       // name OR phone match: ['|', (name ilike), (phone ilike)]
       domain.add('|');
@@ -113,7 +113,9 @@ class CustomersRepository {
   }
 
   Future<Customer> getById(int id) async {
-    final rows = await api.readRecords(AppConstants.partnerModel, [id], _fields);
+    final rows = await api.readRecords(AppConstants.partnerModel, [
+      id,
+    ], _fields);
     if (rows.isEmpty) {
       // Mirror the old "single record missing" behaviour with a typed error
       // so callers (Nearby map) fall back to the cached customer object.
@@ -132,8 +134,11 @@ class CustomersRepository {
     final ids = categoryIds.whereType<num>().map((n) => n.toInt()).toList();
     if (ids.isEmpty) return const [];
     try {
-      final rows = await api
-          .readRecords(AppConstants.partnerCategoryModel, ids, ['name']);
+      final rows = await api.readRecords(
+        AppConstants.partnerCategoryModel,
+        ids,
+        ['name'],
+      );
       return rows
           .map((c) => c['name']?.toString() ?? '')
           .where((s) => s.isNotEmpty)

@@ -1,4 +1,5 @@
 export 'adaptive_center.dart';
+export 'ambient_pulse.dart';
 export 'animated_list_item.dart';
 export 'app_button.dart';
 export 'app_card.dart';
@@ -15,6 +16,7 @@ export 'info_row.dart';
 export 'async_list_view.dart';
 export 'initial_avatar.dart';
 export 'inline_empty_row.dart';
+export 'lazy_indexed_stack.dart';
 export 'map_pin.dart';
 export 'section_header.dart';
 export 'debounced_search_field.dart';

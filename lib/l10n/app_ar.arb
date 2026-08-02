@@ -507,6 +507,7 @@
   "wfEmptyEscalated": "لا توجد زيارات مُصعَّدة",
 
   "wfSearchHint": "ابحث بالعميل أو المرجع أو الغرض…",
+  "wfSearchNoMatch": "لا توجد زيارات مطابقة لبحثك",
   "wfRescheduleTitle": "طلب إعادة جدولة",
   "wfListTitle": "الزيارات",
   "wfDetailTitle": "زيارة",

@@ -65,7 +65,13 @@ class RoutePage extends StatelessWidget {
 
         return Column(
           children: [
-            _RouteMap(stops: stops, points: points, nextIndex: nextIndex, km: km),
+            // The map and the stop list are siblings in one Column, so without
+            // a boundary every scroll of the list re-rasterises the map's tile
+            // and marker layers underneath it.
+            RepaintBoundary(
+              child: _RouteMap(
+                  stops: stops, points: points, nextIndex: nextIndex, km: km),
+            ),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),

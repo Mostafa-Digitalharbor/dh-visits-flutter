@@ -43,7 +43,10 @@ class _CustomersListPageState extends State<CustomersListPage> {
           builder: (context, state) {
             final total = state.items.length;
             final active = state.items
-                .where((c) => c.lastVisit != null && c.lastVisit!.checkOutTime == null)
+                .where(
+                  (c) =>
+                      c.lastVisit != null && c.lastVisit!.checkOutTime == null,
+                )
                 .length;
             return _CustomerStatsRow(total: total, active: active);
           },
@@ -202,21 +205,25 @@ class _CustomerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final initial =
-        InitialAvatar.initialOf(customer.name);
-    final isActive = customer.lastVisit?.checkOutTime == null &&
-        customer.lastVisit != null;
+    final initial = InitialAvatar.initialOf(customer.name);
+    final isActive =
+        customer.lastVisit?.checkOutTime == null && customer.lastVisit != null;
     final accent = isActive ? Colors.green.shade600 : colors.primary;
-    final hasFooter = customer.phone != null ||
+    final hasFooter =
+        customer.phone != null ||
         customer.mobile != null ||
         customer.lastVisit != null;
-    final addressText = customer.address ??
-        '${customer.latitude.toStringAsFixed(4)}, '
-            '${customer.longitude.toStringAsFixed(4)}';
+    final addressText =
+        customer.address ??
+        (customer.hasCoordinates
+            ? '${customer.latitude.toStringAsFixed(4)}, '
+                  '${customer.longitude.toStringAsFixed(4)}'
+            : '—');
 
     return AppCard(
       padding: EdgeInsets.zero,
-      onTap: () => context.push(AppRoutes.customerDetail(customer.id), extra: customer),
+      onTap: () =>
+          context.push(AppRoutes.customerDetail(customer.id), extra: customer),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -227,9 +234,7 @@ class _CustomerTile extends StatelessWidget {
               decoration: BoxDecoration(
                 color: accent,
                 borderRadius: BorderRadius.horizontal(
-                  left: context.isRtl
-                      ? Radius.zero
-                      : const Radius.circular(12),
+                  left: context.isRtl ? Radius.zero : const Radius.circular(12),
                   right: context.isRtl
                       ? const Radius.circular(12)
                       : Radius.zero,
@@ -256,14 +261,16 @@ class _CustomerTile extends StatelessWidget {
                               colors: [
                                 colors.primary,
                                 Color.lerp(
-                                        colors.primary, colors.tertiary, 0.6) ??
+                                      colors.primary,
+                                      colors.tertiary,
+                                      0.6,
+                                    ) ??
                                     colors.primary,
                               ],
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color:
-                                    colors.primary.withValues(alpha: 0.25),
+                                color: colors.primary.withValues(alpha: 0.25),
                                 blurRadius: 8,
                                 offset: const Offset(0, 3),
                               ),
@@ -332,10 +339,7 @@ class _CustomerTile extends StatelessWidget {
                     ),
                     if (hasFooter) ...[
                       const SizedBox(height: 12),
-                      Divider(
-                        height: 1,
-                        color: colors.outlineVariant,
-                      ),
+                      Divider(height: 1, color: colors.outlineVariant),
                       const SizedBox(height: 10),
                       _MetaFooter(customer: customer),
                     ],
@@ -359,14 +363,13 @@ class _MetaFooter extends StatelessWidget {
     final colors = context.colors;
     final phone = customer.phone ?? customer.mobile;
     final lastVisitTime = customer.lastVisit?.checkInTime;
-    final isActive = customer.lastVisit?.checkOutTime == null &&
-        customer.lastVisit != null;
+    final isActive =
+        customer.lastVisit?.checkOutTime == null && customer.lastVisit != null;
 
     return Row(
       children: [
         if (phone != null) ...[
-          Icon(Icons.phone_outlined,
-              size: 14, color: colors.onSurfaceVariant),
+          Icon(Icons.phone_outlined, size: 14, color: colors.onSurfaceVariant),
           const SizedBox(width: 4),
           Flexible(
             child: Text(
@@ -396,9 +399,7 @@ class _MetaFooter extends StatelessWidget {
           Icon(
             isActive ? Icons.bolt_rounded : Icons.history_rounded,
             size: 14,
-            color: isActive
-                ? Colors.green.shade600
-                : colors.onSurfaceVariant,
+            color: isActive ? Colors.green.shade600 : colors.onSurfaceVariant,
           ),
           const SizedBox(width: 4),
           Flexible(
@@ -434,8 +435,8 @@ class _LastVisitBadge extends StatelessWidget {
     final label = isActive
         ? context.s.visitsHistoryActiveBadge
         : (lastVisit.checkInTime != null
-            ? _relativeShort(context, lastVisit.checkInTime!)
-            : context.s.visitsHistoryCompletedBadge);
+              ? _relativeShort(context, lastVisit.checkInTime!)
+              : context.s.visitsHistoryCompletedBadge);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

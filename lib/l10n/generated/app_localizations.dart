@@ -2852,6 +2852,12 @@ abstract class AppLocalizations {
   /// **'Search by customer, reference or purpose…'**
   String get wfSearchHint;
 
+  /// No description provided for @wfSearchNoMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No visits match your search'**
+  String get wfSearchNoMatch;
+
   /// No description provided for @wfRescheduleTitle.
   ///
   /// In en, this message translates to:

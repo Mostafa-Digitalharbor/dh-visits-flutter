@@ -131,30 +131,87 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
-/// Employee layout: three-tab shell {زياراتي · مسار اليوم · الإعدادات}
-/// (design flows §3). The persistent active-visit bar floats above the nav.
-class _UserShell extends StatefulWidget {
-  const _UserShell();
+/// One tab of a role shell.
+class _Tab {
+  final IconData icon;
+  final String label;
+  final Widget page;
 
-  @override
-  State<_UserShell> createState() => _UserShellState();
+  /// Shown as the app-bar title while this tab is selected. Usually longer than
+  /// [label], which has to fit under a nav icon.
+  final String title;
+
+  const _Tab({
+    required this.icon,
+    required this.label,
+    required this.title,
+    required this.page,
+  });
 }
 
-class _UserShellState extends State<_UserShell> {
+/// The chrome both role shells share: app bar, the two status banners, a lazy
+/// tab stack and the bottom navigation.
+///
+/// The employee and manager shells were two 100-line `Scaffold`s that differed
+/// only in their tab list, which app-bar chips they showed, whether the
+/// active-visit bar was present, and what happened on a tab switch. Keeping
+/// them apart meant every layout fix (the banners, the FAB placement, the
+/// text-scale-aware bar height) had to be made twice — and typically wasn't.
+class _RoleShell extends StatefulWidget {
+  final List<_Tab> tabs;
+
+  /// Tab index that offers "create visit"; `null` for none.
+  final int? fabTab;
+
+  /// Unique across the two shells: two `FloatingActionButton`s with the same
+  /// hero tag on screen at once throws.
+  final String fabHeroTag;
+
+  final bool showGroups;
+  final bool showSettings;
+
+  /// Whether the active-visit bar sits above the nav (field users only —
+  /// managers don't go on visits).
+  final bool showVisitBar;
+
+  /// Fired after the index changes, so a shell can refetch what just came into
+  /// view.
+  final ValueChanged<int>? onTabSelected;
+
+  const _RoleShell({
+    required this.tabs,
+    required this.fabHeroTag,
+    this.fabTab,
+    this.showGroups = false,
+    this.showSettings = true,
+    this.showVisitBar = false,
+    this.onTabSelected,
+  });
+
+  @override
+  State<_RoleShell> createState() => _RoleShellState();
+}
+
+class _RoleShellState extends State<_RoleShell> {
   int _tab = 0;
+
+  void _select(int i) {
+    if (i != _tab) {
+      HapticFeedback.selectionClick();
+      setState(() => _tab = i);
+    }
+    widget.onTabSelected?.call(i);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final titles = [
-      context.s.visitsListTitle,
-      context.s.routeTabTitle,
-      context.s.settingsTitle,
-    ];
+    final tabs = widget.tabs;
     return Scaffold(
       appBar: _AppBar(
-        title: titles[_tab],
-        showSettings: false,
-        topInset: MediaQuery.of(context).padding.top,
+        title: tabs[_tab].title,
+        showGroups: widget.showGroups,
+        showSettings: widget.showSettings,
+        topInset: MediaQuery.paddingOf(context).top,
         textScale: context.textScale,
       ),
       body: Column(
@@ -162,18 +219,16 @@ class _UserShellState extends State<_UserShell> {
           const OfflineBanner(),
           const LiveLocationBanner(),
           Expanded(
-            child: IndexedStack(
+            child: LazyIndexedStack(
               index: _tab,
-              children: const [VisitsListPage(), RoutePage(), SettingsView()],
+              children: [for (final t in tabs) t.page],
             ),
           ),
         ],
       ),
-      // Field employees can plan their own visits (guide §2). Shown only on the
-      // My Visits tab.
-      floatingActionButton: _tab == 0
+      floatingActionButton: _tab == widget.fabTab
           ? FloatingActionButton.extended(
-              heroTag: 'create-visit-user-hero',
+              heroTag: widget.fabHeroTag,
               onPressed: () => context.push(AppRoutes.createVisit),
               icon: const Icon(Symbols.add),
               label: Text(context.s.createVisitTooltip),
@@ -182,40 +237,68 @@ class _UserShellState extends State<_UserShell> {
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          PersistentVisitBar(
-            onTap: () {
-              final active = context.read<VisitBloc>().state.activeVisit;
-              if (active != null) {
-                context.push(AppRoutes.visitDetail(active.id), extra: active);
-              }
-            },
-          ),
+          if (widget.showVisitBar)
+            PersistentVisitBar(
+              onTap: () {
+                final active = context.read<VisitBloc>().state.activeVisit;
+                if (active != null) {
+                  context.push(AppRoutes.visitDetail(active.id), extra: active);
+                }
+              },
+            ),
           NavigationBar(
             selectedIndex: _tab,
-            onDestinationSelected: (i) {
-              HapticFeedback.selectionClick();
-              setState(() => _tab = i);
-            },
+            onDestinationSelected: _select,
             destinations: [
-              NavigationDestination(
-                icon: const Icon(Symbols.list_alt),
-                selectedIcon: const Icon(Symbols.list_alt, fill: 1),
-                label: context.s.visitsTabTitle,
-              ),
-              NavigationDestination(
-                icon: const Icon(Symbols.route),
-                selectedIcon: const Icon(Symbols.route, fill: 1),
-                label: context.s.routeTabTitle,
-              ),
-              NavigationDestination(
-                icon: const Icon(Symbols.settings),
-                selectedIcon: const Icon(Symbols.settings, fill: 1),
-                label: context.s.settingsTitle,
-              ),
+              for (final t in tabs)
+                NavigationDestination(
+                  icon: Icon(t.icon),
+                  selectedIcon: Icon(t.icon, fill: 1),
+                  label: t.label,
+                ),
             ],
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Employee layout: three-tab shell {زياراتي · مسار اليوم · الإعدادات}
+/// (design flows §3). The persistent active-visit bar floats above the nav.
+class _UserShell extends StatelessWidget {
+  const _UserShell();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    return _RoleShell(
+      // Field employees can plan their own visits (guide §2), from the My
+      // Visits tab only.
+      fabTab: 0,
+      fabHeroTag: 'create-visit-user-hero',
+      showSettings: false,
+      showVisitBar: true,
+      tabs: [
+        _Tab(
+          icon: Symbols.list_alt,
+          label: s.visitsTabTitle,
+          title: s.visitsListTitle,
+          page: const VisitsListPage(),
+        ),
+        _Tab(
+          icon: Symbols.route,
+          label: s.routeTabTitle,
+          title: s.routeTabTitle,
+          page: const RoutePage(),
+        ),
+        _Tab(
+          icon: Symbols.settings,
+          label: s.settingsTitle,
+          title: s.settingsTitle,
+          page: const SettingsView(),
+        ),
+      ],
     );
   }
 }
@@ -231,15 +314,17 @@ class _ManagerShell extends StatefulWidget {
 }
 
 class _ManagerShellState extends State<_ManagerShell> {
-  int _tabIndex = 0; // 0 dashboard · 1 visits · 2 analytics
+  static const _dashboardTab = 0;
+  static const _visitsTab = 1;
+  static const _analyticsTab = 2;
 
   // Dashboard & Analytics need the FULL team dataset, so they get their own
   // `team`-scoped blocs — independent of the list tab, whose scope changes as
   // the manager switches pending/team/escalated chips.
   //
-  // Held here rather than created inline in the IndexedStack so that switching
-  // tabs can refetch them. The stack builds each child once and keeps it alive,
-  // so a manager who approved a visit on the list tab came back to a Dashboard
+  // Held here rather than created inline in the tab stack so that switching
+  // tabs can refetch them. The stack keeps each child alive once built, so a
+  // manager who approved a visit on the list tab came back to a Dashboard
   // still showing the pre-approval counts — and Analytics, which has no
   // pull-to-refresh, could not be corrected at all without restarting the app.
   late final VisitsListBloc _dashboardBloc;
@@ -250,8 +335,11 @@ class _ManagerShellState extends State<_ManagerShell> {
     super.initState();
     _dashboardBloc = VisitsListBloc(repository: sl<VisitsRepository>())
       ..add(const VisitsListLoadRequested(scope: VisitListScope.team));
-    _analyticsBloc = VisitsListBloc(repository: sl<VisitsRepository>())
-      ..add(const VisitsListLoadRequested(scope: VisitListScope.team));
+    // Not loaded upfront: Analytics reads the same `team` slice as the
+    // dashboard and is three taps away at launch, so fetching it during the
+    // login burst just adds a request to the slowest moment in the app. The
+    // tab loads itself the first time it is opened (see [_onTabSelected]).
+    _analyticsBloc = VisitsListBloc(repository: sl<VisitsRepository>());
   }
 
   @override
@@ -264,83 +352,45 @@ class _ManagerShellState extends State<_ManagerShell> {
   /// Refetch the tab being opened, so its numbers reflect any workflow action
   /// taken while it was off-screen.
   void _onTabSelected(int i) {
-    HapticFeedback.selectionClick();
-    setState(() => _tabIndex = i);
     const reload = VisitsListLoadRequested(scope: VisitListScope.team);
-    if (i == 0) _dashboardBloc.add(reload);
-    if (i == 2) _analyticsBloc.add(reload);
+    if (i == _dashboardTab) _dashboardBloc.add(reload);
+    if (i == _analyticsTab) _analyticsBloc.add(reload);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isVisits = _tabIndex == 1;
-    final titles = [
-      context.s.dashboardTabTitle,
-      context.s.visitsListTitle,
-      context.s.analyticsTabTitle,
-    ];
-    return Scaffold(
-      appBar: _AppBar(
-        title: titles[_tabIndex],
-        showGroups: true,
-        topInset: MediaQuery.of(context).padding.top,
-        textScale: context.textScale,
-      ),
-      body: Column(
-        children: [
-          const OfflineBanner(),
-          const LiveLocationBanner(),
-          Expanded(
-            child: IndexedStack(
-              index: _tabIndex,
-              children: [
-                // Dashboard & Analytics need the FULL team dataset, so they get
-                // their own `team`-scoped bloc — independent of the list tab,
-                // whose scope changes as the manager switches pending/team/
-                // escalated chips.
-                BlocProvider.value(
-                  value: _dashboardBloc,
-                  child: const DashboardPage(),
-                ),
-                const VisitsListPage(),
-                BlocProvider.value(
-                  value: _analyticsBloc,
-                  child: const AnalyticsPage(),
-                ),
-              ],
-            ),
+    final s = context.s;
+    return _RoleShell(
+      fabTab: _visitsTab,
+      fabHeroTag: 'create-visit-hero',
+      showGroups: true,
+      onTabSelected: _onTabSelected,
+      tabs: [
+        _Tab(
+          icon: Symbols.dashboard,
+          label: s.dashboardTabTitle,
+          title: s.dashboardTabTitle,
+          page: BlocProvider.value(
+            value: _dashboardBloc,
+            child: const DashboardPage(),
           ),
-        ],
-      ),
-      floatingActionButton: isVisits
-          ? FloatingActionButton.extended(
-              heroTag: 'create-visit-hero',
-              onPressed: () => context.push(AppRoutes.createVisit),
-              icon: const Icon(Symbols.add),
-              label: Text(context.s.createVisitTooltip),
-            )
-          : null,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tabIndex,
-        onDestinationSelected: _onTabSelected,
-        destinations: [
-          NavigationDestination(
-            icon: const Icon(Symbols.dashboard),
-            selectedIcon: const Icon(Symbols.dashboard, fill: 1),
-            label: context.s.dashboardTabTitle,
+        ),
+        _Tab(
+          icon: Symbols.list_alt,
+          label: s.visitsTabTitle,
+          title: s.visitsListTitle,
+          page: const VisitsListPage(),
+        ),
+        _Tab(
+          icon: Symbols.insights,
+          label: s.analyticsTabTitle,
+          title: s.analyticsTabTitle,
+          page: BlocProvider.value(
+            value: _analyticsBloc,
+            child: const AnalyticsPage(),
           ),
-          NavigationDestination(
-            icon: const Icon(Symbols.list_alt),
-            selectedIcon: const Icon(Symbols.list_alt, fill: 1),
-            label: context.s.visitsTabTitle,
-          ),
-          NavigationDestination(
-            icon: const Icon(Symbols.insights),
-            selectedIcon: const Icon(Symbols.insights, fill: 1),
-            label: context.s.analyticsTabTitle,
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

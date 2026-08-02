@@ -6,13 +6,19 @@ import 'package:flutter/material.dart';
 /// stagger based on their `index` so longer lists "cascade" instead of
 /// popping in at once.
 ///
-/// Cheap to use — runs once when the widget first mounts, then the child
-/// renders normally on rebuild.
-class AnimatedListItem extends StatefulWidget {
+/// **Only the first screenful animates.** A `ListView` builds rows lazily and
+/// rebuilds them as they recycle, so wrapping every row meant a fresh
+/// `AnimationController` + `Timer` allocated (and a 380ms opacity + transform
+/// animation started) for each row that scrolled into view — for the whole life
+/// of the list, not just its entrance. The effect is an entrance flourish; past
+/// the fold there is no entrance to flourish, only scrolling, and on a low-end
+/// device that per-row animation is felt as scroll jank. Rows at or beyond
+/// [animateBelowIndex] render their child directly, with no `State` at all.
+class AnimatedListItem extends StatelessWidget {
   final int index;
   final Widget child;
 
-  /// Per-item stagger delay. With 60ms × index, an 8-row list finishes
+  /// Per-item stagger delay. With 55ms × index, an 8-row list finishes
   /// animating in well under half a second.
   final Duration step;
 
@@ -23,6 +29,10 @@ class AnimatedListItem extends StatefulWidget {
   /// nearly 2 seconds.
   final Duration maxDelay;
 
+  /// Rows from this index on are not animated. Roughly a tall phone's worth of
+  /// list-tile-sized rows, so everything visible on first paint still cascades.
+  final int animateBelowIndex;
+
   const AnimatedListItem({
     super.key,
     required this.index,
@@ -30,13 +40,42 @@ class AnimatedListItem extends StatefulWidget {
     this.step = const Duration(milliseconds: 55),
     this.duration = const Duration(milliseconds: 380),
     this.maxDelay = const Duration(milliseconds: 350),
+    this.animateBelowIndex = 12,
   });
 
   @override
-  State<AnimatedListItem> createState() => _AnimatedListItemState();
+  Widget build(BuildContext context) {
+    if (index >= animateBelowIndex) return child;
+    return _AnimatedListItem(
+      index: index,
+      step: step,
+      duration: duration,
+      maxDelay: maxDelay,
+      child: child,
+    );
+  }
 }
 
-class _AnimatedListItemState extends State<AnimatedListItem>
+class _AnimatedListItem extends StatefulWidget {
+  final int index;
+  final Widget child;
+  final Duration step;
+  final Duration duration;
+  final Duration maxDelay;
+
+  const _AnimatedListItem({
+    required this.index,
+    required this.child,
+    required this.step,
+    required this.duration,
+    required this.maxDelay,
+  });
+
+  @override
+  State<_AnimatedListItem> createState() => _AnimatedListItemState();
+}
+
+class _AnimatedListItemState extends State<_AnimatedListItem>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl =
       AnimationController(vsync: this, duration: widget.duration);

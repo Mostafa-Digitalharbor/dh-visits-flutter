@@ -15,16 +15,19 @@ part 'visits_list_state.dart';
 class VisitsListBloc extends Bloc<VisitsListEvent, VisitsListState> {
   final VisitsRepository repository;
 
-  VisitsListBloc({required this.repository}) : super(const VisitsListState()) {
+  VisitsListBloc({required this.repository}) : super(VisitsListState.initial) {
     on<VisitsListLoadRequested>(_onLoad);
     on<VisitsListScopeChanged>(_onScopeChanged);
     on<VisitsListSearchChanged>(
         (e, emit) => emit(state.copyWith(searchQuery: e.query)));
     on<VisitsListStateFilterChanged>((e, emit) => emit(state.copyWith(
         stateFilter: e.state, clearStateFilter: e.state == null)));
-    on<VisitsListReset>((_, emit) => emit(const VisitsListState()));
+    on<VisitsListReset>((_, emit) => emit(VisitsListState.initial));
   }
 
+  /// Floor on how long the loading skeleton stays up, so a fast reply doesn't
+  /// flash it for 80ms. Deliberately applied **only when a skeleton is actually
+  /// on screen** — see [_ensureMinSkeleton].
   static const _minSkeleton = Duration(milliseconds: 350);
 
   Future<void> _onScopeChanged(
@@ -52,6 +55,10 @@ class VisitsListBloc extends Bloc<VisitsListEvent, VisitsListState> {
     Emitter<VisitsListState> emit,
   ) async {
     final started = DateTime.now();
+    // A refresh over rows already on screen shows no skeleton, so there is
+    // nothing to hold — padding it just made every pull-to-refresh 350ms
+    // slower than the backend actually is.
+    final showsSkeleton = state.items.isEmpty;
     emit(state.copyWith(status: VisitsListStatus.loading, error: null));
     try {
       final items = switch (scope) {
@@ -63,15 +70,15 @@ class VisitsListBloc extends Bloc<VisitsListEvent, VisitsListState> {
         VisitListScope.escalated =>
           await repository.managerList(VisitManagerScope.escalated),
       };
-      await _ensureMinSkeleton(started);
+      await _ensureMinSkeleton(started, showsSkeleton);
       emit(state.copyWith(status: VisitsListStatus.success, items: items));
     } on ApiException catch (e) {
-      await _ensureMinSkeleton(started);
+      await _ensureMinSkeleton(started, showsSkeleton);
       emit(state.copyWith(status: VisitsListStatus.failure, error: e));
     } catch (e) {
       // Never leave the UI stuck on the loading skeleton — surface any
       // unexpected error (e.g. a response-parsing failure) as a failure state.
-      await _ensureMinSkeleton(started);
+      await _ensureMinSkeleton(started, showsSkeleton);
       emit(state.copyWith(
         status: VisitsListStatus.failure,
         error: ApiException.unexpected(e),
@@ -79,7 +86,8 @@ class VisitsListBloc extends Bloc<VisitsListEvent, VisitsListState> {
     }
   }
 
-  Future<void> _ensureMinSkeleton(DateTime started) async {
+  Future<void> _ensureMinSkeleton(DateTime started, bool showsSkeleton) async {
+    if (!showsSkeleton) return;
     final remaining = _minSkeleton - DateTime.now().difference(started);
     if (remaining > Duration.zero) await Future.delayed(remaining);
   }

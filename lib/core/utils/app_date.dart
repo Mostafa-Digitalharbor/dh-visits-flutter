@@ -53,8 +53,23 @@ class AppDate {
         (m) => '${m.group(0)!.codeUnitAt(0) - 0x0660}',
       );
 
-  static AppDateFormat _fmt(String pattern, BuildContext context) =>
-      AppDateFormat._(DateFormat(pattern, localeOf(context)));
+  /// `DateFormat` instances keyed by `locale|pattern`.
+  ///
+  /// Constructing one parses the pattern and resolves the locale's symbol set,
+  /// and these helpers are called *per row* — `VisitCard` formats a schedule,
+  /// the route list formats an ETA — so a 200-visit list was building 200
+  /// identical formatters per scroll pass. `DateFormat` is immutable once
+  /// built, so sharing one is safe. The map is bounded by
+  /// patterns × supported locales (a handful), never by data.
+  static final Map<String, AppDateFormat> _cache = {};
+
+  static AppDateFormat _fmt(String pattern, BuildContext context) {
+    final locale = localeOf(context);
+    return _cache.putIfAbsent(
+      '$locale|$pattern',
+      () => AppDateFormat._(DateFormat(pattern, locale)),
+    );
+  }
 
   // ---- Formatters (reuse across several values in one build) ----
 
@@ -94,5 +109,7 @@ class AppDate {
 
   /// "2026-07-15" — absolute date, reads the same in both languages and needs
   /// no locale (the >1 week fallback in [RelativeTime]).
-  static String isoDate(DateTime when) => DateFormat('yyyy-MM-dd').format(when);
+  static final DateFormat _iso = DateFormat('yyyy-MM-dd');
+
+  static String isoDate(DateTime when) => _iso.format(when);
 }

@@ -63,15 +63,17 @@ class GreetingHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      children: [
-                        Text('${context.s.dashboardGreeting} 👋',
-                            style: TextStyle(
-                                color: white.withValues(alpha: 0.85),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600)),
-                      ],
-                    ),
+                    // Was wrapped in a bare `Row` purely to left-align, which
+                    // handed the Text an unbounded width and overflowed once
+                    // the greeting got long (Arabic, or a large font scale).
+                    // The Column already aligns to the start.
+                    Text('${context.s.dashboardGreeting} 👋',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: white.withValues(alpha: 0.85),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600)),
                     const SizedBox(height: 2),
                     Text(name,
                         maxLines: 1,
@@ -81,19 +83,32 @@ class GreetingHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              _RoleChip(label: roleLabel, icon: roleIcon),
+              const SizedBox(width: 8),
+              // Flexible, not a bare child: a Row lays its inflexible children
+              // out at their intrinsic width *first*, so a long role label
+              // ("مدير المشروع") took the space the Expanded above needed and
+              // pushed the whole header past the card.
+              Flexible(child: _RoleChip(label: roleLabel, icon: roleIcon)),
             ],
           ),
           const SizedBox(height: 16),
           Row(
             children: [
-              Text(context.s.dashboardTodayProgress,
-                  style: TextStyle(
-                      color: white.withValues(alpha: 0.85),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600)),
-              const Spacer(),
+              // The label yields; the count must not be truncated — it is the
+              // number the whole header exists to show. With 1200/1200 · 100%
+              // on a 320dp screen the two together do not fit.
+              Flexible(
+                child: Text(context.s.dashboardTodayProgress,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: white.withValues(alpha: 0.85),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(width: 8),
               Text('$done/$total · ${(pct * 100).round()}%',
+                  maxLines: 1,
                   style: const TextStyle(
                       color: white,
                       fontSize: 13,
@@ -197,8 +212,15 @@ class _RoleChip extends StatelessWidget {
         children: [
           Icon(icon, fill: 1, size: 15, color: white),
           const SizedBox(width: 5),
-          Text(label,
-              style: const TextStyle(color: white, fontSize: 12, fontWeight: FontWeight.w700)),
+          // Flexible so the chip can be squeezed by its parent rather than
+          // forcing its own intrinsic width onto the header.
+          Flexible(
+            child: Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    color: white, fontSize: 12, fontWeight: FontWeight.w700)),
+          ),
         ],
       ),
     );
