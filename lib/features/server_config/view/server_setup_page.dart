@@ -142,7 +142,10 @@ class _ServerSetupPageState extends State<ServerSetupPage> {
   Widget build(BuildContext context) {
     final cs = context.colors;
     return Scaffold(
-      backgroundColor: cs.surface,
+      // Match the sheet, not the page: on a tall screen (tablet, or an iPad
+      // running the iPhone build) the sheet ends mid-screen and the leftover
+      // space showed as a differently-shaded band under it.
+      backgroundColor: cs.surfaceContainerLowest,
       body: SingleChildScrollView(
         child: ConstrainedBox(
           constraints: BoxConstraints(minHeight: MediaQuery.sizeOf(context).height),

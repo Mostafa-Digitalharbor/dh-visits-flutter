@@ -66,7 +66,9 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     final cs = context.colors;
     return Scaffold(
-      backgroundColor: cs.surface,
+      // Match the sheet colour so the leftover space under it on tall screens
+      // reads as one surface (see ServerSetupPage for the same fix).
+      backgroundColor: cs.surfaceContainerLowest,
       body: BlocConsumer<AuthBloc, AuthState>(
         listenWhen: (p, n) => p.error != n.error && n.error != null,
         listener: (context, state) {
@@ -179,7 +181,7 @@ class _RememberRow extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 context.s.loginRememberMe,
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant),
+                style: TextStyle(fontSize: FontSz.base, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant),
               ),
             ],
           ),
@@ -189,7 +191,7 @@ class _RememberRow extends StatelessWidget {
           onTap: () => _showForgotPasswordHelp(context),
           child: Text(
             context.s.loginForgotPassword,
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: cs.primary),
+            style: TextStyle(fontSize: FontSz.base, fontWeight: FontWeight.w700, color: cs.primary),
           ),
         ),
       ],

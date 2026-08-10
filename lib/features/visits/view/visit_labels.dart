@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../shared/extensions/context_extensions.dart';
+import '../../../shared/widgets/widgets.dart';
 import '../data/models/visit.dart';
 import '../data/models/visit_participant.dart';
-import '../../../app/design/app_dimens.dart';
 
 /// Localized label for a workflow state.
 String visitStateLabel(BuildContext context, VisitState state) {
@@ -94,23 +94,9 @@ class VisitStateBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tone = visitStateColor(context, state);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-      decoration: BoxDecoration(
-        color: tone.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(Radii.pill),
-      ),
-      child: Text(
-        visitStateLabel(context, state),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: 12.5,
-          fontWeight: FontWeight.w700,
-          color: tone,
-        ),
-      ),
+    return TonePill(
+      label: visitStateLabel(context, state),
+      color: visitStateColor(context, state),
     );
   }
 }

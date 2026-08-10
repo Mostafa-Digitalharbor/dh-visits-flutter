@@ -360,7 +360,6 @@ class _LeaderboardRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -384,15 +383,7 @@ class _LeaderboardRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(Radii.badge),
-                  child: LinearProgressIndicator(
-                    minHeight: 6,
-                    value: fraction.clamp(0, 1),
-                    backgroundColor: colors.surfaceContainerHighest,
-                    valueColor: AlwaysStoppedAnimation<Color>(color),
-                  ),
-                ),
+                ProgressTrack(value: fraction, color: color),
               ],
             ),
           ),

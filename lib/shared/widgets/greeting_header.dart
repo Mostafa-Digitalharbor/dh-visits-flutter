@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme.dart';
 import '../extensions/context_extensions.dart';
 import 'initial_avatar.dart';
+import 'tone_pill.dart';
 
 /// Brand-gradient greeting/day header used on the manager dashboard and the
 /// employee "my visits" screen. Matches design screens 02 + 10.
@@ -55,7 +56,7 @@ class GreetingHeader extends StatelessWidget {
                 ),
                 child: Text(initial,
                     style: const TextStyle(
-                        color: white, fontSize: 18, fontWeight: FontWeight.w800)),
+                        color: white, fontSize: FontSz.avatar, fontWeight: FontWeight.w800)),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -72,14 +73,14 @@ class GreetingHeader extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                             color: white.withValues(alpha: 0.85),
-                            fontSize: 13,
+                            fontSize: FontSz.base,
                             fontWeight: FontWeight.w600)),
                     const SizedBox(height: 2),
                     Text(name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                            color: white, fontSize: 22, fontWeight: FontWeight.w800)),
+                            color: white, fontSize: FontSz.greeting, fontWeight: FontWeight.w800)),
                   ],
                 ),
               ),
@@ -103,15 +104,16 @@ class GreetingHeader extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                         color: white.withValues(alpha: 0.85),
-                        fontSize: 13,
+                        fontSize: FontSz.base,
                         fontWeight: FontWeight.w600)),
               ),
               const SizedBox(width: 8),
-              Text('$done/$total · ${(pct * 100).round()}%',
+              // ٪ in Arabic, % in English — the one place the sign was hard-coded.
+              Text('$done/$total · ${(pct * 100).round()}${context.s.unitPercent}',
                   maxLines: 1,
                   style: const TextStyle(
                       color: white,
-                      fontSize: 13,
+                      fontSize: FontSz.base,
                       fontWeight: FontWeight.w800,
                       fontFeatures: [FontFeature.tabularFigures()])),
             ],
@@ -175,7 +177,7 @@ class _Stat extends StatelessWidget {
         Text(stat.value,
             style: const TextStyle(
                 color: white,
-                fontSize: 15,
+                fontSize: FontSz.lg,
                 fontWeight: FontWeight.w800,
                 fontFeatures: [FontFeature.tabularFigures()])),
         const SizedBox(width: 4),
@@ -185,7 +187,7 @@ class _Stat extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                   color: white.withValues(alpha: 0.82),
-                  fontSize: 12,
+                  fontSize: FontSz.sm,
                   fontWeight: FontWeight.w500)),
         ),
       ],
@@ -200,29 +202,16 @@ class _RoleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const white = Colors.white;
-    return Container(
+    // Flexible label: this chip sits inside a bounded header row, and has to
+    // yield to it rather than force its intrinsic width onto it.
+    return TonePill(
+      label: label,
+      icon: icon,
+      flexibleLabel: true,
+      color: Colors.white,
+      tintAlpha: 0.18,
+      fontSize: FontSz.sm,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(Radii.pill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, fill: 1, size: 15, color: white),
-          const SizedBox(width: 5),
-          // Flexible so the chip can be squeezed by its parent rather than
-          // forcing its own intrinsic width onto the header.
-          Flexible(
-            child: Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    color: white, fontSize: 12, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -25,6 +25,35 @@ class AppColors {
   static const red = Color(0xFFC8364B);
   static const red400 = Color(0xFFFF8A93);
 
+  /// Deep teal that closes the auth hero gradient and tints the push
+  /// notification accent — the only cool tone between [cyan500] and [navy600].
+  static const teal500 = Color(0xFF2DA3C0);
+
+  /// Android notification accent (system tints the small icon with it).
+  static const notificationAccent = Color(0xFF0CACEA);
+
+  // ---- leaderboard medals (analytics "by employee" ranks 1-3) ----
+  static const medalGold = Color(0xFFD9A40C);
+  static const medalSilver = Color(0xFF9AA0B4);
+  static const medalBronze = Color(0xFFB87333);
+
+  // ---- shadows: black at fixed alphas, so elevation reads the same in both
+  // themes without every widget hand-rolling its own Color(0x..000000) ----
+  static const shadowSoft = Color(0x11000000);
+  static const shadowMedium = Color(0x40000000);
+  static const shadowStrong = Color(0x55000000);
+
+  // ---- skeleton shimmer ----
+  static const skeletonBaseDark = Color(0xFF2A2A2A);
+  static const skeletonBaseLight = Color(0xFFE6E6E6);
+  static const skeletonHighlightDark = Color(0xFF3A3A3A);
+  static const skeletonHighlightLight = Color(0xFFF5F5F5);
+
+  /// Shimmer pair for the given theme brightness: `(base, highlight)`.
+  static (Color, Color) skeletonShimmer(bool isDark) => isDark
+      ? (skeletonBaseDark, skeletonHighlightDark)
+      : (skeletonBaseLight, skeletonHighlightLight);
+
   // ---- map tile placeholder fills (shown behind tiles while they load) ----
   static const mapBgDark = Color(0xFF1A1A1A);
   static const mapBgLight = Color(0xFFE5E5E5);

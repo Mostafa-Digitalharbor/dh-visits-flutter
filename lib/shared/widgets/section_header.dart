@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/design/app_typography.dart';
 import '../extensions/context_extensions.dart';
 
 /// Small heading above a card or list section.
@@ -21,27 +22,40 @@ class SectionHeader extends StatelessWidget {
   /// Uppercase, letter-spaced, no icon.
   final bool isEyebrow;
 
+  /// Eyebrow only. Each caller sits above a different kind of block (a settings
+  /// group card, a customer-detail field list) and wants its own gap.
+  final EdgeInsetsGeometry padding;
+
   const SectionHeader({
     super.key,
     required this.label,
     this.icon,
     this.trailing,
-  }) : isEyebrow = false;
+  })  : isEyebrow = false,
+        padding = EdgeInsets.zero;
 
-  const SectionHeader.eyebrow({super.key, required this.label})
-      : icon = null,
+  const SectionHeader.eyebrow({
+    super.key,
+    required this.label,
+    this.padding = EdgeInsets.zero,
+  })  : icon = null,
         trailing = null,
         isEyebrow = true;
 
   @override
   Widget build(BuildContext context) {
     if (isEyebrow) {
-      return Text(
-        label.toUpperCase(),
-        style: context.text.labelMedium?.copyWith(
-          color: context.colors.primary,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1.0,
+      return Padding(
+        padding: padding,
+        child: Text(
+          label.toUpperCase(),
+          // AppType.eyebrow is the theme's labelSmall — the two private copies
+          // this replaced reached the same style from opposite directions, one
+          // via the token and one via `context.text.labelSmall`.
+          style: AppType.eyebrow.copyWith(
+            color: context.colors.primary,
+            letterSpacing: 1.0,
+          ),
         ),
       );
     }

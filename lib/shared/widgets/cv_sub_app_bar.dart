@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../app/theme.dart';
 import '../extensions/context_extensions.dart';
+import 'icon_action_chip.dart';
 
 /// Sub-screen app bar (design `02-components.md §8 — CvAppBar`, back variant):
 /// a 40×40 direction-aware back chip + an optional eyebrow above the title,
@@ -48,7 +49,7 @@ class CvSubAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         child: Row(
           children: [
-            _Chip(
+            IconActionChip(
               icon: rtl ? Symbols.arrow_forward_ios : Symbols.arrow_back_ios_new,
               onTap: () {
                 if (context.canPop()) {
@@ -76,7 +77,7 @@ class CvSubAppBar extends StatelessWidget implements PreferredSizeWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                              fontSize: 11,
+                              fontSize: FontSz.xs,
                               height: 1.15,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.3,
@@ -85,7 +86,7 @@ class CvSubAppBar extends StatelessWidget implements PreferredSizeWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            fontSize: 19,
+                            fontSize: FontSz.appBar,
                             height: 1.15,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.2,
@@ -102,29 +103,3 @@ class CvSubAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-class _Chip extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  const _Chip({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = context.colors;
-    final x = context.x;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(Radii.sm),
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(Radii.sm),
-          border: Border.all(color: x.outlineVariant),
-          boxShadow: x.elev1,
-        ),
-        child: Icon(icon, size: 20, color: cs.onSurfaceVariant),
-      ),
-    );
-  }
-}

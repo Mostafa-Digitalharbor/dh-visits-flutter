@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../app/design/app_colors.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/app_refresh_indicator.dart';
@@ -206,7 +207,7 @@ class _VisitDetailBodyState extends State<_VisitDetailBody> {
         if (busy)
           const Positioned.fill(
             child: ColoredBox(
-              color: Color(0x11000000),
+              color: AppColors.shadowSoft,
               child: Center(child: CircularProgressIndicator()),
             ),
           ),

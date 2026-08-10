@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../../core/api/api_exceptions.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../shared/extensions/context_extensions.dart';
+import '../../../shared/widgets/widgets.dart';
 import '../data/models/visit_attachment.dart';
 import '../data/visits_repository.dart';
 import 'visit_section.dart';
@@ -115,16 +116,7 @@ class VisitAttachmentsSection extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 child: Row(
                   children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: cs.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(Radii.tile),
-                      ),
-                      child: Icon(_iconFor(a.mimetype),
-                          size: 19, color: cs.primary),
-                    ),
+                    IconBadge(icon: _iconFor(a.mimetype), color: cs.primary),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(

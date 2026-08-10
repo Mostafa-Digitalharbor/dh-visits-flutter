@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../../app/design/app_decor.dart';
 import '../../../app/theme.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
@@ -184,26 +185,20 @@ class _MetricTile extends StatelessWidget {
     final up = delta >= 0;
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(Radii.lg),
-        border: Border.all(color: x.outlineVariant),
-        boxShadow: x.elev1,
-      ),
+      decoration: AppDecor.panel(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                width: 38,
-                height: 38,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: tone.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(Radii.sm),
-                ),
-                child: Icon(icon, fill: 1, size: 20, color: tone),
+              IconBadge(
+                icon: icon,
+                color: tone,
+                size: 38,
+                iconSize: 20,
+                radius: Radii.sm,
+                tintAlpha: 0.14,
+                fill: 1,
               ),
               const Spacer(),
               // On a 320dp screen these tiles are ~140dp wide, and a
@@ -228,7 +223,7 @@ class _MetricTile extends StatelessWidget {
                       Text('${up ? '+' : ''}$delta$deltaUnit',
                           maxLines: 1,
                           style: TextStyle(
-                              fontSize: 12,
+                              fontSize: FontSz.sm,
                               fontWeight: FontWeight.w700,
                               color: deltaColor)),
                     ],
@@ -243,7 +238,7 @@ class _MetricTile extends StatelessWidget {
           Text(label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: x.textTertiary)),
+              style: TextStyle(fontSize: FontSz.sm, fontWeight: FontWeight.w500, color: x.textTertiary)),
         ],
       ),
     );
@@ -294,7 +289,7 @@ class _WeeklyChart extends StatelessWidget {
                 child: Text(context.s.analyticsWeeklyCompare,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: x.textTertiary)),
+                    style: TextStyle(fontSize: FontSz.sm, color: x.textTertiary)),
               ),
             ],
           ),
@@ -340,7 +335,7 @@ class _Bar extends StatelessWidget {
         Text('$count',
             maxLines: 1,
             style: TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w800, color: isToday ? cs.primary : x.textTertiary)),
+                fontSize: FontSz.sm, fontWeight: FontWeight.w800, color: isToday ? cs.primary : x.textTertiary)),
         const SizedBox(height: 6),
         // The bar takes whatever the two labels leave rather than a hardcoded
         // 8 + 80·v. Those fixed numbers plus the labels' own line heights added
@@ -372,7 +367,7 @@ class _Bar extends StatelessWidget {
         Text(label,
             maxLines: 1,
             style: TextStyle(
-                fontSize: 10,
+                fontSize: FontSz.tiny,
                 fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
                 color: isToday ? cs.primary : x.textTertiary)),
       ],
@@ -431,9 +426,9 @@ class _EmpRow extends StatelessWidget {
     final x = context.x;
     final tone = pct >= 90 ? x.success : x.warning;
     final medal = switch (rank) {
-      1 => const Color(0xFFD9A40C),
-      2 => const Color(0xFF9AA0B4),
-      3 => const Color(0xFFB87333),
+      1 => AppColors.medalGold,
+      2 => AppColors.medalSilver,
+      3 => AppColors.medalBronze,
       _ => cs.onSurfaceVariant,
     };
     // Ranks 1-3 sit on fixed medal hues that pair with white. Rank 4+ falls
@@ -453,7 +448,7 @@ class _EmpRow extends StatelessWidget {
               alignment: Alignment.center,
               decoration: BoxDecoration(gradient: x.avatarGradient, shape: BoxShape.circle),
               child: Text(initial,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: FontSz.xl)),
             ),
             PositionedDirectional(
               end: -2,
@@ -468,7 +463,7 @@ class _EmpRow extends StatelessWidget {
                   border: Border.all(color: cs.surfaceContainerLowest, width: 2),
                 ),
                 child: Text('$rank',
-                    style: TextStyle(color: medalText, fontSize: 9, fontWeight: FontWeight.w800)),
+                    style: TextStyle(color: medalText, fontSize: FontSz.micro, fontWeight: FontWeight.w800)),
               ),
             ),
           ],
@@ -488,22 +483,14 @@ class _EmpRow extends StatelessWidget {
                   ),
                   Text('$pct${context.s.unitPercent} · $visits',
                       style: TextStyle(
-                          fontSize: 12,
+                          fontSize: FontSz.sm,
                           fontWeight: FontWeight.w700,
                           color: tone,
                           fontFeatures: const [FontFeature.tabularFigures()])),
                 ],
               ),
               const SizedBox(height: 6),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(Radii.badge),
-                child: LinearProgressIndicator(
-                  minHeight: 6,
-                  value: (pct / 100).clamp(0, 1),
-                  backgroundColor: cs.surfaceContainerHigh,
-                  valueColor: AlwaysStoppedAnimation<Color>(tone),
-                ),
-              ),
+              ProgressTrack(value: pct / 100, color: tone),
             ],
           ),
         ),

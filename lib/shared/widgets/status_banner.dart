@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../app/design/app_typography.dart';
+
 /// Slim tinted strip that sits under the AppBar to report an app-wide
 /// condition — offline, queued work, location sharing stopped.
 ///
@@ -54,7 +56,7 @@ class StatusBanner extends StatelessWidget {
                   style: TextStyle(
                     color: color,
                     fontWeight: FontWeight.w700,
-                    fontSize: 12,
+                    fontSize: FontSz.sm,
                   ),
                 ),
               ),

@@ -4,10 +4,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/design/app_colors.dart';
 import '../../../app/design/app_dimens.dart';
+import '../../../app/design/app_typography.dart';
 import '../../../app/routes.dart';
 import '../../../core/utils/app_date.dart';
 import '../../../core/utils/duration_format.dart';
 import '../../../shared/extensions/context_extensions.dart';
+import '../../../shared/widgets/widgets.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/data/models/user.dart';
 import '../data/models/visit.dart';
@@ -230,21 +232,12 @@ class VisitExecutionSection extends StatelessWidget {
           value: dur.localized(context),
           valueColor: isShort ? AppColors.amber : null,
           trailing: isShort
-              ? Container(
+              ? TonePill(
+                  label: context.s.wfShortVisitHint,
+                  color: AppColors.amber,
+                  fontSize: FontSz.xs,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.amber.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(Radii.pill),
-                  ),
-                  child: Text(
-                    context.s.wfShortVisitHint,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.amber,
-                    ),
-                  ),
                 )
               : null,
         ),
@@ -320,15 +313,7 @@ class _ParticipantTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: tone.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(Radii.tile),
-            ),
-            child: Icon(Icons.person_outline, size: 19, color: tone),
-          ),
+          IconBadge(icon: Icons.person_outline, color: tone),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -345,7 +330,7 @@ class _ParticipantTile extends StatelessWidget {
                   style: TextStyle(
                     color: tone,
                     fontWeight: FontWeight.w700,
-                    fontSize: 12.5,
+                    fontSize: FontSz.sm,
                   ),
                 ),
               ],

@@ -1,7 +1,9 @@
 # imglib.ps1 — GDI+ helpers for precise screenshot compositing (Cairo font).
 Add-Type -AssemblyName System.Drawing
 
-$Global:FontDir = "C:\Users\NINJAZ~1\AppData\Local\Temp\claude\e--mostafa-Companies-Digital-Harbor-Visits-location-gps\91b2d9bf-4d8e-4f62-9bc4-3b9f86930cbd\scratchpad\fonts"
+# Fonts live next to this script (they used to live in a session temp dir, which
+# meant the whole pipeline broke as soon as that dir was cleaned up).
+$Global:FontDir = Join-Path $PSScriptRoot 'fonts'
 $Global:PFCs = @{}
 
 function Get-CairoFamily([string]$weight) {

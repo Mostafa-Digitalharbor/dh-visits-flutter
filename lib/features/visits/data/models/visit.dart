@@ -301,7 +301,16 @@ class Visit extends Equatable {
   String? get visitTypeName => linkedRecordName;
 
   /// Scheduled day has passed and the visit isn't completed/running/closed.
-  bool get isOverdue {
+  bool get isOverdue => isOverdueAt(DateTime.now());
+
+  /// [isOverdue] against an explicit clock.
+  ///
+  /// Aggregations take a `now` so their output is reproducible; reading the
+  /// wall clock in here made the dashboard's "overdue" count ignore that
+  /// injected clock, so the same visit list produced a different KPI depending
+  /// on the day the code ran (and the metrics test started failing on its own
+  /// weeks after it was written).
+  bool isOverdueAt(DateTime now) {
     final s = scheduledDatetime;
     if (s == null) return false;
     if (isDone ||
@@ -310,7 +319,6 @@ class Visit extends Equatable {
         state == VisitState.inProgress) {
       return false;
     }
-    final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final sd = DateTime(s.year, s.month, s.day);
     return sd.isBefore(today);

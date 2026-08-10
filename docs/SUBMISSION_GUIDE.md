@@ -510,8 +510,14 @@ sentry-cli debug-files upload --org digital-harbor --project customer-visits-mob
 
 ### Apple
 
+> **حصل فعلًا يوم 2026-08-06 على النسخة 1.0 (4):** رفض تحت البندين 2.3.10 و2.1.
+> التشخيص والرد وخطوات إعادة التقديم في
+> [../store/appstore/apple-review-2026-08-06.md](../store/appstore/apple-review-2026-08-06.md).
+
 | السبب | الحل |
 |---|---|
+| **"Guideline 2.3.10 - non-iOS status bar images"** | لقطات App Store لازم تتصوَّر على iOS -- `store/photo/tools/ios_shots.sh`. لقطة أندرويد مؤطَّرة = رفض مباشر |
+| **"Guideline 2.1 - Provide server address"** | التطبيق بيطلب عنوان سيرفر الشركة أول شاشة؛ حساب demo لوحده مش كفاية -- لازم URL + اسم الـ database في الـ Notes |
 | "Guideline 5.1.1 - Data Collection and Storage" | راجع App Privacy form -- محتاج تكون أوضح في الـ purpose |
 | "Guideline 2.1 - App Completeness" | فيه bug أو الـ login مش شغّال للـ reviewer -- وفّر credentials صحيحة |
 | "Guideline 4.0 - Design" | الـ UI مش متبع iOS HIG -- نادراً يحصل لتطبيق Flutter |

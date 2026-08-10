@@ -149,7 +149,7 @@ class DashboardActiveMapCard extends StatelessWidget {
                         style: TextStyle(
                           color: Colors.green.shade800,
                           fontWeight: FontWeight.w700,
-                          fontSize: 12,
+                          fontSize: FontSz.sm,
                         ),
                       ),
                     ),

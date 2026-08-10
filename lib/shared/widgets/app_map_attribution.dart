@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../app/design/app_typography.dart';
+
 import '../../core/constants.dart';
 import '../../core/utils/communications.dart';
 
@@ -45,7 +47,7 @@ class AppMapAttribution extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               child: Text(
                 '© OpenStreetMap',
-                style: TextStyle(fontSize: 9, height: 1.2, color: fg),
+                style: TextStyle(fontSize: FontSz.micro, height: 1.2, color: fg),
                 // Never let a large system font size blow the badge up over
                 // the map; the credit only has to be legible, not prominent.
                 textScaler: TextScaler.noScaling,

@@ -441,6 +441,18 @@ class AppLocalizationsAr extends AppLocalizations {
   String get visitLiveIndicator => 'مباشر';
 
   @override
+  String get mapZoomIn => 'تكبير';
+
+  @override
+  String get mapZoomOut => 'تصغير';
+
+  @override
+  String get mapRecenter => 'توسيط الخريطة';
+
+  @override
+  String get mapOpenDirections => 'فتح الاتجاهات';
+
+  @override
   String get mapLiveTracking => 'تتبّع مباشر';
 
   @override
@@ -1156,6 +1168,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get settingsAccount => 'الحساب';
+
+  @override
+  String get settingsServer => 'تغيير الخادم';
+
+  @override
+  String get settingsServerNone => 'غير محدد';
 
   @override
   String get settingsAbout => 'حول التطبيق';

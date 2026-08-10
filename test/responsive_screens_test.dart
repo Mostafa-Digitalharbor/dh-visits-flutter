@@ -26,10 +26,30 @@ import 'package:location_gps/features/analytics/view/analytics_page.dart';
 import 'package:location_gps/features/auth/bloc/auth_bloc.dart';
 import 'package:location_gps/features/auth/data/auth_repository.dart';
 import 'package:location_gps/features/auth/data/models/user.dart';
+import 'package:location_gps/features/customers/bloc/customers_bloc.dart';
+import 'package:location_gps/features/customers/data/customers_repository.dart';
+import 'package:location_gps/features/customers/data/models/customer.dart';
+import 'package:location_gps/features/customers/view/customers_list_page.dart';
 import 'package:location_gps/features/dashboard/view/dashboard_page.dart';
+import 'package:location_gps/features/review/view/review_page.dart';
+import 'package:location_gps/features/route/view/route_page.dart';
+import 'package:location_gps/features/settings/view/settings_page.dart';
+import 'package:location_gps/core/api/api_client.dart';
+import 'package:location_gps/core/config/server_config.dart';
+import 'package:location_gps/core/config/server_config_cubit.dart';
+import 'package:location_gps/core/config/server_config_repository.dart';
+import 'package:location_gps/core/di/service_locator.dart';
+import 'package:location_gps/core/network/connectivity_status.dart';
+import 'package:location_gps/core/network/pending_actions_queue.dart';
+import 'package:location_gps/core/settings/settings_cubit.dart';
+import 'package:location_gps/core/settings/settings_repository.dart';
+import 'package:location_gps/shared/bloc/searchable_list_bloc.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:location_gps/features/visits/bloc/visits_list_bloc.dart';
 import 'package:location_gps/features/visits/data/models/visit.dart';
 import 'package:location_gps/features/visits/data/visits_repository.dart';
+import 'package:location_gps/features/visits/view/visits_list_page.dart';
 import 'package:location_gps/l10n/generated/app_localizations.dart';
 
 class _FakeVisitsRepo implements VisitsRepository {
@@ -39,6 +59,12 @@ class _FakeVisitsRepo implements VisitsRepository {
 }
 
 class _FakeAuthRepo implements AuthRepository {
+  @override
+  noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName} not stubbed');
+}
+
+class _FakeCustomersRepo implements CustomersRepository {
   @override
   noSuchMethod(Invocation invocation) =>
       throw UnimplementedError('${invocation.memberName} not stubbed');
@@ -57,6 +83,42 @@ class _StubListBloc extends VisitsListBloc {
   _StubListBloc(List<Visit> items) : super(repository: _FakeVisitsRepo()) {
     emit(VisitsListState(status: VisitsListStatus.success, items: items));
   }
+}
+
+class _FakeServerConfigRepo implements ServerConfigRepository {
+  @override
+  ServerConfig read() => const ServerConfig(
+        baseUrl: 'https://thedigitalharbor-dh-visits-new.odoo.com',
+        database: 'thedigitalharbor-dh-visits-new-main-35787218',
+      );
+
+  @override
+  noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName} not stubbed');
+}
+
+/// Only `updateBaseUrl` is reached during construction; everything else on the
+/// client would be a network call this test has no business making.
+class _FakeApiClient implements ApiClient {
+  @override
+  void updateBaseUrl(String baseUrl) {}
+
+  @override
+  noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName} not stubbed');
+}
+
+/// Same idea for the customer list. `ListLoadRequested` is fired from the
+/// page's `initState`, so the loader would run against the fake repo — the
+/// event handler is overridden to a no-op and the seeded state left standing.
+class _StubCustomersBloc extends CustomersBloc {
+  _StubCustomersBloc(List<Customer> items)
+      : super(repository: _FakeCustomersRepo()) {
+    emit(CustomersState(status: ListStatus.success, items: items));
+  }
+
+  @override
+  void add(SearchableListEvent event) {}
 }
 
 const _manager = AuthUser(
@@ -103,6 +165,39 @@ List<Visit> _seed() {
   ];
 }
 
+/// Customers carrying the values that break the list card: a long Arabic
+/// company name, a full address, a phone, tags, and a last visit — both still
+/// open (the "active" badge) and closed (the relative-time badge).
+List<Customer> _seedCustomers() {
+  final now = DateTime.now();
+  return [
+    for (var i = 0; i < 20; i++)
+      Customer(
+        id: i + 1,
+        name: i.isEven ? _longCustomer : 'Acme Corp',
+        latitude: 24.7 + i * 0.01,
+        longitude: 46.6 + i * 0.01,
+        address: 'طريق الملك عبد العزيز، حي الملقا، الرياض ١٢٤٧٣، السعودية',
+        phone: '+966 55 123 4567',
+        isCompany: i.isEven,
+        jobPosition: 'مدير المشتريات والعقود',
+        categories: const ['عميل ذهبي', 'قطاع حكومي'],
+        lastVisit: i % 3 == 0
+            ? null
+            : CustomerLastVisit(
+                id: i,
+                employeeName: i % 4 == 0 ? _longEmployee : 'Sam Sales',
+                checkInTime: now.subtract(Duration(hours: i + 1)),
+                // Every third one still open, so the "active" branch of the
+                // badge is exercised as well as the relative-time branch.
+                checkOutTime: i % 3 == 1
+                    ? null
+                    : now.subtract(Duration(minutes: i * 10)),
+              ),
+      ),
+  ];
+}
+
 typedef _Viewport = ({String name, Size size});
 
 const _viewports = <_Viewport>[
@@ -125,21 +220,44 @@ Future<List<FlutterErrorDetails>> _layoutErrors(
   required Locale locale,
   required double textScale,
   required List<Visit> items,
+  List<Customer> customers = const [],
+  // Tab bodies (Dashboard, Analytics, the two lists) are hosted by the shell's
+  // Scaffold and need one supplied here. Full pages (Route, Review) build their
+  // own, and nesting them changes the very constraints this test measures —
+  // which is how a 38px overflow on Review hid behind an unrelated async
+  // failure the first time it was covered.
+  bool wrapInScaffold = true,
 }) async {
-  tester.view.physicalSize = size;
-  tester.view.devicePixelRatio = 1.0;
-  addTearDown(tester.view.reset);
-
+  // Order matters: `addTearDown` runs callbacks in reverse registration order,
+  // so the collector has to be registered *first* to be uninstalled *last*.
+  // The other way round, resetting the view relaid the tree out with the
+  // collector already gone, and any overflow that surfaced during that reset
+  // reached the binding as an unhandled error — which fails the test with an
+  // unrelated "test overrode FlutterError.onError" assertion and then hangs
+  // until the 10-minute timeout instead of naming the offending widget.
   final collected = <FlutterErrorDetails>[];
   final previous = FlutterError.onError;
   FlutterError.onError = collected.add;
   addTearDown(() => FlutterError.onError = previous);
+
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
 
   await tester.pumpWidget(
     MultiBlocProvider(
       providers: [
         BlocProvider<AuthBloc>(create: (_) => _StubAuthBloc(_manager)),
         BlocProvider<VisitsListBloc>(create: (_) => _StubListBloc(items)),
+        BlocProvider<CustomersBloc>(
+            create: (_) => _StubCustomersBloc(customers)),
+        BlocProvider<SettingsCubit>(
+            create: (_) => SettingsCubit(repository: settingsRepo!)),
+        BlocProvider<ServerConfigCubit>(
+            create: (_) => ServerConfigCubit(
+                  repository: _FakeServerConfigRepo(),
+                  apiClient: _FakeApiClient(),
+                )),
       ],
       child: MaterialApp(
         // The real theme, not the default: these pages read semantic tokens
@@ -159,7 +277,7 @@ Future<List<FlutterErrorDetails>> _layoutErrors(
               .copyWith(textScaler: TextScaler.linear(textScale)),
           child: child!,
         ),
-        home: Scaffold(body: page),
+        home: wrapInScaffold ? Scaffold(body: page) : page,
       ),
     ),
   );
@@ -182,10 +300,40 @@ void _expectNoLayoutErrors(List<FlutterErrorDetails> errors) {
   );
 }
 
+/// Built once in `setUpAll` against mocked prefs. `SettingsCubit` reads the
+/// stored theme/locale in its constructor, so it needs a real repository
+/// rather than a `noSuchMethod` fake.
+SettingsRepository? settingsRepo;
+
 void main() {
-  setUpAll(() async => initializeDateFormatting());
+  setUpAll(() async {
+    initializeDateFormatting();
+    SharedPreferences.setMockInitialValues(const {});
+    final prefs = await SharedPreferences.getInstance();
+    settingsRepo = SettingsRepository(prefs: prefs);
+    // The settings "last sync" row resolves the queue straight out of the
+    // service locator during build, so the locator has to be populated even
+    // though this test never syncs anything.
+    if (!sl.isRegistered<PendingActionsQueue>()) {
+      sl.registerSingleton<PendingActionsQueue>(PendingActionsQueue(
+        prefs: prefs,
+        repository: _FakeVisitsRepo(),
+        connectivity: ConnectivityStatus(),
+      ));
+    }
+    // The settings screen reads the build version from platform metadata,
+    // which has no implementation under the test binding.
+    PackageInfo.setMockInitialValues(
+      appName: 'Visits',
+      packageName: 'net.digitalharbor.visits',
+      version: '1.0.0',
+      buildNumber: '5',
+      buildSignature: '',
+    );
+  });
 
   final items = _seed();
+  final customers = _seedCustomers();
 
   for (final vp in _viewports) {
     for (final locale in const [Locale('ar'), Locale('en')]) {
@@ -201,6 +349,59 @@ void main() {
         testWidgets('Analytics fits — $tag', (tester) async {
           _expectNoLayoutErrors(await _layoutErrors(
               tester, const AnalyticsPage(),
+              size: vp.size, locale: locale, textScale: scale, items: items));
+        });
+
+        // The list is the screen a rep lives in all day, and the one that
+        // renders the longest Odoo-shaped strings (customer + project +
+        // employee on one card). The file header always claimed it was
+        // covered; it wasn't.
+        testWidgets('Visits list fits — $tag', (tester) async {
+          _expectNoLayoutErrors(await _layoutErrors(
+              tester, const VisitsListPage(),
+              size: vp.size, locale: locale, textScale: scale, items: items));
+        });
+
+        // The manager's other everyday tab. Its card packs a name, an address,
+        // a phone, a "last visit" badge and a chevron onto one line — and the
+        // badge sits in the unbounded slot of that row, where a widget that
+        // asks its parent to flex throws rather than merely overflowing.
+        testWidgets('Customers list fits — $tag', (tester) async {
+          _expectNoLayoutErrors(await _layoutErrors(
+              tester, const CustomersListPage(),
+              size: vp.size,
+              locale: locale,
+              textScale: scale,
+              items: items,
+              customers: customers));
+        });
+
+        // Route and Review read the same bloc as the visits list but lay it out
+        // far more densely — a timeline row and a per-day comparison table,
+        // both packing numbers and Arabic labels onto one line.
+        testWidgets('Route fits — $tag', (tester) async {
+          _expectNoLayoutErrors(await _layoutErrors(tester, const RoutePage(),
+              size: vp.size,
+              locale: locale,
+              textScale: scale,
+              items: items,
+              wrapInScaffold: false));
+        });
+
+        testWidgets('Review fits — $tag', (tester) async {
+          _expectNoLayoutErrors(await _layoutErrors(tester, const ReviewPage(),
+              size: vp.size,
+              locale: locale,
+              textScale: scale,
+              items: items,
+              wrapInScaffold: false));
+        });
+
+        // Settings is the densest single column in the app: a profile card, a
+        // switch row, and two radio groups whose labels are the longest
+        // translated strings in the ARBs.
+        testWidgets('Settings fits — $tag', (tester) async {
+          _expectNoLayoutErrors(await _layoutErrors(tester, const SettingsView(),
               size: vp.size, locale: locale, textScale: scale, items: items));
         });
       }

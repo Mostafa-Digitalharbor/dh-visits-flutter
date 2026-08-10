@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
+import '../../app/design/app_colors.dart';
 import '../../app/design/app_dimens.dart';
 
 /// Wraps any child with shimmer animation, using theme-appropriate colors.
@@ -18,11 +19,11 @@ class AppShimmer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final (base, highlight) = AppColors.skeletonShimmer(isDark);
     return RepaintBoundary(
       child: Shimmer.fromColors(
-        baseColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE6E6E6),
-        highlightColor:
-            isDark ? const Color(0xFF3A3A3A) : const Color(0xFFF5F5F5),
+        baseColor: base,
+        highlightColor: highlight,
         period: const Duration(milliseconds: 1400),
         child: child,
       ),

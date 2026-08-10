@@ -75,11 +75,19 @@ This is an enterprise app that works with your company's system. You need sign-i
 
 ## App Review Information
 
+> **2026-08-06:** submitting demo credentials without the **server address** got the
+> app rejected under guideline 2.1 — the reviewer could not get past the "Connect
+> your server" screen. The Notes below must always carry the server URL + database
+> name. Full reply and checklist: [apple-review-2026-08-06.md](apple-review-2026-08-06.md).
+
 **Sign-In required:** tick it. Provide a working demo account on the live backend
 with a few clean visits already seeded, and keep it working until the app is approved
 — review can re-test weeks later.
 
-**Notes:**
+**Notes:** the live text now lives in
+[apple-review-2026-08-06.md § 4-ب](apple-review-2026-08-06.md) — it carries the server
+address and database name, without which the reviewer cannot get past the first screen.
+The draft below is kept only as background.
 
 ```
 Field Visits is an enterprise field-service app used by employees of companies that run our backend. Sign-in credentials are issued by the employer; there is no public self-registration. The demo account above is seeded with sample customers and visits so every screen can be reached.

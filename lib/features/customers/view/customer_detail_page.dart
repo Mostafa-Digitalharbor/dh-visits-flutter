@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
+import '../../../app/design/app_typography.dart';
 
 import '../../../core/api/api_exceptions.dart';
 import '../../../core/constants.dart';
@@ -147,7 +148,7 @@ class _CustomerBody extends StatelessWidget {
               style: TextStyle(
                 color: colors.onPrimary,
                 fontWeight: FontWeight.w600,
-                fontSize: 16,
+                fontSize: FontSz.xl,
               ),
             ),
             background: _CustomerHero(customer: customer),
@@ -159,12 +160,18 @@ class _CustomerBody extends StatelessWidget {
             children: [
               _QuickActionsRow(customer: customer),
               const SizedBox(height: 14),
-              _SectionLabel(label: context.s.customerSectionInfo),
+              SectionHeader.eyebrow(
+                label: context.s.customerSectionInfo,
+                padding: _sectionLabelPad,
+              ),
               const SizedBox(height: 6),
               _CustomerInfoCard(customer: customer),
               if (customer.lastVisit != null) ...[
                 const SizedBox(height: 16),
-                _SectionLabel(label: context.s.customerLastVisit),
+                SectionHeader.eyebrow(
+                  label: context.s.customerLastVisit,
+                  padding: _sectionLabelPad,
+                ),
                 const SizedBox(height: 6),
                 Card(
                   margin: EdgeInsets.zero,
@@ -257,7 +264,7 @@ class _CustomerHero extends StatelessWidget {
                     InitialAvatar.initialOf(customer.name),
                     style: TextStyle(
                       color: colors.onPrimary,
-                      fontSize: 32,
+                      fontSize: FontSz.heroInitial,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -511,21 +518,14 @@ class _CustomerInfoCard extends StatelessWidget {
               runSpacing: 6,
               children: [
                 for (final t in customer.categories)
-                  Container(
+                  TonePill(
+                    label: t,
+                    color: cs.tertiary,
+                    fontSize: context.text.labelMedium?.fontSize ?? 12,
+                    fontWeight: FontWeight.w600,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
                       vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cs.tertiary.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(Radii.pill),
-                    ),
-                    child: Text(
-                      t,
-                      style: context.text.labelMedium?.copyWith(
-                        color: cs.tertiary,
-                        fontWeight: FontWeight.w600,
-                      ),
                     ),
                   ),
               ],
@@ -537,25 +537,10 @@ class _CustomerInfoCard extends StatelessWidget {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  final String label;
-  const _SectionLabel({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, right: 4, bottom: 2),
-      child: Text(
-        label.toUpperCase(),
-        style: context.text.labelSmall?.copyWith(
-          color: context.colors.primary,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.0,
-        ),
-      ),
-    );
-  }
-}
+/// Inset of this screen's eyebrows: nudged in to line up with the card text
+/// beneath them, and held tight to it.
+const _sectionLabelPad =
+    EdgeInsetsDirectional.only(start: 4, end: 4, bottom: 2);
 
 class _DetailSkeleton extends StatelessWidget {
   const _DetailSkeleton();

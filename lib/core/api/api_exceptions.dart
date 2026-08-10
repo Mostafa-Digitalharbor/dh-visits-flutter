@@ -68,15 +68,57 @@ class ApiException implements Exception {
 
     // Prefer the inner Odoo message ("data.message") over the wrapper
     // ("error.message") since the wrapper is always "Odoo Server Error".
-    String? serverMessage =
+    String? rawMessage =
         dataMessage?.isNotEmpty == true ? dataMessage : null;
-    serverMessage ??= err['message']?.toString();
+    rawMessage ??= err['message']?.toString();
+
+    // Classify *before* deciding what the user may see: the code mapping still
+    // wants the raw text (it sniffs field-permission errors out of
+    // AUTH_REQUIRED), but only messages a human actually authored are fit to
+    // render.
+    final code = _mapCode(rawCode, dataName, rawMessage);
+    final showable = _isUserFacingMessage(dataName, rawMessage);
 
     return ApiException(
-      code: _mapCode(rawCode, dataName, serverMessage),
-      serverMessage: serverMessage,
-      details: err['details'] ?? err['data'],
+      code: code,
+      serverMessage: showable ? rawMessage : null,
+      // The diagnostic is never lost — it just moves somewhere the UI can't
+      // render it from.
+      details: err['details'] ?? err['data'] ?? (showable ? null : rawMessage),
     );
+  }
+
+  /// Odoo exception classes whose `data.message` is written *for an end user*.
+  ///
+  /// `UserError` / `ValidationError` / `RedirectWarning` are what an Odoo
+  /// developer raises to explain a business rule ("A visit cannot be started
+  /// before its scheduled time"). Everything else — `builtins.TypeError`,
+  /// `KeyError`, `psycopg2.*`, and even `MissingError` — carries a Python
+  /// diagnostic.
+  static const _userAuthoredOdooErrors = {
+    'odoo.exceptions.UserError',
+    'odoo.exceptions.ValidationError',
+    'odoo.exceptions.RedirectWarning',
+    'odoo.exceptions.Warning',
+  };
+
+  /// Whether [message] may be shown to the user verbatim.
+  ///
+  /// This exists because the live backend really does return
+  /// `builtins.TypeError: VisitApiController.create_visit() missing 1 required
+  /// positional argument: 'vals'` — which used to be rendered, in English,
+  /// into the middle of an Arabic screen, as the sole explanation a field rep
+  /// got for a failed action. An unmapped server fault is a bug on our side;
+  /// the user gets the localized fallback and support gets the trace.
+  static bool _isUserFacingMessage(String? odooName, String? message) {
+    if (message == null || message.trim().isEmpty) return false;
+    // The JSON-RPC wrapper's own text, present on every Odoo fault.
+    if (message.trim() == 'Odoo Server Error') return false;
+    // No Odoo exception class means this came from the module's own REST
+    // contract (`{"error": {"code": "VALIDATION_ERROR", "message": ...}}`),
+    // where the message is written for the app to display.
+    if (odooName == null || odooName.isEmpty) return true;
+    return _userAuthoredOdooErrors.contains(odooName);
   }
 
   factory ApiException.network() => ApiException(code: ApiErrorCode.network);

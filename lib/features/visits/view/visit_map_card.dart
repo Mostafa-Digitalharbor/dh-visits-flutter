@@ -12,7 +12,6 @@ import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../data/models/visit.dart';
 import '../data/visits_repository.dart';
-import '../../../app/design/app_dimens.dart';
 
 /// A compact geofence map on the visit-detail page.
 ///
@@ -255,9 +254,10 @@ class _VisitMapCardState extends State<VisitMapCard> {
                 Positioned(
                   right: 12,
                   bottom: 12,
-                  child: _MapFab(
+                  child: MapFab.rounded(
                     icon: Symbols.assistant_direction,
                     onTap: () => _openDirections(context),
+                    semanticLabel: context.s.mapOpenDirections,
                   ),
                 ),
               ],
@@ -389,26 +389,3 @@ class _Pin extends StatelessWidget {
       MapPin.icon(icon: icon, color: color, borderWidth: 3);
 }
 
-class _MapFab extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  const _MapFab({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: context.colors.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.btn)),
-      elevation: 3,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(Radii.btn),
-        onTap: onTap,
-        child: SizedBox(
-          width: 44,
-          height: 44,
-          child: Icon(icon, color: context.colors.primary),
-        ),
-      ),
-    );
-  }
-}

@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../app/routes.dart';
+import '../../../app/design/app_decor.dart';
 import '../../../app/theme.dart';
 import '../../../core/constants.dart';
 import '../../../core/utils/app_date.dart';
@@ -211,7 +212,7 @@ class _RouteMap extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                       '${stops.length} ${context.s.routeStops} · ${context.s.unitKm(km.toStringAsFixed(1))}',
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                      style: const TextStyle(color: Colors.white, fontSize: FontSz.sm, fontWeight: FontWeight.w700)),
                 ],
               ),
             ),
@@ -252,12 +253,7 @@ class _SummaryTile extends StatelessWidget {
     final x = context.x;
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(Radii.lg),
-        border: Border.all(color: x.outlineVariant),
-        boxShadow: x.elev1,
-      ),
+      decoration: AppDecor.panel(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -268,7 +264,7 @@ class _SummaryTile extends StatelessWidget {
           const SizedBox(height: 8),
           Text(value, style: AppType.number(20, cs.onSurface)),
           const SizedBox(height: 2),
-          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: x.textTertiary)),
+          Text(label, style: TextStyle(fontSize: FontSz.sm, fontWeight: FontWeight.w500, color: x.textTertiary)),
         ],
       ),
     );
@@ -314,7 +310,7 @@ class _StopRow extends StatelessWidget {
                   child: Text('${index + 1}',
                       style: TextStyle(
                           color: isNext ? Colors.white : cs.onSurfaceVariant,
-                          fontSize: 13,
+                          fontSize: FontSz.base,
                           fontWeight: FontWeight.w800)),
                 ),
               ),
@@ -346,7 +342,7 @@ class _StopRow extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                           decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(Radii.pill)),
                           child: Text(context.s.routeNextStop,
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: cs.onPrimaryContainer)),
+                              style: TextStyle(fontSize: FontSz.xs, fontWeight: FontWeight.w700, color: cs.onPrimaryContainer)),
                         ),
                     ],
                   ),
@@ -363,7 +359,7 @@ class _StopRow extends StatelessWidget {
                           index == 0 ? '$eta · ${context.s.routeStartPoint}' : eta,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: x.textTertiary),
+                          style: TextStyle(fontSize: FontSz.sm, fontWeight: FontWeight.w600, color: x.textTertiary),
                         ),
                       ),
                       if (driveMinutes != null) ...[
@@ -375,7 +371,7 @@ class _StopRow extends StatelessWidget {
                             context.s.routeDriveMinutes(driveMinutes!),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: x.textTertiary),
+                            style: TextStyle(fontSize: FontSz.sm, fontWeight: FontWeight.w600, color: x.textTertiary),
                           ),
                         ),
                       ],

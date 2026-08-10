@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../app/design/app_colors.dart';
+
 /// Circular marker for a `flutter_map` layer: a filled disc with a white ring
 /// and a drop shadow, holding an icon, an initial or a number.
 ///
@@ -93,7 +95,7 @@ class MapPin extends StatelessWidget {
         border: Border.all(color: borderColor, width: borderWidth),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x55000000),
+            color: AppColors.shadowStrong,
             blurRadius: 8,
             offset: Offset(0, 3),
           ),

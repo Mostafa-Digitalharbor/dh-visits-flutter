@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../app/routes.dart';
+import '../../../app/design/app_decor.dart';
 import '../../../app/theme.dart';
 import '../../../core/utils/app_date.dart';
 import '../../../core/api/api_exceptions.dart';
@@ -130,14 +131,24 @@ class _PendingChip extends StatelessWidget {
         color: x.warningContainer,
         borderRadius: BorderRadius.circular(Radii.pill),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Symbols.pending, fill: 1, size: 16, color: x.warning),
-          const SizedBox(width: 6),
-          Text(context.s.reviewPendingCount(count),
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: x.onWarningContainer)),
-        ],
+      // FittedBox, not an ellipsis: this chip is the headline of the screen —
+      // "3 visits waiting for your review". On a 320dp phone at the app's
+      // 1.25 text-scale ceiling the Arabic string is 38px wider than the row,
+      // and "3 visits waiting for…" answers nothing. Scaling the whole chip
+      // keeps the sentence readable where it has to shrink and leaves it at
+      // full size everywhere else — the same trade-off the analytics delta
+      // chip makes.
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Symbols.pending, fill: 1, size: 16, color: x.warning),
+            const SizedBox(width: 6),
+            Text(context.s.reviewPendingCount(count),
+                style: TextStyle(fontSize: FontSz.base, fontWeight: FontWeight.w700, color: x.onWarningContainer)),
+          ],
+        ),
       ),
     );
   }
@@ -183,12 +194,7 @@ class _ReviewCard extends StatelessWidget {
             : x.warning;
 
     return Container(
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(Radii.lg),
-        border: Border.all(color: x.outlineVariant),
-        boxShadow: x.elev1,
-      ),
+      decoration: AppDecor.panel(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -236,7 +242,7 @@ class _ReviewCard extends StatelessWidget {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                        fontSize: 12,
+                                        fontSize: FontSz.sm,
                                         fontWeight: FontWeight.w600,
                                         color: x.textTertiary)),
                               ],
@@ -272,7 +278,7 @@ class _ReviewCard extends StatelessWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                      fontSize: 12.5,
+                                      fontSize: FontSz.sm,
                                       fontWeight: FontWeight.w700,
                                       color: cs.onSurfaceVariant)),
                             ),
@@ -281,7 +287,7 @@ class _ReviewCard extends StatelessWidget {
                             const SizedBox(width: 4),
                             Text('$arrival ~ $departure',
                                 style: TextStyle(
-                                    fontSize: 12.5,
+                                    fontSize: FontSz.sm,
                                     fontWeight: FontWeight.w800,
                                     color: onTimeColor,
                                     fontFeatures: const [
@@ -349,7 +355,7 @@ class _DurationChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(duration.clock,
               style: TextStyle(
-                  fontSize: 12,
+                  fontSize: FontSz.sm,
                   fontWeight: FontWeight.w700,
                   color: context.colors.onSurfaceVariant,
                   fontFeatures: const [FontFeature.tabularFigures()])),
@@ -382,19 +388,26 @@ class _ActionButton extends StatelessWidget {
           child: Container(
             height: 48,
             alignment: Alignment.center,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, fill: 1, size: 18, color: fg),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(label,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            // Scale the label down rather than ellipsise it. Reject gets a
+            // quarter of this row (flex 1 against Approve's 3), which on a
+            // 320dp screen at the app's 1.25 text-scale ceiling clipped it to
+            // "Re…" — an unreadable stub on the *destructive* action, where
+            // mistaking it for anything else rejects a colleague's visit.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, fill: 1, size: 18, color: fg),
+                  const SizedBox(width: 6),
+                  Text(label,
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: AppType.button
                           .copyWith(fontWeight: FontWeight.w800, color: fg)),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

@@ -16,13 +16,15 @@ $shots = [ordered]@{
     '4-analytics'    = '04_analytics.png'
 }
 
+# Play only. The App Store sizes used to be generated here from the same Android
+# captures — that is what got build 1.0 (4) rejected under guideline 2.3.10
+# (Android status bar + gesture pill on App Store screenshots). iOS shots are now
+# captured on a simulator: store/photo/tools/ios_shots.sh, then compose.ps1 -Platform ios.
+# iPad sizes are gone too: TARGETED_DEVICE_FAMILY is "1" (iPhone only) as of 1.0.1 (5).
 $targets = [ordered]@{
     'play-phone'     = @(1350, 2400)
     'play-tablet-7'  = @(1350, 2400)
     'play-tablet-10' = @(1600, 2560)
-    'ios-6.9'        = @(1290, 2796)   # iPhone 16/15 Pro Max — required
-    'ios-6.5'        = @(1242, 2688)   # older Max — optional fallback
-    'ipad-13'        = @(2064, 2752)   # required while TARGETED_DEVICE_FAMILY includes 2
 }
 
 function New-Framed($srcPath, $dstPath, $TW, $TH) {

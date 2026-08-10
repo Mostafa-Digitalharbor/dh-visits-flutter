@@ -469,7 +469,7 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            fontSize: 11,
+                            fontSize: FontSz.xs,
                             height: 1.15,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.3,
@@ -478,7 +478,7 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            fontSize: 19,
+                            fontSize: FontSz.appBar,
                             height: 1.15,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.2,
@@ -487,7 +487,7 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
               if (showGroups) ...[
-                _ActionChip(
+                IconActionChip(
                   icon: Symbols.groups,
                   tooltip: context.s.customersTitle,
                   onTap: () => context.push(AppRoutes.customers),
@@ -497,7 +497,7 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
               const _NotificationChip(),
               const SizedBox(width: 8),
               if (showSettings)
-                _ActionChip(
+                IconActionChip(
                   icon: Symbols.settings,
                   tooltip: context.s.settingsTitle,
                   onTap: () => context.push(AppRoutes.settings),
@@ -556,7 +556,7 @@ class _NotificationChipState extends State<_NotificationChip>
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        _ActionChip(
+        IconActionChip(
           icon: Symbols.notifications,
           tooltip: context.s.wfNotificationsTitle,
           onTap: () async {
@@ -583,7 +583,7 @@ class _NotificationChipState extends State<_NotificationChip>
                 _count > 99 ? '99+' : '$_count',
                 style: TextStyle(
                   color: cs.onError,
-                  fontSize: 10,
+                  fontSize: FontSz.tiny,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -594,33 +594,3 @@ class _NotificationChipState extends State<_NotificationChip>
   }
 }
 
-class _ActionChip extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-  const _ActionChip({required this.icon, required this.tooltip, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = context.colors;
-    final x = context.x;
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(Radii.sm),
-        child: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(Radii.sm),
-            border: Border.all(color: x.outlineVariant),
-            boxShadow: x.elev1,
-          ),
-          child: Icon(icon, size: 21, color: cs.onSurfaceVariant),
-        ),
-      ),
-    );
-  }
-}

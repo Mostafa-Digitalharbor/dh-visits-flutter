@@ -114,7 +114,7 @@ class DashboardSummary {
     final employees = <String, int>{};
 
     for (final v in visits) {
-      if (v.isOverdue) overdue++;
+      if (v.isOverdueAt(today)) overdue++;
       if (v.isAwaitingApproval) pending++;
       if (v.isInProgress) active++;
 

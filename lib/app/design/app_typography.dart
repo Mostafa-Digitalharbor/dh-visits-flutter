@@ -2,6 +2,70 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// The only font sizes the app is allowed to use.
+///
+/// The composite styles in [AppType] cover most text, but plenty of call sites
+/// legitimately need a different weight or colour than a token bakes in, and
+/// were reaching for a bare `fontSize:` literal to get there. That left 55
+/// inline sizes across 18 files — including 11.5, 12.5 and 13.5, rungs that
+/// exist nowhere in the foundations doc and arrived purely by drift.
+///
+/// Sizes live here so the ladder stays finite and reviewable, while weight and
+/// colour stay at the call site where they carry meaning.
+class FontSz {
+  FontSz._();
+
+  /// 9 — graphical annotations that sit inside a fixed shape: the map
+  /// attribution strip, the rank numeral inside an 18dp medal. Not for prose;
+  /// these do not grow with the OS text scale because their container can't.
+  static const micro = 9.0;
+
+  /// 10 — nav badge counts, the smallest caption still meant to be read.
+  static const tiny = 10.0;
+
+  /// 11 — eyebrows, chip captions.
+  static const xs = 11.0;
+
+  /// 12 — badges, chips, tabs, metric captions. The app's most common size.
+  static const sm = 12.0;
+
+  /// 13 — secondary body, list subtitles.
+  static const base = 13.0;
+
+  /// 14 — body, buttons.
+  static const md = 14.0;
+
+  /// 15 — settings rows, primary list titles.
+  static const lg = 15.0;
+
+  /// 16 — card titles, leaderboard avatar initials.
+  static const xl = 16.0;
+
+  /// 18 — greeting avatar initial.
+  static const avatar = 18.0;
+
+  /// 19 — app-bar titles.
+  static const appBar = 19.0;
+
+  /// 20 — the customer-list initial.
+  static const listInitial = 20.0;
+
+  /// 22 — the greeting name, the biggest text in the dashboard header.
+  static const greeting = 22.0;
+
+  /// 23 — auth sheet heading ("Welcome back").
+  static const authHeading = 23.0;
+
+  /// 24 — settings profile initial.
+  static const profileInitial = 24.0;
+
+  /// 30 — the auth wordmark.
+  static const wordmark = 30.0;
+
+  /// 32 — customer-detail hero initial.
+  static const heroInitial = 32.0;
+}
+
 class AppType {
   AppType._();
 

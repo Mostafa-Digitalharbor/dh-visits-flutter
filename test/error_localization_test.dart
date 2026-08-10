@@ -99,6 +99,80 @@ void main() {
     });
   });
 
+  group('ApiException.fromJson — server faults', () {
+    /// The JSON-RPC envelope Odoo actually returns.
+    Map<String, dynamic> fault(String name, String message) => {
+          'error': {
+            'code': 200,
+            'message': 'Odoo Server Error',
+            'data': {'name': name, 'message': message, 'debug': 'Traceback…'},
+          }
+        };
+
+    // Captured verbatim from the live backend by calling the endpoint with no
+    // arguments. Before the fix, `localize()` returned this string — English
+    // Python, mid-sentence, as the only explanation an Arabic-speaking field
+    // rep got for a failed "create visit".
+    const pythonFault =
+        "VisitApiController.create_visit() missing 1 required positional "
+        "argument: 'vals'";
+
+    testWidgets('an internal Python error never reaches the user', (t) async {
+      final e = ApiException.fromJson(fault('builtins.TypeError', pythonFault));
+      for (final locale in [en, ar]) {
+        final shown = await localize(t, e, locale);
+        expect(shown, isNot(contains('VisitApiController')));
+        expect(shown, isNot(contains('positional')));
+        expect(shown, isNot(contains('vals')));
+      }
+      expect(await localize(t, e, en), lookupAppLocalizations(en).errUnknown);
+      expect(await localize(t, e, ar), lookupAppLocalizations(ar).errUnknown);
+    });
+
+    test('…but the diagnostic still survives for support', () {
+      final e = ApiException.fromJson(fault('builtins.TypeError', pythonFault));
+      expect(e.serverMessage, isNull);
+      expect(e.toString(), contains('create_visit'));
+    });
+
+    testWidgets('a business rule from the server IS shown', (t) async {
+      // UserError is what an Odoo developer raises to explain a rule, so it
+      // stays the most specific thing the user can be told.
+      final e = ApiException.fromJson(fault(
+          'odoo.exceptions.UserError', 'A visit cannot start before it is approved'));
+      expect(await localize(t, e, en),
+          'A visit cannot start before it is approved');
+    });
+
+    testWidgets('MissingError falls back rather than leaking record ids',
+        (t) async {
+      final e = ApiException.fromJson(fault('odoo.exceptions.MissingError',
+          'Record does not exist or has been deleted. (Records: dh.visit(999,), User: 2)'));
+      final shown = await localize(t, e, ar);
+      expect(shown, isNot(contains('dh.visit')));
+      expect(shown, equals(lookupAppLocalizations(ar).errNotFound));
+    });
+
+    testWidgets('the bare JSON-RPC wrapper text is never shown', (t) async {
+      // Every Odoo fault carries message: "Odoo Server Error" on the wrapper.
+      final e = ApiException.fromJson({
+        'error': {'code': 200, 'message': 'Odoo Server Error'}
+      });
+      for (final locale in [en, ar]) {
+        expect(await localize(t, e, locale), isNot(contains('Odoo Server Error')));
+      }
+    });
+
+    testWidgets('the module\'s own REST contract message is shown', (t) async {
+      // No Odoo exception class => this came from dh_visit_management's own
+      // error envelope, where the message is written for the app to display.
+      final e = ApiException.fromJson({
+        'error': {'code': 'VALIDATION_ERROR', 'message': 'Outcome is required'}
+      });
+      expect(await localize(t, e, en), 'Outcome is required');
+    });
+  });
+
   group('every error code is localized in both languages', () {
     // An unlocalized code would surface as an English string (or throw) on an
     // Arabic screen; the exhaustive switch in localize() is only useful if

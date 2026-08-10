@@ -33,9 +33,9 @@ class AuthHero extends StatelessWidget {
                 begin: const Alignment(-1, -0.7),
                 end: const Alignment(1, 1),
                 colors: [
-                  const Color(0xFF0B1240).withValues(alpha: 0.92),
-                  const Color(0xFF1E2A6E).withValues(alpha: 0.88),
-                  const Color(0xFF2DA3C0).withValues(alpha: 0.82),
+                  AppColors.navy900.withValues(alpha: 0.92),
+                  AppColors.navy700.withValues(alpha: 0.88),
+                  AppColors.teal500.withValues(alpha: 0.82),
                 ],
                 stops: const [0, 0.55, 1],
               ),
@@ -45,7 +45,7 @@ class AuthHero extends StatelessWidget {
         Positioned(
           top: -40,
           right: -40,
-          child: _Glow(size: 200, color: const Color(0xFF3FBFD9).withValues(alpha: 0.45)),
+          child: _Glow(size: 200, color: AppColors.cyan500.withValues(alpha: 0.45)),
         ),
         Positioned(
           bottom: -10,
@@ -64,7 +64,7 @@ class AuthHero extends StatelessWidget {
               Text(
                 context.s.loginTitle,
                 style: const TextStyle(
-                  fontSize: 30,
+                  fontSize: FontSz.wordmark,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5,
                   color: Colors.white,
@@ -75,7 +75,7 @@ class AuthHero extends StatelessWidget {
                 context.s.appTagline,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 13.5,
+                  fontSize: FontSz.base,
                   fontWeight: FontWeight.w600,
                   color: Colors.white.withValues(alpha: 0.82),
                 ),
@@ -119,7 +119,7 @@ class _LogoTile extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: const [
-          BoxShadow(color: Color(0x40000000), blurRadius: 24, offset: Offset(0, 10)),
+          BoxShadow(color: AppColors.shadowMedium, blurRadius: 24, offset: Offset(0, 10)),
         ],
         border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1),
       ),
@@ -157,7 +157,7 @@ class _HeroChips extends StatelessWidget {
                   Text(
                     isArabic ? 'EN' : 'ع',
                     style: const TextStyle(
-                      fontSize: 12.5,
+                      fontSize: FontSz.sm,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
                     ),
@@ -279,7 +279,7 @@ class AuthSheetTitle extends StatelessWidget {
         Text(
           title,
           style: TextStyle(
-            fontSize: 23,
+            fontSize: FontSz.authHeading,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.3,
             color: cs.onSurface,
@@ -289,7 +289,7 @@ class AuthSheetTitle extends StatelessWidget {
         Text(
           subtitle,
           style: TextStyle(
-            fontSize: 14,
+            fontSize: FontSz.md,
             fontWeight: FontWeight.w500,
             color: cs.onSurfaceVariant,
           ),
@@ -343,7 +343,7 @@ class _AuthFieldState extends State<AuthField> {
       keyboardType: widget.keyboardType,
       textInputAction: widget.textInputAction,
       inputFormatters: widget.inputFormatters,
-      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+      style: const TextStyle(fontSize: FontSz.lg, fontWeight: FontWeight.w600),
       decoration: InputDecoration(
         hintText: widget.hint,
         prefixIcon: Icon(widget.icon, size: 20, color: x.textTertiary),
@@ -410,7 +410,7 @@ class AuthPrimaryButton extends StatelessWidget {
                         Text(
                           label,
                           style: TextStyle(
-                            fontSize: 15,
+                            fontSize: FontSz.lg,
                             fontWeight: FontWeight.w800,
                             color: cs.onPrimary,
                           ),
@@ -447,7 +447,7 @@ class AuthSecureFooter extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-                fontSize: 11.5, fontWeight: FontWeight.w600, color: x.textDisabled),
+                fontSize: FontSz.xs, fontWeight: FontWeight.w600, color: x.textDisabled),
           ),
         ),
       ],

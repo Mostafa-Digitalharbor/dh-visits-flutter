@@ -7,6 +7,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../app/theme.dart';
+import '../../../core/config/server_config_cubit.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/pending_actions_queue.dart';
 import '../../../core/settings/settings_cubit.dart';
@@ -52,6 +53,16 @@ class _SettingsViewState extends State<SettingsView> {
   void initState() {
     super.initState();
     _loadVersion();
+  }
+
+  /// Host of the backend the app is pointed at, shown under "Change server"
+  /// so the user can tell which company server they are on at a glance.
+  String _serverHost(BuildContext context) {
+    final url = context.watch<ServerConfigCubit>().state.baseUrl;
+    if (url.isEmpty) return context.s.settingsServerNone;
+    return Uri.tryParse(url)?.host.isNotEmpty == true
+        ? Uri.parse(url).host
+        : url;
   }
 
   Future<void> _loadVersion() async {
@@ -142,6 +153,15 @@ class _SettingsViewState extends State<SettingsView> {
                   value: state.notifications,
                   onChanged: (v) =>
                       context.read<SettingsCubit>().setNotifications(v),
+                ),
+                const _RowDivider(),
+                // The only in-app way back to the server-setup screen. Without
+                // it, switching backends means wiping app data.
+                _NavRow(
+                  icon: Symbols.dns,
+                  label: context.s.settingsServer,
+                  subtitle: _serverHost(context),
+                  onTap: () => context.push(AppRoutes.setup),
                 ),
               ]),
               const SizedBox(height: 18),
@@ -240,7 +260,7 @@ class _ProfileCard extends StatelessWidget {
                 ),
                 child: Text(initial,
                     style: const TextStyle(
-                        color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+                        color: Colors.white, fontSize: FontSz.profileInitial, fontWeight: FontWeight.w800)),
               ),
               // Online presence dot (bottom inline-start), 2px surface border.
               PositionedDirectional(
@@ -286,7 +306,7 @@ class _ProfileCard extends StatelessWidget {
                       const SizedBox(width: 5),
                       Text(isManager ? context.s.roleManager : context.s.roleUser,
                           style: TextStyle(
-                              fontSize: 12,
+                              fontSize: FontSz.sm,
                               fontWeight: FontWeight.w700,
                               color: cs.onPrimaryContainer)),
                     ],
@@ -301,20 +321,16 @@ class _ProfileCard extends StatelessWidget {
   }
 }
 
+/// Eyebrow above a settings group card.
 class _GroupLabel extends StatelessWidget {
   final String label;
   const _GroupLabel(this.label);
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(start: 6, bottom: 8),
-      child: Text(
-        label.toUpperCase(),
-        style: AppType.eyebrow.copyWith(color: context.colors.primary, letterSpacing: 1.0),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SectionHeader.eyebrow(
+        label: label,
+        padding: const EdgeInsetsDirectional.only(start: 6, bottom: 8),
+      );
 }
 
 class _GroupCard extends StatelessWidget {

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/routes.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../../app/design/app_decor.dart';
 import '../../../app/theme.dart';
 import '../../../core/utils/app_date.dart';
 import '../../../core/utils/relative_time.dart';
@@ -147,21 +148,17 @@ class _StatTile extends StatelessWidget {
     final cs = context.colors;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(Radii.lg),
-        border: Border.all(color: context.x.outlineVariant),
-      ),
+      decoration: AppDecor.panel(context, shadow: false),
       child: Row(
         children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: container,
-              borderRadius: BorderRadius.circular(Radii.sm),
-            ),
-            child: Icon(icon, size: 20, fill: 1, color: tone),
+          IconBadge(
+            icon: icon,
+            color: tone,
+            background: container,
+            size: 38,
+            iconSize: 20,
+            radius: Radii.sm,
+            fill: 1,
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -171,20 +168,14 @@ class _StatTile extends StatelessWidget {
               children: [
                 Text(
                   '$value',
-                  style: TextStyle(
-                    fontSize: 22,
-                    height: 1.1,
-                    fontWeight: FontWeight.w800,
-                    color: cs.onSurface,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+                  style: AppType.number(22, cs.onSurface).copyWith(height: 1.1),
                 ),
                 Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: FontSz.sm,
                     fontWeight: FontWeight.w600,
                     color: cs.onSurfaceVariant,
                   ),
@@ -281,7 +272,7 @@ class _CustomerTile extends StatelessWidget {
                             initial,
                             style: TextStyle(
                               color: colors.onPrimary,
-                              fontSize: 20,
+                              fontSize: FontSz.listInitial,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -325,7 +316,17 @@ class _CustomerTile extends StatelessWidget {
                         ),
                         if (customer.lastVisit != null) ...[
                           const SizedBox(width: 6),
-                          _LastVisitBadge(lastVisit: customer.lastVisit!),
+                          // Flexible, not a bare child: at 320dp with the text
+                          // scale at its 1.25 ceiling the badge, the chevron
+                          // and the avatar together left the name/address
+                          // column about 14dp, which is narrower than the
+                          // address row's own icon — so that row overflowed by
+                          // 2px. Letting the badge give way instead ellipsises
+                          // a label that is already a rough "3h ago".
+                          Flexible(
+                            child: _LastVisitBadge(
+                                lastVisit: customer.lastVisit!),
+                          ),
                         ],
                         const SizedBox(width: 4),
                         Icon(
@@ -438,32 +439,19 @@ class _LastVisitBadge extends StatelessWidget {
               ? _relativeShort(context, lastVisit.checkInTime!)
               : context.s.visitsHistoryCompletedBadge);
 
-    return Container(
+    return TonePill(
+      label: label,
+      icon: isActive ? Icons.circle : Icons.history_rounded,
+      color: accent,
+      // Safe here — the caller wraps this badge in a Flexible, so it is laid
+      // out against a bounded width.
+      flexibleLabel: true,
+      iconSize: 9,
+      fontSize: FontSz.tiny,
+      radius: Radii.sm,
+      tintAlpha: 0.12,
+      borderAlpha: 0.35,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(Radii.sm),
-        border: Border.all(color: accent.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isActive ? Icons.circle : Icons.history_rounded,
-            size: 9,
-            color: accent,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: accent,
-              fontWeight: FontWeight.w700,
-              fontSize: 10,
-            ),
-          ),
-        ],
-      ),
     );
   }
 

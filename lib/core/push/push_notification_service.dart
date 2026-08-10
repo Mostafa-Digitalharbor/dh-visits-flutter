@@ -9,6 +9,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/design/app_assets.dart';
+import '../../app/design/app_colors.dart';
 import '../../firebase_options.dart';
 import '../../l10n/generated/app_localizations.dart';
 import 'push_repository.dart';
@@ -62,7 +63,7 @@ class PushNotificationService {
   /// `default_notification_color` at for the pushes the OS renders itself.
   /// Both paths have to agree or a foreground notification looks like a
   /// different app's than the same message received in the background.
-  static const Color _accent = Color(0xFF0CACEA);
+  static const Color _accent = AppColors.notificationAccent;
 
   /// The channel's name and description are user-visible — Android lists them
   /// under Settings → Notifications — so they are localized like any other

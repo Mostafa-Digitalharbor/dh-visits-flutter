@@ -448,6 +448,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get visitLiveIndicator => 'Live';
 
   @override
+  String get mapZoomIn => 'Zoom in';
+
+  @override
+  String get mapZoomOut => 'Zoom out';
+
+  @override
+  String get mapRecenter => 'Centre the map';
+
+  @override
+  String get mapOpenDirections => 'Open directions';
+
+  @override
   String get mapLiveTracking => 'Live tracking';
 
   @override
@@ -1165,6 +1177,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAccount => 'Account';
+
+  @override
+  String get settingsServer => 'Change server';
+
+  @override
+  String get settingsServerNone => 'Not set';
 
   @override
   String get settingsAbout => 'About';

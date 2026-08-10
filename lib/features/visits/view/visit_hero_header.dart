@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/design/app_colors.dart';
 import '../../../app/design/app_dimens.dart';
 import '../../../shared/extensions/context_extensions.dart';
+import '../../../shared/widgets/widgets.dart';
 import '../data/models/visit.dart';
 import 'visit_labels.dart';
 
@@ -41,20 +42,16 @@ class VisitHeroHeader extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Icon(
-                  visit.isOpportunity
-                      ? Icons.emoji_events_outlined
-                      : Icons.storefront_outlined,
-                  color: AppColors.cyan400,
-                  size: 24,
-                ),
+              IconBadge(
+                icon: visit.isOpportunity
+                    ? Icons.emoji_events_outlined
+                    : Icons.storefront_outlined,
+                color: Colors.white,
+                iconColor: AppColors.cyan400,
+                size: 44,
+                iconSize: 24,
+                radius: 13,
+                tintAlpha: 0.14,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -114,24 +111,16 @@ class _HeroStateBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Lift muted state tones so they stay legible on navy.
+    // Lift muted state tones so they stay legible on navy, and carry an
+    // outline the flat list badge doesn't need — a 0.22 tint alone would sink
+    // into the gradient behind it.
     final base = visitStateColor(context, state);
-    final tone = Color.lerp(base, Colors.white, 0.25)!;
-    return Container(
+    return TonePill(
+      label: visitStateLabel(context, state),
+      color: Color.lerp(base, Colors.white, 0.25)!,
+      tintAlpha: 0.22,
+      borderAlpha: 0.5,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: tone.withValues(alpha: 0.22),
-        borderRadius: BorderRadius.circular(Radii.pill),
-        border: Border.all(color: tone.withValues(alpha: 0.5)),
-      ),
-      child: Text(
-        visitStateLabel(context, state),
-        style: TextStyle(
-          fontSize: 12.5,
-          fontWeight: FontWeight.w700,
-          color: tone,
-        ),
-      ),
     );
   }
 }

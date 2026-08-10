@@ -220,8 +220,11 @@ flutter pub get
 # 3. توليد ملفات الترجمة (لو عدّلت في .arb)
 flutter gen-l10n
 
-# 4. شغّل التطبيق على الإعدادات الافتراضية (تبيوس dev/trial)
+# 4. شغّل التطبيق -- هيبدأ من شاشة "اتصل بالخادم" زي أول تشغيل عند العميل
 flutter run
+
+# 4-ب. لو عايز تتخطى شاشة الإعداد وتروح للـ backend الاختباري على طول
+flutter run --dart-define=DEV_SEED_SERVER=true
 
 # 5. أو شغّله على instance بعينه عن طريق --dart-define
 flutter run \

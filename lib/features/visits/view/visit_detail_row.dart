@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/design/app_dimens.dart';
 import '../../../core/utils/communications.dart';
 import '../../../shared/extensions/context_extensions.dart';
+import '../../../shared/widgets/widgets.dart';
 
 /// A titled group: a small header (icon + label) above a card of [rows].
 /// widget (e.g. an "open in maps" button) and value color (e.g. a warning).
@@ -36,15 +37,7 @@ class VisitDetailRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: tint.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(Radii.tile),
-            ),
-            child: Icon(icon, size: 19, color: tint),
-          ),
+          IconBadge(icon: icon, color: tint),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -110,13 +103,13 @@ class VisitMapsPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(Radii.tile),
         onTap: () => context.openExternal(
             () => Communications.openInMaps(latitude, longitude, label: label)),
-        child: Container(
+        child: IconBadge(
+          icon: Icons.map_outlined,
+          color: cs.tertiary,
+          size: null,
           padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: cs.tertiary.withValues(alpha: 0.14),
-            borderRadius: BorderRadius.circular(Radii.tile),
-          ),
-          child: Icon(Icons.map_outlined, size: 18, color: cs.tertiary),
+          iconSize: 18,
+          tintAlpha: 0.14,
         ),
       ),
     );

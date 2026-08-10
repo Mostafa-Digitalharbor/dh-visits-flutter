@@ -866,6 +866,30 @@ abstract class AppLocalizations {
   /// **'Live'**
   String get visitLiveIndicator;
 
+  /// No description provided for @mapZoomIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom in'**
+  String get mapZoomIn;
+
+  /// No description provided for @mapZoomOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom out'**
+  String get mapZoomOut;
+
+  /// No description provided for @mapRecenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Centre the map'**
+  String get mapRecenter;
+
+  /// No description provided for @mapOpenDirections.
+  ///
+  /// In en, this message translates to:
+  /// **'Open directions'**
+  String get mapOpenDirections;
+
   /// No description provided for @mapLiveTracking.
   ///
   /// In en, this message translates to:
@@ -2233,6 +2257,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Account'**
   String get settingsAccount;
+
+  /// No description provided for @settingsServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Change server'**
+  String get settingsServer;
+
+  /// No description provided for @settingsServerNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get settingsServerNone;
 
   /// No description provided for @settingsAbout.
   ///

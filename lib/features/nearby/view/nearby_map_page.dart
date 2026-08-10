@@ -218,13 +218,22 @@ class _NearbyMapPageState extends State<NearbyMapPage> {
                 top: 16,
                 child: Column(
                   children: [
-                    _MapFab(icon: Icons.add, onTap: () => _zoomBy(1)),
+                    MapFab.circle(
+                      icon: Icons.add,
+                      onTap: () => _zoomBy(1),
+                      semanticLabel: context.s.mapZoomIn,
+                    ),
                     const SizedBox(height: 8),
-                    _MapFab(icon: Icons.remove, onTap: () => _zoomBy(-1)),
+                    MapFab.circle(
+                      icon: Icons.remove,
+                      onTap: () => _zoomBy(-1),
+                      semanticLabel: context.s.mapZoomOut,
+                    ),
                     const SizedBox(height: 14),
-                    _MapFab(
+                    MapFab.circle(
                       icon: Icons.my_location,
                       onTap: () => _centerOn(customer),
+                      semanticLabel: context.s.mapRecenter,
                     ),
                   ],
                 ),
@@ -293,29 +302,6 @@ class _EmployeePin extends StatelessWidget {
       );
 }
 
-class _MapFab extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  const _MapFab({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Material(
-      color: colors.surface,
-      shape: const CircleBorder(),
-      elevation: 4,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(11),
-          child: Icon(icon, size: 20, color: colors.onSurface),
-        ),
-      ),
-    );
-  }
-}
 
 class _NearbyMapSkeleton extends StatelessWidget {
   const _NearbyMapSkeleton();
