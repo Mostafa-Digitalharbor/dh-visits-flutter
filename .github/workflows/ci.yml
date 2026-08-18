@@ -59,6 +59,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Reclaim disk space
+        # This job needs MORE room than the release lane, not less: a debug APK
+        # keeps the x86 and x86_64 ABIs that a release AAB splits out, and
+        # --no-tree-shake-icons keeps the whole Material Symbols variable font.
+        # The local artifact is ~187 MB before Gradle's own intermediates.
+        #
+        # Running out mid-build surfaces as a bare "Process completed with exit
+        # code 1", or as
+        #   Could not add entry '.../transforms/...' to cache file-access.bin
+        # which reads like a corrupted cache rather than a full disk. Print
+        # df -h either side so the log answers the question next time.
+        run: |
+          echo "--- before ---"; df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
+          echo "--- after ---";  df -h /
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

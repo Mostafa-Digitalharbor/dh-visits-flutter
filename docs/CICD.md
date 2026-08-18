@@ -283,7 +283,24 @@ same notes inline; this is the index.
     `CODE_SIGN_STYLE=Automatic`; assert the distribution certificate is present
     in the keychain instead of trying to select it.
 
-18. **Pinned Flutter, not `stable`.** The iOS side here is the classic
+18. **Device support is a one-way door.** `TARGETED_DEVICE_FAMILY` had been set
+    to `"1"` (iPhone only), but a shipped version of the app supported iPad, and
+    Apple refuses the upload:
+
+    > `Validation failed (409) This bundle does not support one or more of the
+    > devices supported by the previous app version.`
+
+    It arrives from `altool` **after** a clean archive, a clean export and a
+    two-minute upload — the build is perfect, the store just will not take it.
+    Restored to `"1,2"`, which is what the rest of the project already assumed:
+    13 iPad entries in the asset catalog (including the iPad-only 76pt and
+    83.5pt icons), `UISupportedInterfaceOrientations~ipad` in `Info.plist`, and
+    a `tablet 800x1280` case in the responsive test matrix.
+
+    Consequence for App Store submission (not TestFlight): the listing needs
+    iPad screenshots.
+
+19. **Pinned Flutter, not `stable`.** The iOS side here is the classic
     `UIApplicationDelegate` embedding — no `SceneDelegate.swift`, no
     `UIApplicationSceneManifest`, no `FlutterImplicitEngineDelegate` — and
     `pubspec.lock` was resolved against 3.35.3. Floating on `stable` lets a
