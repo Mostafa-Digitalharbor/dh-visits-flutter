@@ -138,6 +138,32 @@ jobs:
              && [ -n "$ASC_KEY_ID" ] && [ -n "$ASC_ISSUER_ID" ] && [ -n "$ASC_KEY_P8_BASE64" ]; then
             ios=true
           fi
+          # Shape checks, not just presence. Two of these secrets are short
+          # identifiers sitting next to a secret whose value is a huge base64
+          # blob, and the blob is what happens to be on the clipboard right
+          # after `base64 -w0 AuthKey_XXXX.p8 | clip`. Pasting it into
+          # ASC_KEY_ID instead produced `File name too long` from a step that
+          # was merely trying to name a file -- eight minutes into a macOS job,
+          # with the value masked as *** so the log gave no hint.
+          #
+          # A missing secret means "this platform is not configured" and skips.
+          # A malformed one means somebody made a mistake, so it fails loudly.
+          if [ "$ios" = "true" ]; then
+            if ! printf '%s' "$ASC_KEY_ID" | grep -qE '^[A-Za-z0-9]{8,12}$'; then
+              echo "::error::ASC_KEY_ID must be the ~10-character App Store Connect key id (e.g. 2G7RZ7Y856), but it is ${#ASC_KEY_ID} characters. The base64 of the .p8 belongs in ASC_KEY_P8_BASE64, not here."
+              exit 1
+            fi
+            if ! printf '%s' "$ASC_ISSUER_ID" | grep -qE '^[0-9a-fA-F-]{30,40}$'; then
+              echo "::error::ASC_ISSUER_ID must be the UUID shown above the key table in App Store Connect (8-4-4-4-12 hex), but it is ${#ASC_ISSUER_ID} characters."
+              exit 1
+            fi
+            if printf '%s' "$ASC_KEY_P8_BASE64" | grep -q "BEGIN PRIVATE KEY"; then
+              echo "::error::ASC_KEY_P8_BASE64 holds the raw .p8 text, not its base64. Re-run: base64 -w0 AuthKey_<id>.p8"
+              exit 1
+            fi
+            echo "iOS secret shapes OK (key id ${#ASC_KEY_ID} chars, issuer ${#ASC_ISSUER_ID} chars)."
+          fi
+
           echo "has_android=$android" >> "$GITHUB_OUTPUT"
           echo "has_ios=$ios"         >> "$GITHUB_OUTPUT"
           {
@@ -278,22 +304,65 @@ jobs:
             --build-number=${{ needs.version.outputs.build_number }} \
             $flags
 
-      - name: Confirm the AAB is upload-signed, not debug-signed
+      - name: Confirm the AAB is signed with the upload key
         # Catches the failure this lane cannot otherwise see: a key.properties
         # that exists but names the wrong alias still yields a valid-looking
         # AAB, and Play only rejects it after the upload.
+        #
+        # Do NOT use `jarsigner -verify` here. It is a JAR utility that predates
+        # the APK Signature Schemes, so on a perfectly valid AAB it reports
+        # every single entry as
+        #   "Entry base/... is signed in JarFile but is not signed in
+        #    JarInputStream"
+        # and exits non-zero -- hundreds of lines of noise that read like a
+        # broken signature and fail the release on a good build.
+        #
+        # Compare the certificates instead. That is the thing Play actually
+        # checks, and it is one line of output either way.
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          set -uo pipefail
+          set -euo pipefail
           aab=build/app/outputs/bundle/release/app-release.aab
           ls -la "$aab"
-          out="$(jarsigner -verify -verbose:summary "$aab" 2>&1 || true)"
-          printf '%s\n' "$out" | grep -q "jar verified" \
-            || { echo "::error::AAB failed signature verification"; printf '%s\n' "$out"; exit 1; }
-          if printf '%s\n' "$out" | grep -qi "CN=Android Debug"; then
-            echo "::error::AAB is DEBUG-signed -- key.properties did not take effect."
+
+          # Capture each tool's whole output first and slice it in memory --
+          # piping a JVM straight into `grep -m1` can kill it on EPIPE and, with
+          # pipefail on, fail the step for a reason that is not the signature.
+          from_keystore="$(keytool -list -v \
+            -keystore "$RUNNER_TEMP/upload-keystore.jks" \
+            -alias "$ANDROID_KEY_ALIAS" \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" 2>/dev/null || true)"
+          from_aab="$(keytool -printcert -jarfile "$aab" 2>/dev/null || true)"
+          if ! printf '%s\n' "$from_aab" | grep -q 'SHA256:'; then
+            # `-jarfile` reads the v1 (JAR) signature block. An AAB always has
+            # one -- Play re-signs the APKs it derives -- but reach into the
+            # archive directly rather than trusting that, because the failure
+            # mode is a green build reported as unsigned.
+            from_aab="$(unzip -p "$aab" 'META-INF/*.RSA' 'META-INF/*.DSA' 'META-INF/*.EC' 2>/dev/null \
+              | keytool -printcert 2>/dev/null || true)"
+          fi
+
+          expected="$(printf '%s\n' "$from_keystore" | grep 'SHA256:' | head -n 1 | tr -d ' \t')"
+          actual="$(printf '%s\n' "$from_aab"        | grep 'SHA256:' | head -n 1 | tr -d ' \t')"
+
+          echo "keystore : $expected"
+          echo "aab      : $actual"
+
+          if [ -z "$actual" ]; then
+            echo "::error::The AAB carries no signature at all."
             exit 1
           fi
-          echo "Signature OK."
+          if printf '%s\n' "$from_aab" | grep -qi 'CN=Android Debug'; then
+            echo "::error::The AAB is DEBUG-signed -- android/key.properties did not take effect."
+            exit 1
+          fi
+          if [ "$expected" != "$actual" ]; then
+            echo "::error::The AAB was signed with a different certificate than the keystore in ANDROID_KEYSTORE_BASE64. Play would reject it."
+            exit 1
+          fi
+          echo "Signature matches the upload key."
 
       - uses: actions/upload-artifact@v4
         with:

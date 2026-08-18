@@ -3,12 +3,26 @@
 # out -- so the pod deployment target came from whatever CocoaPods defaulted to
 # on that machine. On a CI runner that is not a value we want decided for us.
 #
-# 13.0 must stay in lockstep with:
-#   - IPHONEOS_DEPLOYMENT_TARGET in ios/Runner.xcodeproj/project.pbxproj
+# 15.0, not the 13.0 the Xcode project shipped with. `firebase_core` and
+# `firebase_messaging` both declare `s.ios.deployment_target = '15.0'`, and
+# CocoaPods refuses the whole resolution rather than warning:
+#
+#   [!] CocoaPods could not find compatible versions for pod "firebase_core"
+#       ... they required a higher minimum deployment target
+#
+# Every other plugin in this app asks for 13.0 or lower, so Firebase alone sets
+# the floor. Re-derive it after any plugin bump with:
+#   grep -r "ios.deployment_target" ~/.pub-cache/hosted/pub.dev/*/ios/*.podspec
+#
+# The number must stay in lockstep with:
+#   - IPHONEOS_DEPLOYMENT_TARGET in ios/Runner.xcodeproj/project.pbxproj (x3)
 #   - MinimumOSVersion in ios/Flutter/AppFrameworkInfo.plist
-# If those three ever disagree, App Store Connect rejects the upload during
-# processing with a MinimumOSVersion error long after the build looked green.
-platform :ios, '13.0'
+# If those disagree, App Store Connect accepts the upload and then rejects it
+# during processing, long after the build looked green.
+#
+# Cost of the floor: iOS 15 needs an iPhone 6s or newer (2015+). It drops the
+# iPhone 6/6 Plus and 5s.
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -54,7 +68,7 @@ post_install do |installer|
     # geolocator both ship pods that otherwise emit "target ... is lower than
     # the minimum supported" warnings that become errors under newer Xcode.
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
     end
   end
 end

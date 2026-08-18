@@ -34,9 +34,19 @@ so nothing can race or go stale.
 pipeline existed. Raise it if the workflow is ever reset; **never lower it** —
 Play permanently rejects a versionCode it has already seen.
 
-To rehearse without tagging, use **Run workflow** on the Actions tab and pass a
-version. That still uploads. There is no dry-run mode by design: a lane that can
-be run in "pretend" mode is a lane nobody checks the output of.
+### Rehearsing without shipping
+
+**Run workflow** on the Actions tab takes a version and a `dry_run` checkbox
+that defaults to **on**. With it on, both platforms build, sign and export in
+full — the whole credential path is exercised — and the two upload steps are
+skipped, so no Play versionCode and no TestFlight build number are consumed.
+The signed AAB and IPA are attached to the run as artifacts.
+
+A tag ignores the checkbox and always uploads. There is exactly one way to reach
+a store, and it is deliberate.
+
+Use the dry run for the first run after any credential change, not as a habit: a
+lane that is usually run in pretend mode is a lane nobody checks the output of.
 
 ---
 
@@ -216,7 +226,9 @@ same notes inline; this is the index.
     `MinimumOSVersion in 'Runner.app/Frameworks/App.framework' is ''`. A guard
     step reads it out of the archive before export. It must stay in lockstep
     with `IPHONEOS_DEPLOYMENT_TARGET` and `platform :ios` in `ios/Podfile` —
-    all three are `13.0`.
+    all three are `15.0` -- raised from 13.0 because firebase_core and
+    firebase_messaging declare `s.ios.deployment_target = 15.0`, and CocoaPods
+    refuses the whole resolution rather than warning.
 
 12. **Play debug symbols path.** Under AGP 8.x the task name is part of the
     path: `merged_native_libs/release/mergeReleaseNativeLibs/out/lib`. The
@@ -227,7 +239,34 @@ same notes inline; this is the index.
     tree-shaker drops glyphs from those — producing a store build with whole
     rows of blank icons. See [ICONS_TREE_SHAKING.md](ICONS_TREE_SHAKING.md).
 
-14. **Pinned Flutter, not `stable`.** The iOS side here is the classic
+14. **`jarsigner -verify` cannot read an AAB.** It is a JAR utility that predates
+    the APK Signature Schemes, so on a perfectly valid bundle it reports every
+    entry as `signed in JarFile but is not signed in JarInputStream` and exits
+    non-zero — hundreds of lines that look like a broken signature and fail the
+    release on a good build. Compare certificates instead: the SHA-256 from
+    `keytool -printcert -jarfile <aab>` against the one from
+    `keytool -list -v -keystore`. Verified against a real signed AAB; both
+    report `D0:85:57:BA:…`.
+
+15. **Firebase sets the iOS floor.** `firebase_core` and `firebase_messaging`
+    declare `s.ios.deployment_target = '15.0'`; every other plugin here asks for
+    13.0 or lower. CocoaPods does not warn and degrade — it refuses the entire
+    resolution with *"could not find compatible versions for pod firebase_core
+    … they required a higher minimum deployment target"*, which never names the
+    version it wanted. Re-derive after any plugin bump:
+    ```bash
+    grep -r "ios.deployment_target" ~/.pub-cache/hosted/pub.dev/*/ios/*.podspec
+    ```
+
+16. **A masked secret hides its own shape.** `ASC_KEY_ID` holding the base64 of
+    the `.p8` (the thing on the clipboard right after
+    `base64 -w0 AuthKey_XXXX.p8 | clip`) produced `File name too long` from a
+    step that was only naming a file — eight minutes into a macOS job, with the
+    value printed as `***`. The `version` job now checks the *shape* of the iOS
+    secrets on ubuntu in seconds. Missing secret = platform skips; malformed
+    secret = loud failure.
+
+17. **Pinned Flutter, not `stable`.** The iOS side here is the classic
     `UIApplicationDelegate` embedding — no `SceneDelegate.swift`, no
     `UIApplicationSceneManifest`, no `FlutterImplicitEngineDelegate` — and
     `pubspec.lock` was resolved against 3.35.3. Floating on `stable` lets a
