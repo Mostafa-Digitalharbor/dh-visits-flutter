@@ -33,14 +33,14 @@ class DashboardActiveMapCard extends StatelessWidget {
               icon: Icons.location_on_rounded,
               label: context.s.dashboardActiveOnMapTitle,
             ),
-            const SizedBox(height: 12),
+            context.gapH(Insets.x3),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 14),
               child: Row(
                 children: [
                   Icon(Icons.person_off_outlined,
                       size: 20, color: context.colors.onSurfaceVariant),
-                  const SizedBox(width: 10),
+                  context.gapW(Insets.x2h),
                   Expanded(
                     child: Text(
                       context.s.dashboardActiveEmpty,

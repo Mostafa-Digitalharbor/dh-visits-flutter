@@ -19,6 +19,7 @@ export 'async_list_view.dart';
 export 'initial_avatar.dart';
 export 'inline_empty_row.dart';
 export 'lazy_indexed_stack.dart';
+export 'leaderboard_row.dart';
 export 'map_fab.dart';
 export 'map_pin.dart';
 export 'section_header.dart';

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../../../app/design/app_dimens.dart';
+import '../../../app/design/responsive.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../app/design/app_colors.dart';
@@ -175,31 +178,31 @@ class _VisitDetailBodyState extends State<_VisitDetailBody> {
               // approve must meet this before the map makes the visit look
               // legitimate.
               if (widget.state.mockFlagged) ...[
-                const SizedBox(height: 14),
+                context.gapH(Insets.x3h),
                 const VisitMockLocationBanner(),
               ],
-              const SizedBox(height: 14),
+              context.gapH(Insets.x3h),
               VisitMapCard(visit: visit),
-              const SizedBox(height: 14),
+              context.gapH(Insets.x3h),
               VisitInfoSection(visit: visit),
-              const SizedBox(height: 14),
+              context.gapH(Insets.x3h),
               VisitApprovalSection(visit: visit),
               if (visit.startDatetime != null) ...[
-                const SizedBox(height: 14),
+                context.gapH(Insets.x3h),
                 VisitExecutionSection(visit: visit),
               ],
               if (visit.participants.isNotEmpty) ...[
-                const SizedBox(height: 14),
+                context.gapH(Insets.x3h),
                 VisitParticipantsSection(visit: visit),
               ],
               if (visit.attachmentCount > 0) ...[
-                const SizedBox(height: 14),
+                context.gapH(Insets.x3h),
                 VisitAttachmentsSection(
                   attachments: widget.state.attachments,
                   error: widget.state.attachmentsError,
                 ),
               ],
-              const SizedBox(height: 14),
+              context.gapH(Insets.x3h),
               VisitHistorySection(visit: visit),
             ],
           ),

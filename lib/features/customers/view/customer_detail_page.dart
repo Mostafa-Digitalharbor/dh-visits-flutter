@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
 import '../../../app/design/app_typography.dart';
+import '../../../app/design/responsive.dart';
 
 import '../../../core/api/api_exceptions.dart';
 import '../../../core/constants.dart';
@@ -133,13 +134,16 @@ class _CustomerBody extends StatelessWidget {
       slivers: [
         SliverAppBar(
           pinned: true,
-          expandedHeight: 200,
+          expandedHeight: _heroHeight(context),
           backgroundColor: colors.primary,
           foregroundColor: colors.onPrimary,
           flexibleSpace: FlexibleSpaceBar(
-            titlePadding: const EdgeInsets.symmetric(
-              horizontal: 56,
-              vertical: 14,
+            // The horizontal inset clears the back button on one side and the
+            // (possible) actions on the other, so the collapsed title never
+            // slides under them.
+            titlePadding: EdgeInsets.symmetric(
+              horizontal: context.r(Insets.x12 + Insets.x2),
+              vertical: context.r(Insets.x3h),
             ),
             title: Text(
               customer.name,
@@ -155,24 +159,29 @@ class _CustomerBody extends StatelessWidget {
           ),
         ),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          padding: EdgeInsets.fromLTRB(
+            context.r(Insets.screen),
+            context.r(Insets.screen),
+            context.r(Insets.screen),
+            context.rh(Insets.x6),
+          ),
           sliver: SliverList.list(
             children: [
               _QuickActionsRow(customer: customer),
-              const SizedBox(height: 14),
+              context.gapH(Insets.x3h),
               SectionHeader.eyebrow(
                 label: context.s.customerSectionInfo,
                 padding: _sectionLabelPad,
               ),
-              const SizedBox(height: 6),
+              context.gapH(Insets.x1h),
               _CustomerInfoCard(customer: customer),
               if (customer.lastVisit != null) ...[
-                const SizedBox(height: 16),
+                context.gapH(Insets.x4),
                 SectionHeader.eyebrow(
                   label: context.s.customerLastVisit,
                   padding: _sectionLabelPad,
                 ),
-                const SizedBox(height: 6),
+                context.gapH(Insets.x1h),
                 Card(
                   margin: EdgeInsets.zero,
                   child: ListTile(
@@ -196,13 +205,13 @@ class _CustomerBody extends StatelessWidget {
                   ),
                 ),
               ],
-              const SizedBox(height: 24),
+              context.gapH(Insets.x6),
               AppButton(
                 label: context.s.wfCreateTitle,
                 icon: Icons.add,
                 onPressed: () => context.push(AppRoutes.createVisit),
               ),
-              const SizedBox(height: 10),
+              context.gapH(Insets.x2h),
               AppButton.secondary(
                 label: context.s.customerActionNearby(
                   AppConstants.defaultRadiusMeters.toStringAsFixed(0),
@@ -223,6 +232,22 @@ class _CustomerBody extends StatelessWidget {
   }
 }
 
+/// Space above and below the hero circle — enough to clear the pinned app-bar
+/// row on one side and the collapsing title on the other.
+const double _heroPadV = 56.0;
+
+/// Height of the collapsing header, **derived from what the hero stacks** and
+/// scaled on the same axis as its contents.
+///
+/// Both facts are load-bearing. The two used to be independent constants, and
+/// scaling them on different axes — the circle by width, the header by height —
+/// broke the screen in landscape: a 720×360 viewport scales width *up* to 1.2×
+/// and height *down* to 0.85×, so the circle grew while its box shrank and the
+/// hero overflowed by 12dp. Deriving the height means the box is by
+/// construction big enough for the content, at every viewport.
+double _heroHeight(BuildContext context) =>
+    context.r(CompSz.avatarHero + _heroPadV * 2 + Insets.cardGap);
+
 class _CustomerHero extends StatelessWidget {
   final Customer customer;
   const _CustomerHero({required this.customer});
@@ -242,23 +267,28 @@ class _CustomerHero extends StatelessWidget {
         ),
       ),
       alignment: Alignment.center,
-      padding: const EdgeInsets.only(top: 56, bottom: 56),
+      // Symmetric, and large enough that the circle clears both the pinned
+      // app-bar row above it and the collapsing title below.
+      padding: EdgeInsets.symmetric(vertical: context.r(_heroPadV)),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Not [InitialAvatar]: this one is a white wash over the brand
+          // gradient rather than the gradient itself, and swaps the initial
+          // for a building glyph on company records.
           Container(
-            width: 72,
-            height: 72,
+            width: context.r(CompSz.avatarHero),
+            height: context.r(CompSz.avatarHero),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: colors.onPrimary.withValues(alpha: 0.18),
+              color: colors.onPrimary.withValues(alpha: Alphas.wash),
             ),
             alignment: Alignment.center,
             child: customer.isCompany
                 ? Icon(
                     Icons.apartment_rounded,
                     color: colors.onPrimary,
-                    size: 36,
+                    size: context.r(IconSz.hero),
                   )
                 : Text(
                     InitialAvatar.initialOf(customer.name),
@@ -295,7 +325,7 @@ class _QuickActionsRow extends StatelessWidget {
                 : () => context.openExternal(() => Communications.dial(phone)),
           ),
         ),
-        const SizedBox(width: 10),
+        context.gapW(Insets.x2h),
         if (email != null) ...[
           Expanded(
             child: _QuickAction(
@@ -306,7 +336,7 @@ class _QuickActionsRow extends StatelessWidget {
                   context.openExternal(() => Communications.mailto(email)),
             ),
           ),
-          const SizedBox(width: 10),
+          context.gapW(Insets.x2h),
         ],
         Expanded(
           child: _QuickAction(
@@ -346,22 +376,23 @@ class _QuickAction extends StatelessWidget {
     final enabled = onTap != null;
     final effectiveColor = enabled
         ? color
-        : context.colors.onSurfaceVariant.withValues(alpha: 0.5);
+        : context.colors.onSurfaceVariant.withValues(alpha: Alphas.disabled);
     return Material(
       color: enabled
-          ? color.withValues(alpha: 0.10)
-          : context.colors.surfaceContainerHighest.withValues(alpha: 0.5),
+          ? color.withValues(alpha: Alphas.tint)
+          : context.colors.surfaceContainerHighest
+              .withValues(alpha: Alphas.disabled),
       borderRadius: BorderRadius.circular(Radii.btn),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(Radii.btn),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          padding: context.padSym(h: Insets.x3, v: Insets.x3h),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 20, color: effectiveColor),
-              const SizedBox(width: 8),
+              Icon(icon, size: context.r(IconSz.sm), color: effectiveColor),
+              context.gapW(Insets.x2),
               Flexible(
                 child: Text(
                   label,
@@ -417,9 +448,9 @@ class _CustomerInfoCard extends StatelessWidget {
         children: [
           // Company vs individual badge.
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            padding: context.padSym(h: Insets.x3, v: Insets.x1h + 1),
             decoration: BoxDecoration(
-              color: cs.primaryContainer.withValues(alpha: 0.5),
+              color: cs.primaryContainer.withValues(alpha: Alphas.disabled),
               borderRadius: BorderRadius.circular(Radii.pill),
             ),
             child: Row(
@@ -429,10 +460,10 @@ class _CustomerInfoCard extends StatelessWidget {
                   customer.isCompany
                       ? Icons.apartment_rounded
                       : Icons.person_rounded,
-                  size: 17,
+                  size: context.r(IconSz.badge),
                   color: cs.onPrimaryContainer,
                 ),
-                const SizedBox(width: 6),
+                context.gapW(Insets.x1h),
                 Text(
                   customer.isCompany
                       ? s.customerTypeCompany
@@ -445,7 +476,7 @@ class _CustomerInfoCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 10),
+          context.gapH(Insets.x2h),
           if (address != null && address.isNotEmpty)
             InfoRow(icon: Icons.place_outlined, text: address),
           if (customer.phone != null)
@@ -505,28 +536,25 @@ class _CustomerInfoCard extends StatelessWidget {
           else
             const InfoRow(icon: Icons.my_location, text: '—'),
           if (customer.categories.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            context.gapH(Insets.x2h),
             Text(
               s.customerFieldTags,
               style: context.text.labelSmall?.copyWith(
                 color: cs.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 6),
+            context.gapH(Insets.x1h),
             Wrap(
-              spacing: 6,
-              runSpacing: 6,
+              spacing: context.r(Insets.x1h),
+              runSpacing: context.r(Insets.x1h),
               children: [
                 for (final t in customer.categories)
                   TonePill(
                     label: t,
                     color: cs.tertiary,
-                    fontSize: context.text.labelMedium?.fontSize ?? 12,
+                    fontSize: context.text.labelMedium?.fontSize ?? FontSz.sm,
                     fontWeight: FontWeight.w600,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
+                    padding: context.padSym(h: Insets.x2h, v: Insets.x1 + 1),
                   ),
               ],
             ),
@@ -539,8 +567,16 @@ class _CustomerInfoCard extends StatelessWidget {
 
 /// Inset of this screen's eyebrows: nudged in to line up with the card text
 /// beneath them, and held tight to it.
-const _sectionLabelPad =
-    EdgeInsetsDirectional.only(start: 4, end: 4, bottom: 2);
+const _sectionLabelPad = EdgeInsetsDirectional.only(
+  start: Insets.x1,
+  end: Insets.x1,
+  bottom: 2,
+);
+
+/// Placeholder heights for [_DetailSkeleton] — the measured heights of the
+/// blocks they stand in for, so the page does not jump when the data lands.
+const double _infoCardHeight = 160.0;
+const double _lastVisitCardHeight = 90.0;
 
 class _DetailSkeleton extends StatelessWidget {
   const _DetailSkeleton();
@@ -551,15 +587,23 @@ class _DetailSkeleton extends StatelessWidget {
       appBar: AppBar(title: Text(context.s.customerDetailTitle)),
       body: AppShimmer(
         child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: const [
-            SkeletonCard(height: 160),
-            SizedBox(height: 12),
-            SkeletonCard(height: 90),
-            SizedBox(height: 20),
-            SkeletonBox(width: double.infinity, height: 48, radius: 12),
-            SizedBox(height: 10),
-            SkeletonBox(width: double.infinity, height: 48, radius: 12),
+          padding: context.padAll(Insets.screen),
+          children: [
+            // Stands in for the info card, the last-visit card, and the two
+            // full-width buttons at the foot of the real page.
+            SkeletonCard(height: context.r(_infoCardHeight)),
+            context.gapH(Insets.x3),
+            SkeletonCard(height: context.r(_lastVisitCardHeight)),
+            context.gapH(Insets.x5),
+            SkeletonBox(
+                width: double.infinity,
+                height: context.fixedH(IconSz.hit),
+                radius: Radii.sm),
+            context.gapH(Insets.x2h),
+            SkeletonBox(
+                width: double.infinity,
+                height: context.fixedH(IconSz.hit),
+                radius: Radii.sm),
           ],
         ),
       ),

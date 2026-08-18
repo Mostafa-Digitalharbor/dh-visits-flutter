@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../app/design/responsive.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -223,13 +225,13 @@ class _NearbyMapPageState extends State<NearbyMapPage> {
                       onTap: () => _zoomBy(1),
                       semanticLabel: context.s.mapZoomIn,
                     ),
-                    const SizedBox(height: 8),
+                    context.gapH(Insets.x2),
                     MapFab.circle(
                       icon: Icons.remove,
                       onTap: () => _zoomBy(-1),
                       semanticLabel: context.s.mapZoomOut,
                     ),
-                    const SizedBox(height: 14),
+                    context.gapH(Insets.x3h),
                     MapFab.circle(
                       icon: Icons.my_location,
                       onTap: () => _centerOn(customer),

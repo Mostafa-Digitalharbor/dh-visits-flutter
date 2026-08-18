@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_exceptions.dart';
+import '../../core/api/server_message_l10n.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../app/design/app_dimens.dart';
+import '../../app/design/responsive.dart';
 
 /// Visual kind for snackbars — drives the leading icon and accent color
 /// on `context.showSnack`. Defaults to `info` for plain messages and
@@ -56,7 +58,8 @@ extension AppContext on BuildContext {
       ..showSnackBar(SnackBar(
         backgroundColor: bg,
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        margin: const EdgeInsets.fromLTRB(
+            Insets.x4, Insets.x3, Insets.x4, Insets.x4),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(Radii.btn),
         ),
@@ -64,8 +67,11 @@ extension AppContext on BuildContext {
         duration: AppDurations.snack,
         content: Row(
           children: [
-            Icon(icon, color: fg, size: 20),
-            const SizedBox(width: 10),
+            Icon(icon, color: fg, size: IconSz.sm),
+            // Unqualified: inside an extension on BuildContext the receiver
+            // *is* the context, and the sibling Responsive extension hangs off
+            // the same type.
+            gapW(Insets.x2h),
             Expanded(
               child: Text(
                 message,
@@ -81,7 +87,36 @@ extension AppContext on BuildContext {
   }
 }
 
+/// Any Arabic letter. Used to tell which language a server sentence is in —
+/// the two languages this app ships use disjoint scripts, so script presence
+/// answers it exactly, without a language-detection library.
+final _arabicScript = RegExp(r'[؀-ۿ]');
+
 extension ApiExceptionL10n on ApiException {
+  /// The server's own message, but only when the user can actually read it.
+  ///
+  /// [ApiException.serverMessage] already excludes Python diagnostics, so what
+  /// reaches here is a sentence a human wrote — in English, because the backend
+  /// has no other language installed. Three outcomes, in order:
+  ///
+  /// 1. It is a rule [ServerMessageL10n] knows → return the localized version,
+  ///    which keeps the specifics ("only an approved visit can be started").
+  /// 2. It is unrecognised but already in the UI's language → pass it through;
+  ///    a new backend message is still better than a generic one.
+  /// 3. It is unrecognised and in the *other* language → drop it, and let the
+  ///    caller fall back to its localized default. An English sentence dropped
+  ///    into an Arabic screen is the case this whole path exists to prevent.
+  String? _serverText(BuildContext context) {
+    final raw = serverMessage?.trim();
+    if (raw == null || raw.isEmpty) return null;
+
+    final translated = ServerMessageL10n.translate(context.s, raw);
+    if (translated != null) return translated;
+
+    final wantsArabic = Localizations.localeOf(context).languageCode == 'ar';
+    return _arabicScript.hasMatch(raw) == wantsArabic ? raw : null;
+  }
+
   String localize(BuildContext context) {
     final s = context.s;
     switch (code) {
@@ -96,13 +131,13 @@ extension ApiExceptionL10n on ApiException {
       case ApiErrorCode.network:
         return s.errNetworkUnreachable;
       case ApiErrorCode.validation:
-        return serverMessage ?? s.errValidation;
+        return _serverText(context) ?? s.errValidation;
       case ApiErrorCode.notFound:
-        return serverMessage ?? s.errNotFound;
+        return _serverText(context) ?? s.errNotFound;
       case ApiErrorCode.locationRequired:
         return s.errLocationRequired;
       case ApiErrorCode.server:
-        return serverMessage ?? s.errServerError;
+        return _serverText(context) ?? s.errServerError;
       case ApiErrorCode.locationPermission:
         return s.errLocationPermission;
       case ApiErrorCode.customerLoadFailed:
@@ -112,7 +147,7 @@ extension ApiExceptionL10n on ApiException {
       case ApiErrorCode.sessionRestoreFailed:
         return s.errSessionRestoreFailed;
       case ApiErrorCode.conflict:
-        return serverMessage ?? s.errConflict;
+        return _serverText(context) ?? s.errConflict;
       case ApiErrorCode.insecureConnection:
         return s.errInsecureConnection;
       case ApiErrorCode.unknown:
@@ -121,7 +156,7 @@ extension ApiExceptionL10n on ApiException {
         // "a network error occurred" sends the user off to check their WiFi
         // over what is usually a bug. `network` / `timeout` already carry the
         // genuinely connectivity-related cases.
-        return serverMessage ?? s.errUnknown;
+        return _serverText(context) ?? s.errUnknown;
     }
   }
 }

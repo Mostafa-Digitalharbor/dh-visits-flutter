@@ -15,36 +15,26 @@ import '../../../core/utils/relative_time.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../auth/bloc/auth_bloc.dart';
+import '../../auth/data/models/user.dart';
 
-/// Settings — profile card + grouped cards (account, appearance, language,
-/// sync/about) + logout. Matches design screen 07/14.
-class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final isManager = context.watch<AuthBloc>().state.user?.canEditVisits ?? false;
-    return Scaffold(
-      appBar: CvSubAppBar(
-        title: context.s.settingsTitle,
-        eyebrow: isManager ? context.s.roleManagerTitle : context.s.roleEmployeeTitle,
-        topInset: MediaQuery.paddingOf(context).top,
-      ),
-      body: const SettingsView(),
-    );
-  }
-}
-
-/// The settings content without a Scaffold/AppBar — usable both as a pushed
-/// route ([SettingsPage]) and as an employee bottom-nav tab body.
-class SettingsView extends StatefulWidget {
-  const SettingsView({super.key});
+/// Profile — who you are signed in as, then everything scoped to that account:
+/// the manager's own tools, notification/server settings, appearance, language,
+/// sync/about, and sign-out. Matches design screen 07/14.
+///
+/// This screen used to be "Settings", reachable only from an app-bar gear and
+/// wrapped in its own pushed route. It became the account **tab** of both role
+/// shells instead, because the identity card was already its header and
+/// sign-out already its footer — the gear was the odd one out, not the profile.
+/// The shell supplies the app bar, so there is no page wrapper here and no
+/// `/profile` route: nothing pushes it.
+class ProfileView extends StatefulWidget {
+  const ProfileView({super.key});
 
   @override
-  State<SettingsView> createState() => _SettingsViewState();
+  State<ProfileView> createState() => _ProfileViewState();
 }
 
-class _SettingsViewState extends State<SettingsView> {
+class _ProfileViewState extends State<ProfileView> {
   /// Real build version, read from the platform package metadata (falls back to
   /// a placeholder until the async read completes).
   String _appVersion = '—';
@@ -119,18 +109,24 @@ class _SettingsViewState extends State<SettingsView> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthBloc>().state.user;
+    // Built once and reused for all six separators: this screen is a stack of
+    // labelled groups, and the gap between them is one decision, not six.
+    final groupGap = context.gapH(Insets.x4h);
     return BlocBuilder<SettingsCubit, SettingsState>(
         builder: (context, state) {
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+            padding: _pagePadding(context),
             children: [
-              if (user != null)
-                _ProfileCard(
-                  name: user.displayName,
-                  login: user.username,
-                  isManager: user.canEditVisits,
-                ),
-              const SizedBox(height: 18),
+              if (user != null) _ProfileCard(user: user),
+              // The launch snackbar that says this is long gone by the time
+              // someone wonders where their buttons went, and the profile is
+              // exactly where they come to check what they are. So it is
+              // restated here, permanently, next to the role it contradicts.
+              if (user?.profileIncomplete ?? false) ...[
+                context.gapH(Insets.x3),
+                const _ProfileIncompleteNotice(),
+              ],
+              groupGap,
               // ── الإدارة (للمدير فقط) ────────────────────────────────────
               if (user?.canEditVisits ?? false) ...[
                 _GroupLabel(context.s.roleManagerTitle),
@@ -141,7 +137,7 @@ class _SettingsViewState extends State<SettingsView> {
                     onTap: () => context.push(AppRoutes.customers),
                   ),
                 ]),
-                const SizedBox(height: 18),
+                groupGap,
               ],
               // ── الحساب ──────────────────────────────────────────────────
               _GroupLabel(context.s.settingsAccount),
@@ -164,7 +160,7 @@ class _SettingsViewState extends State<SettingsView> {
                   onTap: () => context.push(AppRoutes.setup),
                 ),
               ]),
-              const SizedBox(height: 18),
+              groupGap,
               _GroupLabel(context.s.themeMode),
               _GroupCard(children: [
                 _OptionRow(
@@ -188,7 +184,7 @@ class _SettingsViewState extends State<SettingsView> {
                   onTap: () => context.read<SettingsCubit>().setThemeMode(ThemeMode.system),
                 ),
               ]),
-              const SizedBox(height: 18),
+              groupGap,
               _GroupLabel(context.s.language),
               _GroupCard(children: [
                 _OptionRow(
@@ -205,7 +201,7 @@ class _SettingsViewState extends State<SettingsView> {
                   onTap: () => context.read<SettingsCubit>().setLocale(const Locale('en')),
                 ),
               ]),
-              const SizedBox(height: 18),
+              groupGap,
               // ── المزامنة / المساعدة / حول التطبيق ───────────────────────
               _GroupCard(children: [
                 _SyncRow(onSync: () => _onSyncNow(context)),
@@ -217,9 +213,9 @@ class _SettingsViewState extends State<SettingsView> {
                   onTap: () => _onAbout(context),
                 ),
               ]),
-              const SizedBox(height: 24),
+              context.gapH(Insets.x6),
               _LogoutButton(onTap: () => _onLogoutTap(context)),
-              const SizedBox(height: 18),
+              groupGap,
               Center(
                 child: Text(
                   context.s.aboutFooter,
@@ -233,67 +229,109 @@ class _SettingsViewState extends State<SettingsView> {
   }
 }
 
+/// Tighter at the top than the other screens — the profile card is its own
+/// visual header, so it does not need a full screen inset above it. The deep
+/// bottom inset clears the shell's nav bar under the footer text.
+EdgeInsets _pagePadding(BuildContext context) => EdgeInsets.fromLTRB(
+      context.r(Insets.screen),
+      context.r(Insets.x3),
+      context.r(Insets.screen),
+      context.rh(Insets.x8),
+    );
+
+/// 64 — the largest avatar in the app after the customer-detail hero. Passed
+/// unscaled: [InitialAvatar] sizes its glyph from this, and the card it sits in
+/// is a fixed-height row that already breathes with the text scale.
+const double _profileAvatarSize = 64.0;
+
+/// The online dot, and how far it is inset from the avatar's edge — the same
+/// 2dp doubles as its ring width, which is what makes the ring read as a
+/// cut-out rather than an outline.
+const double _presenceDotSize = 15.0;
+const double _presenceDotInset = 2.0;
+
 class _ProfileCard extends StatelessWidget {
-  final String name;
-  final String login;
-  final bool isManager;
-  const _ProfileCard({required this.name, required this.login, required this.isManager});
+  final AuthUser user;
+  const _ProfileCard({required this.user});
+
+  /// The badge names the user's *visit* role, not the manager/employee split
+  /// the rest of the chrome uses. A project manager and a team manager both
+  /// read as "manager" everywhere else in the app; this is the one screen whose
+  /// job is to answer "what am I", so it answers precisely.
+  ///
+  /// [VisitRole.none] with the Odoo admin flag is a real combination — the
+  /// database administrator on a server whose visit groups were never seeded —
+  /// and calling that person a field employee would be actively misleading.
+  String _roleLabel(BuildContext context) {
+    switch (user.visitRole) {
+      case VisitRole.admin:
+        return context.s.roleAdmin;
+      case VisitRole.projectManager:
+        return context.s.roleProjectManager;
+      case VisitRole.manager:
+        return context.s.roleManager;
+      case VisitRole.user:
+        return context.s.roleUser;
+      case VisitRole.none:
+        return user.isAdmin ? context.s.roleAdmin : context.s.roleUser;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = context.colors;
     final x = context.x;
-    final initial = InitialAvatar.initialOf(name);
+    final dot = context.r(_presenceDotSize);
+    final name = user.displayName;
+    final login = user.username;
+    final isManager = user.canEditVisits;
     return AppCard(
       child: Row(
         children: [
           Stack(
             children: [
-              Container(
-                width: 64,
-                height: 64,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  gradient: x.avatarGradient,
-                  shape: BoxShape.circle,
-                  boxShadow: x.elev1,
-                ),
-                child: Text(initial,
-                    style: const TextStyle(
-                        color: Colors.white, fontSize: FontSz.profileInitial, fontWeight: FontWeight.w800)),
-              ),
-              // Online presence dot (bottom inline-start), 2px surface border.
+              // [InitialAvatar], not a hand-rolled circle: it owns the gradient,
+              // the proportional glyph size and — the part that matters — the
+              // guard that stops an empty or whitespace-only Odoo name throwing
+              // a RangeError on `name[0]`.
+              InitialAvatar(name: name, size: _profileAvatarSize),
+              // Online presence dot, inline-start so it mirrors in Arabic.
               PositionedDirectional(
-                start: 2,
-                bottom: 2,
+                start: _presenceDotInset,
+                bottom: _presenceDotInset,
                 child: Container(
-                  width: 15,
-                  height: 15,
+                  width: dot,
+                  height: dot,
                   decoration: BoxDecoration(
                     color: x.success,
                     shape: BoxShape.circle,
-                    border: Border.all(color: cs.surfaceContainerLowest, width: 2),
+                    // Ringed in the card colour so it reads as sitting on top
+                    // of the avatar rather than merging into it.
+                    border: Border.all(
+                      color: cs.surfaceContainerLowest,
+                      width: _presenceDotInset,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(width: 14),
+          context.gapW(Insets.x3h),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(name,
                     style: AppType.titleLg.copyWith(fontWeight: FontWeight.w800, color: cs.onSurface)),
-                const SizedBox(height: 2),
+                context.gapH(Insets.hair),
                 Directionality(
                   textDirection: TextDirection.ltr,
                   child: Text(login,
                       style: AppType.bodySm.copyWith(color: cs.onSurfaceVariant)),
                 ),
-                const SizedBox(height: 6),
+                context.gapH(Insets.x1h),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: context.padSym(h: Insets.x2h, v: Insets.x1 + 1),
                   decoration: BoxDecoration(
                     color: cs.primaryContainer,
                     borderRadius: BorderRadius.circular(Radii.pill),
@@ -302,17 +340,56 @@ class _ProfileCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(isManager ? Symbols.shield_person : Symbols.badge,
-                          fill: 1, size: 15, color: cs.onPrimaryContainer),
-                      const SizedBox(width: 5),
-                      Text(isManager ? context.s.roleManager : context.s.roleUser,
-                          style: TextStyle(
-                              fontSize: FontSz.sm,
-                              fontWeight: FontWeight.w700,
-                              color: cs.onPrimaryContainer)),
+                          fill: 1,
+                          size: context.r(IconSz.pill),
+                          color: cs.onPrimaryContainer),
+                      context.gapW(Insets.x1 + 1),
+                      // Flexible: the pill is inside a Row inside a Column that
+                      // the card already bounds, and "مدير المشروع" at 1.25×
+                      // is wider than a 320dp card leaves for it.
+                      Flexible(
+                        child: Text(_roleLabel(context),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: FontSz.sm,
+                                fontWeight: FontWeight.w700,
+                                color: cs.onPrimaryContainer)),
+                      ),
                     ],
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Why the role above may be a fallback rather than the truth.
+///
+/// [AuthUser.profileIncomplete] means the post-login permission read failed, so
+/// the badge shows the default role and every workflow button is hidden. Said
+/// once in a launch snackbar it is gone before it is needed; said here it sits
+/// next to the claim it qualifies.
+class _ProfileIncompleteNotice extends StatelessWidget {
+  const _ProfileIncompleteNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final x = context.x;
+    return AppCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Symbols.warning, fill: 1, size: context.r(IconSz.sm), color: x.warning),
+          context.gapW(Insets.x2h),
+          Expanded(
+            child: Text(
+              context.s.errProfileIncomplete,
+              style: AppType.bodySm.copyWith(color: context.colors.onSurfaceVariant),
             ),
           ),
         ],
@@ -479,6 +556,10 @@ class _SyncRow extends StatelessWidget {
   }
 }
 
+/// 54 — taller than a standard button. Sign-out is the one destructive action
+/// on this screen and is deliberately given its own weight at the foot of it.
+const double _logoutHeight = 54.0;
+
 class _LogoutButton extends StatelessWidget {
   final VoidCallback onTap;
   const _LogoutButton({required this.onTap});
@@ -493,13 +574,16 @@ class _LogoutButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(Radii.md),
         child: Container(
-          height: 54,
+          // fixedH: the row holds a label, so the button grows with the OS text
+          // scale instead of clipping it.
+          height: context.fixedH(_logoutHeight),
           alignment: Alignment.center,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Symbols.logout, fill: 1, size: 20, color: cs.error),
-              const SizedBox(width: 8),
+              Icon(Symbols.logout,
+                  fill: 1, size: context.r(IconSz.sm), color: cs.error),
+              context.gapW(Insets.x2),
               Text(context.s.commonLogout,
                   style: AppType.button.copyWith(fontWeight: FontWeight.w800, color: cs.error)),
             ],

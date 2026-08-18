@@ -41,6 +41,14 @@
   "language": "Language",
   "languageArabic": "العربية",
   "languageEnglish": "English",
+  "languageCodeShortArabic": "ع",
+  "@languageCodeShortArabic": {
+    "description": "Two-character label on the auth screen's language chip, shown when the app is in English so the chip advertises the language it switches TO. Written in Arabic in every locale — a language chip names itself, it is not translated."
+  },
+  "languageCodeShortEnglish": "EN",
+  "@languageCodeShortEnglish": {
+    "description": "Counterpart of languageCodeShortArabic, shown when the app is in Arabic. Written in Latin script in every locale."
+  },
 
   "commonBack": "Back",
   "commonContinue": "Continue",
@@ -80,6 +88,48 @@
   "errAuthRequired": "You must sign in",
   "errPermissionDenied": "You don't have permission for this action",
   "errValidation": "Invalid data — please review and try again",
+  "errNotVisitApprover": "You aren't an approver for this visit. Only a manager in the owner's reporting line can approve or reject it.",
+  "@errNotVisitApprover": {
+    "description": "Localized replacement for the backend's English 'You are not authorized to approve or reject this visit…'. See ServerMessageL10n."
+  },
+  "errOnlyApprovedCanStart": "This visit has to be approved before it can be started.",
+  "@errOnlyApprovedCanStart": {
+    "description": "Replaces the backend's 'Only an approved visit can be started.'"
+  },
+  "errOnlyInProgressCanEnd": "Only a visit that is currently in progress can be ended.",
+  "@errOnlyInProgressCanEnd": {
+    "description": "Replaces the backend's 'Only a visit in progress can be ended.'"
+  },
+  "errOnlyDraftCanSubmit": "Only a draft or rescheduled visit can be submitted for approval.",
+  "@errOnlyDraftCanSubmit": {
+    "description": "Replaces the backend's 'Only draft or rescheduled visits can be submitted.'"
+  },
+  "errCannotApproveInState": "This visit can't be approved in its current state. Refresh to see where it stands.",
+  "@errCannotApproveInState": {
+    "description": "Replaces the backend's 'This visit cannot be approved in its current state.' — usually means someone else already acted on it."
+  },
+  "errCannotRejectInState": "This visit can't be rejected in its current state. Refresh to see where it stands.",
+  "@errCannotRejectInState": {
+    "description": "Replaces the backend's 'This visit cannot be rejected in its current state.'"
+  },
+  "errOutcomeRequired": "Add the visit outcome before ending the visit.",
+  "@errOutcomeRequired": {
+    "description": "Replaces the backend's 'The visit outcome is required before ending the visit.'"
+  },
+  "errMissingRequiredField": "A required field is missing: {field}",
+  "@errMissingRequiredField": {
+    "description": "Replaces Odoo's 'Missing required value for the field ...'. The field label comes from the server and is already translated there when a translation exists.",
+    "placeholders": {
+      "field": {
+        "type": "String",
+        "example": "Purpose"
+      }
+    }
+  },
+  "errRecordInUse": "That record is still linked to something else, so it can't be changed.",
+  "@errRecordInUse": {
+    "description": "Replaces Odoo's referential-integrity message, which names internal model ids and calls the record 'the troublemaker'."
+  },
   "errNotFound": "Item not found",
   "errLocationRequired": "Customer has no coordinates set",
   "errServerError": "Server error — please try again later",
@@ -264,8 +314,24 @@
   "nearbyAdjustRadius": "Adjust radius",
   "roleManager": "Manager",
   "roleUser": "Field employee",
+  "roleProjectManager": "Project manager",
+  "@roleProjectManager": {
+    "description": "Visit role badge on the profile screen — group_visit_project_manager. Also sees escalated visits."
+  },
+  "roleAdmin": "Administrator",
+  "@roleAdmin": {
+    "description": "Visit role badge on the profile screen — group_visit_admin, or an Odoo database admin on a server whose visit groups were never seeded."
+  },
   "roleManagerTitle": "Team manager",
   "roleEmployeeTitle": "Field rep",
+  "profileTitle": "Profile",
+  "@profileTitle": {
+    "description": "Title of the account screen: identity, then the settings scoped to that account, then sign out."
+  },
+  "profileTabTitle": "Profile",
+  "@profileTabTitle": {
+    "description": "Bottom-navigation label for the profile tab. Sits under an icon next to three other labels, so it must stay short."
+  },
   "visitsHistoryActiveBadge": "Active now",
   "visitsScheduledLabel": "Scheduled",
   "dashboardGreeting": "Good morning",

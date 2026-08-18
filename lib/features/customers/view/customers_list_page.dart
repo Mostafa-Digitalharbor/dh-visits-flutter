@@ -113,7 +113,7 @@ class _CustomerStatsRow extends StatelessWidget {
               container: context.colors.primaryContainer,
             ),
           ),
-          const SizedBox(width: 12),
+          context.gapW(Insets.x3),
           Expanded(
             child: _StatTile(
               icon: Symbols.trending_up,
@@ -160,7 +160,7 @@ class _StatTile extends StatelessWidget {
             radius: Radii.sm,
             fill: 1,
           ),
-          const SizedBox(width: 10),
+          context.gapW(Insets.x2h),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -277,7 +277,7 @@ class _CustomerTile extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        context.gapW(Insets.x3),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -290,7 +290,7 @@ class _CustomerTile extends StatelessWidget {
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              const SizedBox(height: 3),
+                              context.gapH(Insets.x1),
                               Row(
                                 children: [
                                   Icon(
@@ -298,7 +298,7 @@ class _CustomerTile extends StatelessWidget {
                                     size: 13,
                                     color: colors.onSurfaceVariant,
                                   ),
-                                  const SizedBox(width: 3),
+                                  context.gapW(Insets.x1),
                                   Expanded(
                                     child: Text(
                                       addressText,
@@ -315,7 +315,7 @@ class _CustomerTile extends StatelessWidget {
                           ),
                         ),
                         if (customer.lastVisit != null) ...[
-                          const SizedBox(width: 6),
+                          context.gapW(Insets.x1h),
                           // Flexible, not a bare child: at 320dp with the text
                           // scale at its 1.25 ceiling the badge, the chevron
                           // and the avatar together left the name/address
@@ -328,7 +328,7 @@ class _CustomerTile extends StatelessWidget {
                                 lastVisit: customer.lastVisit!),
                           ),
                         ],
-                        const SizedBox(width: 4),
+                        context.gapW(Insets.x1),
                         Icon(
                           context.isRtl
                               ? Icons.chevron_left
@@ -339,9 +339,9 @@ class _CustomerTile extends StatelessWidget {
                       ],
                     ),
                     if (hasFooter) ...[
-                      const SizedBox(height: 12),
+                      context.gapH(Insets.x3),
                       Divider(height: 1, color: colors.outlineVariant),
-                      const SizedBox(height: 10),
+                      context.gapH(Insets.x2h),
                       _MetaFooter(customer: customer),
                     ],
                   ],
@@ -371,7 +371,7 @@ class _MetaFooter extends StatelessWidget {
       children: [
         if (phone != null) ...[
           Icon(Icons.phone_outlined, size: 14, color: colors.onSurfaceVariant),
-          const SizedBox(width: 4),
+          context.gapW(Insets.x1),
           Flexible(
             child: Text(
               phone,
@@ -385,7 +385,7 @@ class _MetaFooter extends StatelessWidget {
           ),
         ],
         if (phone != null && lastVisitTime != null) ...[
-          const SizedBox(width: 10),
+          context.gapW(Insets.x2h),
           Container(
             width: 3,
             height: 3,
@@ -394,7 +394,7 @@ class _MetaFooter extends StatelessWidget {
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 10),
+          context.gapW(Insets.x2h),
         ],
         if (lastVisitTime != null) ...[
           Icon(
@@ -402,7 +402,7 @@ class _MetaFooter extends StatelessWidget {
             size: 14,
             color: isActive ? Colors.green.shade600 : colors.onSurfaceVariant,
           ),
-          const SizedBox(width: 4),
+          context.gapW(Insets.x1),
           Flexible(
             child: Text(
               isActive

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/design/app_dimens.dart';
+import '../../../app/design/responsive.dart';
+
 import '../../../core/constants.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/app_button.dart';
@@ -90,7 +93,7 @@ Future<T?> _showFormSheet<T>({
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            context.gapH(Insets.x2),
             builder(ctx, (v) => Navigator.of(ctx).pop(v)),
           ],
         ),
@@ -141,7 +144,7 @@ class _RejectReasonBodyState extends State<_RejectReasonBody> {
             border: const OutlineInputBorder(),
           ),
         ),
-        const SizedBox(height: 12),
+        context.gapH(Insets.x3),
         AppButton.destructive(
           label: context.s.wfActionReject,
           onPressed: _submit,
@@ -195,7 +198,7 @@ class _OutcomeBodyState extends State<_OutcomeBody> {
             border: const OutlineInputBorder(),
           ),
         ),
-        const SizedBox(height: 12),
+        context.gapH(Insets.x3),
         AppButton(
           label: context.s.wfActionEnd,
           icon: Icons.stop_circle_outlined,
@@ -270,7 +273,7 @@ class _RescheduleBodyState extends State<_RescheduleBody> {
           icon: const Icon(Icons.event),
           label: Text(label),
         ),
-        const SizedBox(height: 10),
+        context.gapH(Insets.x2h),
         TextField(
           controller: _purpose,
           decoration: InputDecoration(
@@ -278,7 +281,7 @@ class _RescheduleBodyState extends State<_RescheduleBody> {
             border: const OutlineInputBorder(),
           ),
         ),
-        const SizedBox(height: 10),
+        context.gapH(Insets.x2h),
         TextField(
           controller: _location,
           decoration: InputDecoration(
@@ -286,7 +289,7 @@ class _RescheduleBodyState extends State<_RescheduleBody> {
             border: const OutlineInputBorder(),
           ),
         ),
-        const SizedBox(height: 12),
+        context.gapH(Insets.x3),
         AppButton(
           label: context.s.wfActionReschedule,
           onPressed: () => widget.onSubmit(RescheduleResult(

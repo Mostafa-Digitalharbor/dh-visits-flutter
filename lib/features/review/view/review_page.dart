@@ -96,7 +96,7 @@ class _ReviewPageState extends State<ReviewPage> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
             children: [
               Center(child: _PendingChip(count: pending.length)),
-              const SizedBox(height: 14),
+              context.gapH(Insets.x3h),
               for (final v in pending) ...[
                 _ReviewCard(
                   visit: v,
@@ -108,7 +108,7 @@ class _ReviewPageState extends State<ReviewPage> {
                     _decide(v, approve: false, reason: reason);
                   },
                 ),
-                const SizedBox(height: 14),
+                context.gapH(Insets.x3h),
               ],
             ],
           );
@@ -144,7 +144,7 @@ class _PendingChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Symbols.pending, fill: 1, size: 16, color: x.warning),
-            const SizedBox(width: 6),
+            context.gapW(Insets.x1h),
             Text(context.s.reviewPendingCount(count),
                 style: TextStyle(fontSize: FontSz.base, fontWeight: FontWeight.w700, color: x.onWarningContainer)),
           ],
@@ -226,7 +226,7 @@ class _ReviewCard extends StatelessWidget {
                             child: const Icon(Symbols.business,
                                 fill: 1, size: 24, color: Colors.white),
                           ),
-                          const SizedBox(width: 12),
+                          context.gapW(Insets.x3),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,7 +236,7 @@ class _ReviewCard extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                     style: AppType.cardTitle
                                         .copyWith(color: cs.onSurface)),
-                                const SizedBox(height: 2),
+                                context.gapH(Insets.hair),
                                 Text(
                                     '${visit.name ?? '#${visit.id}'}${visit.visitTypeName != null ? ' · ${visit.visitTypeName}' : ''}',
                                     maxLines: 1,
@@ -250,7 +250,7 @@ class _ReviewCard extends StatelessWidget {
                           ),
                           if (visit.visitDuration != null)
                             _DurationChip(duration: visit.visitDuration!),
-                          const SizedBox(width: 4),
+                          context.gapW(Insets.x1),
                           Icon(
                             context.isRtl
                                 ? Icons.chevron_left
@@ -260,7 +260,7 @@ class _ReviewCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      context.gapH(Insets.x3),
                       // Meta strip
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -272,7 +272,7 @@ class _ReviewCard extends StatelessWidget {
                         child: Row(
                           children: [
                             Icon(Symbols.person, size: 15, color: x.textTertiary),
-                            const SizedBox(width: 5),
+                            context.gapW(Insets.x1),
                             Expanded(
                               child: Text(visit.employeeName ?? '-',
                                   maxLines: 1,
@@ -284,7 +284,7 @@ class _ReviewCard extends StatelessWidget {
                             ),
                             Icon(Symbols.check_circle,
                                 fill: 1, size: 14, color: onTimeColor),
-                            const SizedBox(width: 4),
+                            context.gapW(Insets.x1),
                             Text('$arrival ~ $departure',
                                 style: TextStyle(
                                     fontSize: FontSz.sm,
@@ -299,7 +299,7 @@ class _ReviewCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
+                context.gapH(Insets.x3),
                 // Actions
                 Row(
                   children: [
@@ -312,7 +312,7 @@ class _ReviewCard extends StatelessWidget {
                         onTap: busy ? null : onReject,
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    context.gapW(Insets.x2h),
                     Expanded(
                       flex: 3,
                       child: _ActionButton(
@@ -352,7 +352,7 @@ class _DurationChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Symbols.timer, size: 13, color: x.textTertiary),
-          const SizedBox(width: 4),
+          context.gapW(Insets.x1),
           Text(duration.clock,
               style: TextStyle(
                   fontSize: FontSz.sm,
@@ -401,7 +401,7 @@ class _ActionButton extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(icon, fill: 1, size: 18, color: fg),
-                  const SizedBox(width: 6),
+                  context.gapW(Insets.x1h),
                   Text(label,
                       maxLines: 1,
                       style: AppType.button

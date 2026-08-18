@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../../app/design/app_dimens.dart';
+import '../../../app/design/responsive.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../shared/extensions/context_extensions.dart';
@@ -88,7 +91,7 @@ class _BarContent extends StatelessWidget {
             child: Row(
               children: [
                 _LiveDot(color: accent),
-                const SizedBox(width: 10),
+                context.gapW(Insets.x2h),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,14 +150,21 @@ class _LiveDot extends StatelessWidget {
   final Color color;
   const _LiveDot({required this.color});
 
+  /// The solid dot, and the halo that expands out of it. The halo's box is the
+  /// widget's own footprint, so the ring never gets clipped at full scale.
+  static const double _core = 10.0;
+  static const double _halo = 22.0;
+
   @override
   Widget build(BuildContext context) {
     final dot = DecoratedBox(
       decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
+    final halo = context.r(_halo);
+    final core = context.r(_core);
     return SizedBox(
-      width: 22,
-      height: 22,
+      width: halo,
+      height: halo,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -163,11 +173,11 @@ class _LiveDot extends StatelessWidget {
               opacity: Tween<double>(begin: 0.35, end: 0.0).animate(beat),
               child: ScaleTransition(
                 scale: Tween<double>(begin: 0.5, end: 1.0).animate(beat),
-                child: SizedBox(width: 22, height: 22, child: dot),
+                child: SizedBox(width: halo, height: halo, child: dot),
               ),
             ),
           ),
-          SizedBox(width: 10, height: 10, child: dot),
+          SizedBox(width: core, height: core, child: dot),
         ],
       ),
     );

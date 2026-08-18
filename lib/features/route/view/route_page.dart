@@ -86,7 +86,7 @@ class RoutePage extends StatelessWidget {
                           icon: Symbols.pin_drop,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      context.gapW(Insets.x3),
                       Expanded(
                         child: _SummaryTile(
                           label: context.s.routeTotalDistance,
@@ -96,7 +96,7 @@ class RoutePage extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  context.gapH(Insets.x4),
                   for (var i = 0; i < stops.length; i++)
                     _StopRow(
                       index: i,
@@ -209,7 +209,7 @@ class _RouteMap extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Symbols.route, size: 14, color: Colors.white),
-                  const SizedBox(width: 6),
+                  context.gapW(Insets.x1h),
                   Text(
                       '${stops.length} ${context.s.routeStops} · ${context.s.unitKm(km.toStringAsFixed(1))}',
                       style: const TextStyle(color: Colors.white, fontSize: FontSz.sm, fontWeight: FontWeight.w700)),
@@ -261,9 +261,9 @@ class _SummaryTile extends StatelessWidget {
             Icon(icon, size: 16, color: x.textTertiary),
             const Spacer(),
           ]),
-          const SizedBox(height: 8),
+          context.gapH(Insets.x2),
           Text(value, style: AppType.number(20, cs.onSurface)),
-          const SizedBox(height: 2),
+          context.gapH(Insets.hair),
           Text(label, style: TextStyle(fontSize: FontSz.sm, fontWeight: FontWeight.w500, color: x.textTertiary)),
         ],
       ),
@@ -318,7 +318,7 @@ class _StopRow extends StatelessWidget {
                 Expanded(child: Container(width: 2, color: x.divider, margin: const EdgeInsets.symmetric(vertical: 4))),
             ],
           ),
-          const SizedBox(width: 12),
+          context.gapW(Insets.x3),
           Expanded(
             child: InkWell(
               borderRadius: BorderRadius.circular(Radii.sm),
@@ -346,14 +346,14 @@ class _StopRow extends StatelessWidget {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  context.gapH(Insets.x1),
                   // Flexible + ellipsis on both labels: "09:30 · Start point"
                   // plus "25 min drive" already exceeds a 320dp row at the
                   // 1.25 text-scale cap, and Arabic runs longer still.
                   Row(
                     children: [
                       Icon(Symbols.schedule, size: 14, color: x.textTertiary),
-                      const SizedBox(width: 4),
+                      context.gapW(Insets.x1),
                       Flexible(
                         child: Text(
                           index == 0 ? '$eta · ${context.s.routeStartPoint}' : eta,
@@ -363,9 +363,9 @@ class _StopRow extends StatelessWidget {
                         ),
                       ),
                       if (driveMinutes != null) ...[
-                        const SizedBox(width: 10),
+                        context.gapW(Insets.x2h),
                         Icon(Symbols.directions_car, size: 14, color: x.textTertiary),
-                        const SizedBox(width: 4),
+                        context.gapW(Insets.x1),
                         Flexible(
                           child: Text(
                             context.s.routeDriveMinutes(driveMinutes!),

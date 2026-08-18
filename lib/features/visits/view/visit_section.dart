@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/design/app_dimens.dart';
+import '../../../app/design/responsive.dart';
 import '../../../shared/extensions/context_extensions.dart';
 
 /// A titled card of divider-separated rows — the repeating unit of the visit
@@ -27,11 +29,12 @@ class VisitSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsetsDirectional.only(start: 4, bottom: 8),
+          padding: const EdgeInsetsDirectional.only(
+              start: Insets.x1, bottom: Insets.x2),
           child: Row(
             children: [
-              Icon(icon, size: 17, color: cs.primary),
-              const SizedBox(width: 7),
+              Icon(icon, size: context.r(IconSz.badge), color: cs.primary),
+              context.gapW(Insets.x2),
               Expanded(
                 child: Text(
                   title,
@@ -50,14 +53,15 @@ class VisitSection extends StatelessWidget {
         Card(
           margin: EdgeInsets.zero,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            padding: context.padSym(h: Insets.x3h, v: Insets.x1),
             child: Column(
               children: [
                 for (var i = 0; i < rows.length; i++) ...[
                   if (i > 0)
                     Divider(
                         height: 1,
-                        color: cs.outlineVariant.withValues(alpha: 0.6)),
+                        color: cs.outlineVariant
+                            .withValues(alpha: Alphas.subdued)),
                   rows[i],
                 ],
               ],

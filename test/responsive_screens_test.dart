@@ -33,7 +33,7 @@ import 'package:location_gps/features/customers/view/customers_list_page.dart';
 import 'package:location_gps/features/dashboard/view/dashboard_page.dart';
 import 'package:location_gps/features/review/view/review_page.dart';
 import 'package:location_gps/features/route/view/route_page.dart';
-import 'package:location_gps/features/settings/view/settings_page.dart';
+import 'package:location_gps/features/profile/view/profile_page.dart';
 import 'package:location_gps/core/api/api_client.dart';
 import 'package:location_gps/core/config/server_config.dart';
 import 'package:location_gps/core/config/server_config_cubit.dart';
@@ -228,21 +228,30 @@ Future<List<FlutterErrorDetails>> _layoutErrors(
   // failure the first time it was covered.
   bool wrapInScaffold = true,
 }) async {
-  // Order matters: `addTearDown` runs callbacks in reverse registration order,
-  // so the collector has to be registered *first* to be uninstalled *last*.
-  // The other way round, resetting the view relaid the tree out with the
-  // collector already gone, and any overflow that surfaced during that reset
-  // reached the binding as an unhandled error — which fails the test with an
-  // unrelated "test overrode FlutterError.onError" assertion and then hangs
-  // until the 10-minute timeout instead of naming the offending widget.
+  // The handler is restored before this returns, not in a `tearDown`. That
+  // ordering is load-bearing: the caller's `expect` runs immediately after, and
+  // a failing `expect` throws a `TestFailure` — which, with our collector still
+  // installed in place of the binding's, escapes into the zone as an uncaught
+  // error. The binding then trips its own
+  // `'_pendingExceptionDetails != null': A test overrode FlutterError.onError`
+  // assertion and prints *that* instead of the overflow, then hangs until the
+  // 10-minute timeout. A passing run looks identical either way; only a
+  // regression tells them apart, which is the run that has to be readable.
   final collected = <FlutterErrorDetails>[];
   final previous = FlutterError.onError;
   FlutterError.onError = collected.add;
-  addTearDown(() => FlutterError.onError = previous);
 
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
-  addTearDown(tester.view.reset);
+  // Resetting the view relays the tree out at the default size. Anything that
+  // overflows only at that size is an artefact of the teardown, not of the
+  // screen under test, so it is swallowed rather than failing the next test.
+  addTearDown(() {
+    final active = FlutterError.onError;
+    FlutterError.onError = (_) {};
+    tester.view.reset();
+    FlutterError.onError = active;
+  });
 
   await tester.pumpWidget(
     MultiBlocProvider(
@@ -286,6 +295,8 @@ Future<List<FlutterErrorDetails>> _layoutErrors(
   // for good (it wakes again after its rest).
   await tester.pump(const Duration(milliseconds: 900));
   await tester.pump(const Duration(milliseconds: 900));
+
+  FlutterError.onError = previous;
 
   return collected
       .where((e) => e.library != 'image resource service')
@@ -397,11 +408,11 @@ void main() {
               wrapInScaffold: false));
         });
 
-        // Settings is the densest single column in the app: a profile card, a
+        // Profile is the densest single column in the app: an identity card, a
         // switch row, and two radio groups whose labels are the longest
         // translated strings in the ARBs.
-        testWidgets('Settings fits — $tag', (tester) async {
-          _expectNoLayoutErrors(await _layoutErrors(tester, const SettingsView(),
+        testWidgets('Profile fits — $tag', (tester) async {
+          _expectNoLayoutErrors(await _layoutErrors(tester, const ProfileView(),
               size: vp.size, locale: locale, textScale: scale, items: items));
         });
       }

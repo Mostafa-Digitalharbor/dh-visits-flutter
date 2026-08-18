@@ -18,7 +18,6 @@ import '../features/nearby/view/nearby_map_page.dart';
 import '../features/notifications/view/notifications_page.dart';
 import '../features/review/view/review_page.dart';
 import '../features/server_config/view/server_setup_page.dart';
-import '../features/settings/view/settings_page.dart';
 import '../features/visits/data/models/visit.dart';
 import '../features/visits/view/create_visit_page.dart';
 import '../features/visits/view/visit_detail_page.dart';
@@ -44,14 +43,15 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
       }
       if (status == AuthStatus.unauthenticated ||
           status == AuthStatus.authenticating) {
-        // The server is already configured by this point (the gate above sends
-        // first-launch users to /setup), so a signed-out user belongs on
-        // /login — not back through server setup, which made every sign-out
-        // re-confirm the server URL. /setup stays reachable so they can still
-        // switch backends deliberately.
-        return (loc == AppRoutes.login || loc == AppRoutes.setup)
-            ? null
-            : AppRoutes.login;
+        if (loc == AppRoutes.login || loc == AppRoutes.setup) return null;
+        // Coming off the splash is a cold start: the server screen is the first
+        // thing the app asks for, whether or not one is already saved, and
+        // /login is one "continue" away (with a back chip to return here).
+        //
+        // Any other origin is a session that just *ended* — a sign-out, or a
+        // 401 from mid-task — where the server was never in question; making
+        // those re-confirm the URL was pure friction, so they go to /login.
+        return loc == AppRoutes.splash ? AppRoutes.setup : AppRoutes.login;
       }
       // Note: /setup is intentionally excluded here. While the user is changing
       // the server we clear their session, and we don't want a stale
@@ -82,11 +82,6 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
         path: AppRoutes.home,
         pageBuilder: (_, state) =>
             fadeTransition(state, const HomeShell()),
-      ),
-      GoRoute(
-        path: AppRoutes.settings,
-        pageBuilder: (_, state) =>
-            slideTransition(state, const SettingsPage()),
       ),
       GoRoute(
         path: AppRoutes.review,

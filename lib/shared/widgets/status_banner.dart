@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../app/design/app_dimens.dart';
+import '../../app/design/responsive.dart';
+
 import '../../app/design/app_typography.dart';
 
 /// Slim tinted strip that sits under the AppBar to report an app-wide
@@ -47,7 +50,7 @@ class StatusBanner extends StatelessWidget {
           child: Row(
             children: [
               Icon(icon, size: 16, color: color),
-              const SizedBox(width: 8),
+              context.gapW(Insets.x2),
               // Expanded, not bare: these messages are localized sentences that
               // grow in Arabic and at large text scales.
               Expanded(
@@ -61,7 +64,7 @@ class StatusBanner extends StatelessWidget {
                 ),
               ),
               if (action != null) ...[
-                const SizedBox(width: 8),
+                context.gapW(Insets.x2),
                 action!,
               ],
             ],

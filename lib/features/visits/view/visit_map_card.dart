@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../../../app/design/app_dimens.dart';
+import '../../../app/design/responsive.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -327,7 +330,7 @@ class _RangeFooter extends StatelessWidget {
                 children: [
                   Icon(Icons.place_outlined,
                       size: 16, color: context.colors.onSurfaceVariant),
-                  const SizedBox(width: 6),
+                  context.gapW(Insets.x1h),
                   Expanded(
                     child: Text(
                       address!,
@@ -352,7 +355,7 @@ class _RangeFooter extends StatelessWidget {
       children: [
         Icon(inRange ? Icons.verified_outlined : Icons.error_outline,
             size: 18, color: tone),
-        const SizedBox(width: 6),
+        context.gapW(Insets.x1h),
         Expanded(
           child: RichText(
             text: TextSpan(

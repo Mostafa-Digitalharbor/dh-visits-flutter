@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+
+import '../../../app/design/responsive.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -88,7 +90,7 @@ class VisitAttachmentsSection extends StatelessWidget {
             child: Row(
               children: [
                 Icon(Icons.error_outline_rounded, size: 18, color: cs.error),
-                const SizedBox(width: 8),
+                context.gapW(Insets.x2),
                 Expanded(
                   child: Text(
                     context.s.errAttachmentsLoadFailed,
@@ -117,7 +119,7 @@ class VisitAttachmentsSection extends StatelessWidget {
                 child: Row(
                   children: [
                     IconBadge(icon: _iconFor(a.mimetype), color: cs.primary),
-                    const SizedBox(width: 12),
+                    context.gapW(Insets.x3),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,7 +131,7 @@ class VisitAttachmentsSection extends StatelessWidget {
                             style: context.text.bodyLarge
                                 ?.copyWith(fontWeight: FontWeight.w600),
                           ),
-                          const SizedBox(height: 2),
+                          context.gapH(Insets.hair),
                           Text(
                             a.readableSize(context.s),
                             style: context.text.labelSmall

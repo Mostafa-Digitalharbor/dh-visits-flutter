@@ -253,4 +253,71 @@ void main() {
       expect(t.takeException(), isNull);
     });
   });
+
+  // The manager shell went from three tabs to four when Profile was added, so
+  // every label now gets a quarter of the width instead of a third — on a 320dp
+  // phone that is 80dp per destination, and Arabic labels like "لوحة المتابعة"
+  // and "التحليلات" are long. `HomeShell` itself needs half the app's blocs and
+  // a GPS acquire to render, so the bar is built here from the same
+  // localizations the shells read; the count assertions pin it to their tab
+  // lists so a fourth employee tab or a fifth manager tab has to come here too.
+  group('bottom navigation', () {
+    /// `_UserShell` / `_ManagerShell` in `lib/features/home/view/home_shell.dart`.
+    List<String> employeeLabels(AppLocalizations s) =>
+        [s.visitsTabTitle, s.routeTabTitle, s.profileTabTitle];
+    List<String> managerLabels(AppLocalizations s) => [
+          s.dashboardTabTitle,
+          s.visitsTabTitle,
+          s.analyticsTabTitle,
+          s.profileTabTitle,
+        ];
+
+    Future<void> pumpBar(
+      WidgetTester t,
+      List<String> Function(AppLocalizations) labels, {
+      required Locale locale,
+      required double textScale,
+      required int expectedCount,
+    }) async {
+      await pumpIn(
+        t,
+        Builder(
+          builder: (context) {
+            final names = labels(AppLocalizations.of(context));
+            expect(names.length, expectedCount);
+            return NavigationBar(
+              selectedIndex: 0,
+              destinations: [
+                for (final n in names)
+                  NavigationDestination(
+                      icon: const Icon(Icons.circle), label: n),
+              ],
+            );
+          },
+        ),
+        size: _smallPhone,
+        locale: locale,
+        textScale: textScale,
+      );
+      expect(t.takeException(), isNull);
+    }
+
+    for (final locale in const [Locale('ar'), Locale('en')]) {
+      for (final scale in const [1.0, 1.25]) {
+        final tag = '${locale.languageCode} · ${scale}x';
+
+        testWidgets("the manager's four tabs fit a 320dp phone — $tag",
+            (t) async {
+          await pumpBar(t, managerLabels,
+              locale: locale, textScale: scale, expectedCount: 4);
+        });
+
+        testWidgets("the employee's three tabs fit a 320dp phone — $tag",
+            (t) async {
+          await pumpBar(t, employeeLabels,
+              locale: locale, textScale: scale, expectedCount: 3);
+        });
+      }
+    }
+  });
 }

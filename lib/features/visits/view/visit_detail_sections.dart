@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../app/design/responsive.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -137,7 +139,7 @@ class VisitMockLocationBanner extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Icons.gpp_bad_outlined, color: cs.error, size: 22),
-          const SizedBox(width: 10),
+          context.gapW(Insets.x2h),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,7 +151,7 @@ class VisitMockLocationBanner extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 3),
+                context.gapH(Insets.x1),
                 Text(
                   context.s.wfMockFlagBannerBody,
                   style: context.text.bodySmall
@@ -314,7 +316,7 @@ class _ParticipantTile extends StatelessWidget {
       child: Row(
         children: [
           IconBadge(icon: Icons.person_outline, color: tone),
-          const SizedBox(width: 12),
+          context.gapW(Insets.x3),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,7 +326,7 @@ class _ParticipantTile extends StatelessWidget {
                   style: context.text.bodyLarge
                       ?.copyWith(fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 2),
+                context.gapH(Insets.hair),
                 Text(
                   participantStateLabel(context, participant.approvalState),
                   style: TextStyle(

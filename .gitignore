@@ -71,3 +71,9 @@ ios/fastlane/Preview.html
 ios/fastlane/screenshots/
 ios/fastlane/test_output/
 ios/Gemfile.lock
+
+# Throwaway backend probes (endpoint sweeps, role seeding, screenshot driving).
+# They hold live Odoo logins and passwords as literals — `git add -A` is one
+# keystroke away from publishing them. Kept on disk because they are genuinely
+# useful; never in git.
+/scratchpad/

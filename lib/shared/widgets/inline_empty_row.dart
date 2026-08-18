@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../app/design/app_dimens.dart';
+import '../../app/design/responsive.dart';
 import '../extensions/context_extensions.dart';
 
 /// "Nothing here" line rendered *inside* a card, as opposed to [EmptyView],
@@ -22,11 +24,11 @@ class InlineEmptyRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final muted = context.colors.onSurfaceVariant;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(vertical: context.r(Insets.x2)),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: muted),
-          const SizedBox(width: 8),
+          Icon(icon, size: context.r(IconSz.label), color: muted),
+          context.gapW(Insets.x2),
           Expanded(
             child: Text(
               text,

@@ -272,6 +272,18 @@ abstract class AppLocalizations {
   /// **'English'**
   String get languageEnglish;
 
+  /// Two-character label on the auth screen's language chip, shown when the app is in English so the chip advertises the language it switches TO. Written in Arabic in every locale — a language chip names itself, it is not translated.
+  ///
+  /// In en, this message translates to:
+  /// **'ع'**
+  String get languageCodeShortArabic;
+
+  /// Counterpart of languageCodeShortArabic, shown when the app is in Arabic. Written in Latin script in every locale.
+  ///
+  /// In en, this message translates to:
+  /// **'EN'**
+  String get languageCodeShortEnglish;
+
   /// No description provided for @commonBack.
   ///
   /// In en, this message translates to:
@@ -475,6 +487,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Invalid data — please review and try again'**
   String get errValidation;
+
+  /// Localized replacement for the backend's English 'You are not authorized to approve or reject this visit…'. See ServerMessageL10n.
+  ///
+  /// In en, this message translates to:
+  /// **'You aren\'t an approver for this visit. Only a manager in the owner\'s reporting line can approve or reject it.'**
+  String get errNotVisitApprover;
+
+  /// Replaces the backend's 'Only an approved visit can be started.'
+  ///
+  /// In en, this message translates to:
+  /// **'This visit has to be approved before it can be started.'**
+  String get errOnlyApprovedCanStart;
+
+  /// Replaces the backend's 'Only a visit in progress can be ended.'
+  ///
+  /// In en, this message translates to:
+  /// **'Only a visit that is currently in progress can be ended.'**
+  String get errOnlyInProgressCanEnd;
+
+  /// Replaces the backend's 'Only draft or rescheduled visits can be submitted.'
+  ///
+  /// In en, this message translates to:
+  /// **'Only a draft or rescheduled visit can be submitted for approval.'**
+  String get errOnlyDraftCanSubmit;
+
+  /// Replaces the backend's 'This visit cannot be approved in its current state.' — usually means someone else already acted on it.
+  ///
+  /// In en, this message translates to:
+  /// **'This visit can\'t be approved in its current state. Refresh to see where it stands.'**
+  String get errCannotApproveInState;
+
+  /// Replaces the backend's 'This visit cannot be rejected in its current state.'
+  ///
+  /// In en, this message translates to:
+  /// **'This visit can\'t be rejected in its current state. Refresh to see where it stands.'**
+  String get errCannotRejectInState;
+
+  /// Replaces the backend's 'The visit outcome is required before ending the visit.'
+  ///
+  /// In en, this message translates to:
+  /// **'Add the visit outcome before ending the visit.'**
+  String get errOutcomeRequired;
+
+  /// Replaces Odoo's 'Missing required value for the field ...'. The field label comes from the server and is already translated there when a translation exists.
+  ///
+  /// In en, this message translates to:
+  /// **'A required field is missing: {field}'**
+  String errMissingRequiredField(String field);
+
+  /// Replaces Odoo's referential-integrity message, which names internal model ids and calls the record 'the troublemaker'.
+  ///
+  /// In en, this message translates to:
+  /// **'That record is still linked to something else, so it can\'t be changed.'**
+  String get errRecordInUse;
 
   /// No description provided for @errNotFound.
   ///
@@ -1490,6 +1556,18 @@ abstract class AppLocalizations {
   /// **'Field employee'**
   String get roleUser;
 
+  /// Visit role badge on the profile screen — group_visit_project_manager. Also sees escalated visits.
+  ///
+  /// In en, this message translates to:
+  /// **'Project manager'**
+  String get roleProjectManager;
+
+  /// Visit role badge on the profile screen — group_visit_admin, or an Odoo database admin on a server whose visit groups were never seeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Administrator'**
+  String get roleAdmin;
+
   /// No description provided for @roleManagerTitle.
   ///
   /// In en, this message translates to:
@@ -1501,6 +1579,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Field rep'**
   String get roleEmployeeTitle;
+
+  /// Title of the account screen: identity, then the settings scoped to that account, then sign out.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get profileTitle;
+
+  /// Bottom-navigation label for the profile tab. Sits under an icon next to three other labels, so it must stay short.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get profileTabTitle;
 
   /// No description provided for @visitsHistoryActiveBadge.
   ///

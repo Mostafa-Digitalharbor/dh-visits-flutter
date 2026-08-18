@@ -437,3 +437,79 @@ the asks above except removing the existing workarounds — everything is
 already wired to consume the proper response shapes.
 
 Thanks!
+
+---
+
+## 15. Error contract & localization (measured 2026-08-17)
+
+Swept with `scratchpad/error_sweep.mjs` + `scratchpad/role_matrix_sweep.mjs`
+against `dh-visits-new-main-35787218`, as all four visit roles. Every endpoint
+is reachable or cleanly denied for every role, and every failure the app can
+provoke now maps to a code it handles — so none of these block the app. They
+are the things that would make the error contract stop needing client-side
+compensation.
+
+### 15.1 Errors carry no machine-readable code — **highest value**
+
+The workflow refusals arrive only as English prose in `data.message`:
+
+| Endpoint | What the server says |
+|---|---|
+| `approve` (not the approver) | `You are not authorized to approve or reject this visit. Only a manager in <name>'s management hierarchy…` |
+| `start` (not approved) | `Only an approved visit can be started.` |
+| `end` (not started) | `Only a visit in progress can be ended.` |
+| `submit` (already submitted) | `Only draft or rescheduled visits can be submitted.` |
+| `approve` (wrong state) | `This visit cannot be approved in its current state.` |
+| `reject` (wrong state) | `This visit cannot be rejected in its current state.` |
+| `end` (no outcome) | `The visit outcome is required before ending the visit.` |
+
+The app now matches these sentences and substitutes its own translations
+(`lib/core/api/server_message_l10n.dart`). **That match is on English text and
+breaks the moment anyone rewords a message.**
+
+**Ask:** add a stable symbol alongside the prose, e.g.
+
+```json
+{"error": {"code": "VALIDATION_ERROR",
+           "data": {"rule": "visit_not_approved", "message": "Only an approved visit can be started."}}}
+```
+
+Any stable `rule` string works — the app keys off it and drops the text matching.
+
+### 15.2 The server has only `en_US` installed
+
+`res.lang.search_read([('active','=',true)])` → `["en_US"]`, and passing
+`context: {lang: 'ar_001'}` raises `UserError: Invalid language code: ar_001`.
+So the backend cannot answer an Arabic user in Arabic even when asked, which is
+why the translation had to move to the client. Installing `ar_001` and
+translating the module's `UserError` strings would let §15.1 be solved
+server-side instead.
+
+### 15.3 Validations that do not fire
+
+Found while sweeping; each one lets bad data through:
+
+- **`start` accepts no GPS at all.** `/api/visit/start` with neither `latitude`
+  nor `longitude` succeeds and moves the visit to `in_progress`. The app always
+  sends coordinates, so this is not currently visible — but the GPS stamp is
+  the point of the check-in, and nothing on the server requires it.
+- **`reschedule` accepts a date in the past** (`2020-01-01` was accepted on a
+  draft *and* on a submitted visit).
+- **`reject` accepts no reason** — `reject` with the `reason` key absent
+  succeeds; only an *empty-string* reason is refused, and then with a
+  state-machine message rather than a "reason required" one.
+
+### 15.4 Smaller notes
+
+- `crm.lead` is unreadable by **all four** visit roles, so the opportunity
+  picker is empty for everyone. The app degrades correctly (localized "no
+  permission" + retry), but an opportunity-type visit cannot be created against
+  this database until the visit groups get read access to `crm.lead`.
+- `add_participants` with a non-existent employee id surfaces Odoo's
+  referential-integrity message, which names internal models and calls the
+  record "the troublemaker". A `ValidationError` naming the bad id would be
+  friendlier; the app currently replaces it wholesale.
+- `/api/visit/register_device` is idempotent when the same user re-registers a
+  token, but returned `Token already registered.` when a token row belonged to
+  a *different* user. Registration is best-effort on the client so nothing
+  breaks; an upsert keyed on the token would remove the case entirely.

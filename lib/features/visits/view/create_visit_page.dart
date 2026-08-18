@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../../../app/design/app_dimens.dart';
+import '../../../app/design/responsive.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -74,7 +77,7 @@ class _CreateVisitView extends StatelessWidget {
             children: [
               // Visit type
               Text(context.s.wfFieldType, style: context.text.labelLarge),
-              const SizedBox(height: 6),
+              context.gapH(Insets.x1h),
               SegmentedButton<VisitType>(
                 segments: [
                   ButtonSegment(
@@ -92,7 +95,7 @@ class _CreateVisitView extends StatelessWidget {
                 onSelectionChanged: (s) =>
                     bloc.add(CreateVisitTypeChanged(s.first)),
               ),
-              const SizedBox(height: 16),
+              context.gapH(Insets.x4),
 
               // Linked project/opportunity
               _PickerTile(
@@ -112,7 +115,7 @@ class _CreateVisitView extends StatelessWidget {
                     children: [
                       Icon(Icons.business,
                           size: 15, color: context.colors.onSurfaceVariant),
-                      const SizedBox(width: 4),
+                      context.gapW(Insets.x1),
                       // Expanded + ellipsis: the customer auto-fills from the
                       // linked project/opportunity and Odoo company names run
                       // long (more so in Arabic) — unbounded it overflows the
@@ -128,7 +131,7 @@ class _CreateVisitView extends StatelessWidget {
                     ],
                   ),
                 ),
-              const SizedBox(height: 12),
+              context.gapH(Insets.x3),
 
               // Schedule
               _PickerTile(
@@ -139,7 +142,7 @@ class _CreateVisitView extends StatelessWidget {
                 icon: Icons.event,
                 onTap: () => _pickSchedule(context, bloc, state.scheduled),
               ),
-              const SizedBox(height: 12),
+              context.gapH(Insets.x3),
 
               // Purpose (required)
               TextField(
@@ -151,7 +154,7 @@ class _CreateVisitView extends StatelessWidget {
                 ),
                 onChanged: (v) => bloc.add(CreateVisitPurposeChanged(v)),
               ),
-              const SizedBox(height: 12),
+              context.gapH(Insets.x3),
 
               // Location
               TextField(
@@ -164,7 +167,7 @@ class _CreateVisitView extends StatelessWidget {
               ),
 
               if (canPlanForOthers) ...[
-                const SizedBox(height: 12),
+                context.gapH(Insets.x3),
                 _PickerTile(
                   label:
                       '${context.s.wfFieldResponsible} ${context.s.commonOptional}',
@@ -172,11 +175,11 @@ class _CreateVisitView extends StatelessWidget {
                   icon: Icons.person_outline,
                   onTap: () => _pickEmployee(context, bloc),
                 ),
-                const SizedBox(height: 12),
+                context.gapH(Insets.x3),
                 _ParticipantsField(state: state, bloc: bloc),
               ],
 
-              const SizedBox(height: 24),
+              context.gapH(Insets.x6),
               AppButton(
                 label: context.s.createVisitSubmit,
                 icon: Icons.check,

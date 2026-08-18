@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/design/responsive.dart';
+
 import '../../../app/design/app_dimens.dart';
 import '../../../core/utils/communications.dart';
 import '../../../shared/extensions/context_extensions.dart';
@@ -38,7 +40,7 @@ class VisitDetailRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           IconBadge(icon: icon, color: tint),
-          const SizedBox(width: 12),
+          context.gapW(Insets.x3),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -50,7 +52,7 @@ class VisitDetailRow extends StatelessWidget {
                     letterSpacing: 0.2,
                   ),
                 ),
-                const SizedBox(height: 2),
+                context.gapH(Insets.hair),
                 Text(
                   value,
                   style: context.text.bodyLarge?.copyWith(
@@ -62,9 +64,9 @@ class VisitDetailRow extends StatelessWidget {
               ],
             ),
           ),
-          if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+          if (trailing != null) ...[context.gapW(Insets.x2), trailing!],
           if (onTap != null && trailing == null) ...[
-            const SizedBox(width: 4),
+            context.gapW(Insets.x1),
             Icon(
               context.isRtl ? Icons.chevron_left : Icons.chevron_right,
               size: 20,

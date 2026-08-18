@@ -166,10 +166,123 @@ void main() {
     testWidgets('the module\'s own REST contract message is shown', (t) async {
       // No Odoo exception class => this came from dh_visit_management's own
       // error envelope, where the message is written for the app to display.
+      // This one is not a rule ServerMessageL10n knows, so it passes through
+      // to an English reader unchanged.
       final e = ApiException.fromJson({
-        'error': {'code': 'VALIDATION_ERROR', 'message': 'Outcome is required'}
+        'error': {
+          'code': 'VALIDATION_ERROR',
+          'message': 'Territory quota exceeded for this week'
+        }
       });
-      expect(await localize(t, e, en), 'Outcome is required');
+      expect(await localize(t, e, en), 'Territory quota exceeded for this week');
+    });
+  });
+
+  // The backend enforces the visit workflow and explains each refusal in a
+  // sentence — in English, because the server has only en_US installed
+  // (`res.lang` returns exactly ["en_US"], and asking for ar_001 raises
+  // "Invalid language code"). Every string below was captured verbatim from the
+  // live server by `scratchpad/error_sweep.mjs` on 2026-08-17. They are the most
+  // useful errors in the app, and until this group existed an Arabic-speaking
+  // rep read all of them in English.
+  group('the backend speaks English; the user must not have to', () {
+    final rules = <String, String Function(AppLocalizations)>{
+      "You are not authorized to approve or reject this visit. Only a manager "
+          "in Kareem Saleh's management hierarchy can do that.":
+          (s) => s.errNotVisitApprover,
+      'Only an approved visit can be started.': (s) => s.errOnlyApprovedCanStart,
+      'Only a visit in progress can be ended.': (s) => s.errOnlyInProgressCanEnd,
+      'Only draft or rescheduled visits can be submitted.':
+          (s) => s.errOnlyDraftCanSubmit,
+      'This visit cannot be approved in its current state.':
+          (s) => s.errCannotApproveInState,
+      'This visit cannot be rejected in its current state.':
+          (s) => s.errCannotRejectInState,
+      'The visit outcome is required before ending the visit.':
+          (s) => s.errOutcomeRequired,
+      'The operation cannot be completed: Another model is using the record '
+          'you are trying to delete. The troublemaker is: '
+          "'Visit Attendee' (dh.visit.participant)": (s) => s.errRecordInUse,
+    };
+
+    rules.forEach((serverText, expected) {
+      final label = serverText.length > 46
+          ? '${serverText.substring(0, 46)}…'
+          : serverText;
+
+      testWidgets('"$label" reaches an Arabic user in Arabic', (t) async {
+        final e = ApiException(
+            code: ApiErrorCode.validation, serverMessage: serverText);
+        final shown = await localize(t, e, ar);
+        expect(shown, expected(lookupAppLocalizations(ar)));
+        expect(shown, matches(RegExp(r'[؀-ۿ]')),
+            reason: 'still rendered in English');
+        // Not the generic fallback: the whole point is keeping the specifics.
+        expect(shown, isNot(lookupAppLocalizations(ar).errValidation));
+      });
+
+      testWidgets('"$label" reads as our own English, not Odoo\'s', (t) async {
+        final e = ApiException(
+            code: ApiErrorCode.validation, serverMessage: serverText);
+        expect(await localize(t, e, en), expected(lookupAppLocalizations(en)));
+      });
+    });
+
+    testWidgets('a missing required field keeps the field name', (t) async {
+      final e = ApiException(
+        code: ApiErrorCode.validation,
+        serverMessage: "The operation cannot be completed: Missing required "
+            "value for the field 'Purpose' (purpose). Model: 'Visit' (dh.visit)",
+      );
+      for (final locale in [en, ar]) {
+        final shown = await localize(t, e, locale);
+        expect(shown, contains('Purpose'));
+        // The internal technical name and model are not for the user.
+        expect(shown, isNot(contains('dh.visit')));
+        expect(shown, isNot(contains('(purpose)')));
+      }
+      expect(await localize(t, e, ar), matches(RegExp(r'[؀-ۿ]')));
+    });
+  });
+
+  // The backstop for sentences the map above has never seen — a rule added to
+  // the module after this build shipped. Passing those through is right when
+  // the reader can read them and wrong when they cannot, and the two languages
+  // this app ships use disjoint scripts, so the script decides.
+  group('an unrecognised message is shown only in the reader\'s language', () {
+    ApiException msg(String m) =>
+        ApiException(code: ApiErrorCode.validation, serverMessage: m);
+
+    const english = 'Territory quota exceeded for this week';
+    const arabic = 'تم تجاوز الحد الأسبوعي المسموح به لهذه المنطقة';
+
+    testWidgets('English message, English UI → shown', (t) async {
+      expect(await localize(t, msg(english), en), english);
+    });
+
+    testWidgets('English message, Arabic UI → localized fallback', (t) async {
+      final shown = await localize(t, msg(english), ar);
+      expect(shown, lookupAppLocalizations(ar).errValidation);
+      expect(shown, isNot(contains('Territory')));
+    });
+
+    testWidgets('Arabic message, Arabic UI → shown', (t) async {
+      expect(await localize(t, msg(arabic), ar), arabic);
+    });
+
+    testWidgets('Arabic message, English UI → localized fallback', (t) async {
+      final shown = await localize(t, msg(arabic), en);
+      expect(shown, lookupAppLocalizations(en).errValidation);
+      expect(shown, isNot(matches(RegExp(r'[؀-ۿ]'))));
+    });
+
+    testWidgets('a mixed sentence follows its script, not its punctuation',
+        (t) async {
+      // Arabic text carrying a Latin reference — common, and still Arabic.
+      const mixed = 'تعذّر تنفيذ الإجراء على الزيارة VIS/2026/00164';
+      expect(await localize(t, msg(mixed), ar), mixed);
+      expect(await localize(t, msg(mixed), en),
+          lookupAppLocalizations(en).errValidation);
     });
   });
 

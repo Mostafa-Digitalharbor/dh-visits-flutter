@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/design/app_decor.dart';
 import '../../app/design/app_dimens.dart';
+import '../../app/design/responsive.dart';
 import '../extensions/context_extensions.dart';
 
 /// A 40dp square action button on a raised panel — the back arrow on a
@@ -34,11 +35,19 @@ class IconActionChip extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(Radii.sm),
       child: Container(
-        width: 40,
-        height: 40,
+        // Scaled by device width, not text scale: the chip holds a glyph, and
+        // a glyph does not get taller when the user enlarges system fonts.
+        // It does need to shrink on a 320dp bar that has to fit three of them
+        // beside a two-line title.
+        width: context.r(CompSz.chip),
+        height: context.r(CompSz.chip),
         alignment: Alignment.center,
         decoration: AppDecor.panel(context, radius: Radii.sm),
-        child: Icon(icon, size: 21, color: context.colors.onSurfaceVariant),
+        child: Icon(
+          icon,
+          size: context.r(IconSz.chip),
+          color: context.colors.onSurfaceVariant,
+        ),
       ),
     );
     return tooltip == null ? button : Tooltip(message: tooltip!, child: button);

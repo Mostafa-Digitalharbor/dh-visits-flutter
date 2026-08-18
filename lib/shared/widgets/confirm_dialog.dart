@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../app/design/responsive.dart';
+
 import '../extensions/context_extensions.dart';
 import '../../app/design/app_dimens.dart';
 
@@ -78,7 +80,7 @@ class ConfirmDialog extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 8),
+            context.gapH(Insets.x2),
             Text(
               message,
               textAlign: TextAlign.center,
@@ -86,7 +88,7 @@ class ConfirmDialog extends StatelessWidget {
                 color: colors.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 24),
+            context.gapH(Insets.x6),
             Row(
               children: [
                 Expanded(
@@ -100,7 +102,7 @@ class ConfirmDialog extends StatelessWidget {
                     child: Text(cancelLabel ?? context.s.commonNo),
                   ),
                 ),
-                const SizedBox(width: 12),
+                context.gapW(Insets.x3),
                 Expanded(
                   child: FilledButton(
                     style: FilledButton.styleFrom(

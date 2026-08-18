@@ -39,7 +39,7 @@ class NearbyBottomPanel extends StatelessWidget {
                 child: Icon(Icons.business_rounded,
                     size: 18, color: context.colors.onPrimaryContainer),
               ),
-              const SizedBox(width: 10),
+              context.gapW(Insets.x2h),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,7 +67,7 @@ class NearbyBottomPanel extends StatelessWidget {
                   children: [
                     Icon(Icons.access_time,
                         size: 13, color: context.colors.onSurfaceVariant),
-                    const SizedBox(width: 4),
+                    context.gapW(Insets.x1),
                     Text(
                       tf.format(state.lastRefresh!),
                       style: context.text.labelSmall?.copyWith(
@@ -79,10 +79,10 @@ class NearbyBottomPanel extends StatelessWidget {
             ],
           ),
           if (canEdit) ...[
-            const SizedBox(height: 6),
+            context.gapH(Insets.x1h),
             _RadiusSlider(currentRadius: state.radius),
           ],
-          const SizedBox(height: 12),
+          context.gapH(Insets.x3),
           if (state.employees.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -94,7 +94,7 @@ class NearbyBottomPanel extends StatelessWidget {
                           : Icons.person_off_outlined,
                       size: 18,
                       color: context.colors.onSurfaceVariant),
-                  const SizedBox(width: 6),
+                  context.gapW(Insets.x1h),
                   Expanded(
                     child: Text(
                       state.error != null
@@ -119,7 +119,7 @@ class NearbyBottomPanel extends StatelessWidget {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: state.employees.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                separatorBuilder: (_, __) => context.gapW(Insets.x2),
                 itemBuilder: (context, i) =>
                     _EmployeeCard(employee: state.employees[i]),
               ),
@@ -154,7 +154,7 @@ class _RadiusSliderState extends State<_RadiusSlider> {
       children: [
         Icon(Icons.adjust_rounded,
             size: 16, color: context.colors.onSurfaceVariant),
-        const SizedBox(width: 6),
+        context.gapW(Insets.x1h),
         Text(
           context.s.unitMeters(value.toStringAsFixed(0)),
           style: context.text.labelMedium?.copyWith(
@@ -222,7 +222,7 @@ class _EmployeeCard extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          context.gapW(Insets.x2h),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

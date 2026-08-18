@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../../app/routes.dart';
 import '../../../app/theme.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/settings/settings_repository.dart';
@@ -62,81 +64,96 @@ class _LoginPageState extends State<LoginPage> {
   String? _requiredValidator(String? v) =>
       (v == null || v.trim().isEmpty) ? context.s.commonRequired : null;
 
+  /// Step back to the server screen — the first screen of the sign-in flow.
+  /// `go`, not `pop`: the router *redirects* between the two, so /login is the
+  /// only page on the stack and there is nothing to pop back to.
+  void _backToServerSetup() => context.go(AppRoutes.setup);
+
   @override
   Widget build(BuildContext context) {
     final cs = context.colors;
-    return Scaffold(
-      // Match the sheet colour so the leftover space under it on tall screens
-      // reads as one surface (see ServerSetupPage for the same fix).
-      backgroundColor: cs.surfaceContainerLowest,
-      body: BlocConsumer<AuthBloc, AuthState>(
-        listenWhen: (p, n) => p.error != n.error && n.error != null,
-        listener: (context, state) {
-          if (state.error != null) {
-            HapticFeedback.heavyImpact();
-            context.showSnack(state.error!.localize(context), kind: SnackKind.error);
-          }
-        },
-        builder: (context, state) {
-          final loading = state.status == AuthStatus.authenticating;
-          return SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: MediaQuery.sizeOf(context).height),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const AuthHero(),
-                  AuthSheet(
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AuthSheetTitle(
-                            title: context.s.loginWelcomeBack,
-                            subtitle: context.s.loginSubtitle,
-                          ),
-                          const SizedBox(height: 18),
-                          AuthField(
-                            controller: _loginCtrl,
-                            hint: context.s.loginUsername,
-                            icon: Symbols.person,
-                            validator: _requiredValidator,
-                          ),
-                          const SizedBox(height: 12),
-                          AuthField(
-                            controller: _passwordCtrl,
-                            hint: context.s.loginPassword,
-                            icon: Symbols.lock,
-                            isPassword: true,
-                            textInputAction: TextInputAction.done,
-                            validator: _requiredValidator,
-                            onSubmitted: (_) => _submit(),
-                          ),
-                          const SizedBox(height: 14),
-                          _RememberRow(
-                            remember: _remember,
-                            onChanged: (v) => setState(() => _remember = v),
-                          ),
-                          const SizedBox(height: 18),
-                          AuthPrimaryButton(
-                            loading: loading,
-                            onPressed: _submit,
-                            icon: Symbols.login,
-                            label: context.s.loginSubmit,
-                          ),
-                          const SizedBox(height: 18),
-                          AuthSecureFooter(text: context.s.loginSecureFooter),
-                        ],
+    return PopScope(
+      // Keeps the system back gesture in step with the hero's back chip: on
+      // this screen "back" means "change server", not "leave the app".
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _backToServerSetup();
+      },
+      child: Scaffold(
+        // Match the sheet colour so the leftover space under it on tall screens
+        // reads as one surface (see ServerSetupPage for the same fix).
+        backgroundColor: cs.surfaceContainerLowest,
+        body: BlocConsumer<AuthBloc, AuthState>(
+          listenWhen: (p, n) => p.error != n.error && n.error != null,
+          listener: (context, state) {
+            if (state.error != null) {
+              HapticFeedback.heavyImpact();
+              context.showSnack(state.error!.localize(context),
+                  kind: SnackKind.error);
+            }
+          },
+          builder: (context, state) {
+            final loading = state.status == AuthStatus.authenticating;
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints:
+                    BoxConstraints(minHeight: MediaQuery.sizeOf(context).height),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AuthHero(onBack: _backToServerSetup),
+                    AuthSheet(
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AuthSheetTitle(
+                              title: context.s.loginWelcomeBack,
+                              subtitle: context.s.loginSubtitle,
+                            ),
+                            context.gapH(Insets.x4h),
+                            AuthField(
+                              controller: _loginCtrl,
+                              hint: context.s.loginUsername,
+                              icon: Symbols.person,
+                              validator: _requiredValidator,
+                            ),
+                            context.gapH(Insets.x3),
+                            AuthField(
+                              controller: _passwordCtrl,
+                              hint: context.s.loginPassword,
+                              icon: Symbols.lock,
+                              isPassword: true,
+                              textInputAction: TextInputAction.done,
+                              validator: _requiredValidator,
+                              onSubmitted: (_) => _submit(),
+                            ),
+                            context.gapH(Insets.x3h),
+                            _RememberRow(
+                              remember: _remember,
+                              onChanged: (v) => setState(() => _remember = v),
+                            ),
+                            context.gapH(Insets.x4h),
+                            AuthPrimaryButton(
+                              loading: loading,
+                              onPressed: _submit,
+                              icon: Symbols.login,
+                              label: context.s.loginSubmit,
+                            ),
+                            context.gapH(Insets.x4h),
+                            AuthSecureFooter(text: context.s.loginSecureFooter),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -144,6 +161,20 @@ class _LoginPageState extends State<LoginPage> {
 
 // ─── Remember + forgot row ───────────────────────────────────────────────────
 
+/// "Remember me" on one side, "Forgot password?" on the other.
+///
+/// A [Wrap], not a `Row(spaceBetween)`. The Row was the app's largest layout
+/// bug: its two children are localized sentences and neither was flexible, so
+/// the moment they stopped fitting the row overflowed rather than reflowing —
+/// by 103dp on a 320dp phone in English, and by 191dp at the app's 1.25× text
+/// ceiling. Because overflow only asserts in debug, release builds clipped it
+/// silently and "Forgot password?" was simply *missing* for those users, with
+/// nothing on screen to suggest it existed.
+///
+/// `Wrap` keeps the side-by-side design whenever it fits and drops the link to
+/// its own line when it doesn't, so nothing is ever truncated. The per-child
+/// width cap covers the remaining case — a single label longer than the whole
+/// sheet — by ellipsizing that one label instead of overflowing.
 class _RememberRow extends StatelessWidget {
   final bool remember;
   final ValueChanged<bool> onChanged;
@@ -151,50 +182,31 @@ class _RememberRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = context.colors;
-    final x = context.x;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => onChanged(!remember),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedContainer(
-                duration: AppDurations.fast,
-                width: 20,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: remember ? cs.primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(Radii.badge),
-                  border: Border.all(
-                    color: remember ? cs.primary : x.outlineVariant,
-                    width: 1.5,
-                  ),
-                ),
-                child: remember
-                    ? const Icon(Symbols.check, size: 14, color: Colors.white, weight: 700)
-                    : null,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cap = BoxConstraints(maxWidth: constraints.maxWidth);
+        return Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: context.r(Insets.x3),
+          runSpacing: context.r(Insets.x2),
+          children: [
+            ConstrainedBox(
+              constraints: cap,
+              child: _RememberToggle(
+                remember: remember,
+                onChanged: onChanged,
               ),
-              const SizedBox(width: 8),
-              Text(
-                context.s.loginRememberMe,
-                style: TextStyle(fontSize: FontSz.base, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant),
+            ),
+            ConstrainedBox(
+              constraints: cap,
+              child: _ForgotPasswordLink(
+                onTap: () => _showForgotPasswordHelp(context),
               ),
-            ],
-          ),
-        ),
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => _showForgotPasswordHelp(context),
-          child: Text(
-            context.s.loginForgotPassword,
-            style: TextStyle(fontSize: FontSz.base, fontWeight: FontWeight.w700, color: cs.primary),
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -204,7 +216,7 @@ class _RememberRow extends StatelessWidget {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        icon: const Icon(Symbols.lock_reset, size: 32),
+        icon: const Icon(Symbols.lock_reset, size: IconSz.dialog),
         title: Text(dialogContext.s.loginForgotPasswordTitle),
         content: Text(dialogContext.s.loginForgotPasswordBody),
         actions: [
@@ -213,6 +225,88 @@ class _RememberRow extends StatelessWidget {
             child: Text(dialogContext.s.commonClose),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The custom checkbox + its label, as one tap target.
+class _RememberToggle extends StatelessWidget {
+  final bool remember;
+  final ValueChanged<bool> onChanged;
+  const _RememberToggle({required this.remember, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final x = context.x;
+    final box = context.r(CompSz.checkbox);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onChanged(!remember),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedContainer(
+            duration: AppDurations.fast,
+            width: box,
+            height: box,
+            decoration: BoxDecoration(
+              color: remember ? cs.primary : Colors.transparent,
+              borderRadius: BorderRadius.circular(Radii.badge),
+              border: Border.all(
+                color: remember ? cs.primary : x.outlineVariant,
+                width: CompSz.outlineWidth,
+              ),
+            ),
+            child: remember
+                ? Icon(Symbols.check,
+                    size: context.r(IconSz.inline),
+                    color: Colors.white,
+                    weight: 700)
+                : null,
+          ),
+          context.gapW(Insets.x2),
+          // Flexible is safe here only because the parent caps this widget's
+          // width — a Row lays its non-flexible children out unbounded, and a
+          // flex child under an unbounded constraint throws rather than
+          // merely overflowing.
+          Flexible(
+            child: Text(
+              context.s.loginRememberMe,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: FontSz.base,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ForgotPasswordLink extends StatelessWidget {
+  final VoidCallback onTap;
+  const _ForgotPasswordLink({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Text(
+        context.s.loginForgotPassword,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: FontSz.base,
+          fontWeight: FontWeight.w700,
+          color: context.colors.primary,
+        ),
       ),
     );
   }

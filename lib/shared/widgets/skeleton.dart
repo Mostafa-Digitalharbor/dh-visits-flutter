@@ -24,7 +24,7 @@ class AppShimmer extends StatelessWidget {
       child: Shimmer.fromColors(
         baseColor: base,
         highlightColor: highlight,
-        period: const Duration(milliseconds: 1400),
+        period: AppDurations.shimmer,
         child: child,
       ),
     );
@@ -83,13 +83,13 @@ class SkeletonListTile extends StatelessWidget {
           child: Row(
             children: const [
               SkeletonCircle(size: 44),
-              SizedBox(width: 14),
+              SizedBox(width: Insets.x3h),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SkeletonBox(width: 160, height: 14),
-                    SizedBox(height: 8),
+                    SizedBox(height: Insets.x2),
                     SkeletonBox(width: 220, height: 12),
                   ],
                 ),

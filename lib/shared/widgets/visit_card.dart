@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../app/design/app_dimens.dart';
+import '../../app/design/responsive.dart';
+
 import '../../core/utils/app_date.dart';
 import '../../features/visits/data/models/visit.dart';
 import '../../features/visits/view/visit_labels.dart';
@@ -55,7 +58,7 @@ class VisitCard extends StatelessWidget {
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         if (visit.name != null) ...[
-                          const SizedBox(height: 2),
+                          context.gapH(Insets.hair),
                           Text(
                             visit.name!,
                             style: context.text.bodySmall
@@ -65,11 +68,11 @@ class VisitCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  context.gapW(Insets.x2),
                   VisitStateBadge(visit.state),
                 ],
               ),
-              const SizedBox(height: 10),
+              context.gapH(Insets.x2h),
               Wrap(
                 spacing: 12,
                 runSpacing: 4,
@@ -105,7 +108,7 @@ class VisitCard extends StatelessWidget {
                 ],
               ),
               if (!compact && visit.purpose != null) ...[
-                const SizedBox(height: 8),
+                context.gapH(Insets.x2),
                 Text(
                   visit.purpose!,
                   maxLines: 2,
@@ -132,7 +135,7 @@ class VisitCard extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 15, color: c),
-        const SizedBox(width: 4),
+        context.gapW(Insets.x1),
         // Flexible, not a bare Text: the enclosing Wrap hands the Row its full
         // maxWidth, so an unbounded Text takes its intrinsic width and blows
         // past the card. These labels carry user data (Odoo project /

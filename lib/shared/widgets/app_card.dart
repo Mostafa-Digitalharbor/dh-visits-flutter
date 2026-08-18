@@ -10,7 +10,7 @@ class AppCard extends StatefulWidget {
   const AppCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(16),
+    this.padding = const EdgeInsets.all(Insets.cardPad),
     this.onTap,
     this.color,
   });
@@ -32,7 +32,7 @@ class _AppCardState extends State<AppCard>
     return _ctrl ??= AnimationController(
       vsync: this,
       duration: AppDurations.fast,
-      reverseDuration: const Duration(milliseconds: 180),
+      reverseDuration: AppDurations.cardRelease,
       value: 1.0,
       lowerBound: 0.96,
       upperBound: 1.0,

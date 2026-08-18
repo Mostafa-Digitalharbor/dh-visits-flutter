@@ -33,7 +33,7 @@ class InitialAvatar extends StatelessWidget {
   const InitialAvatar({
     super.key,
     required this.name,
-    this.size = 44,
+    this.size = CompSz.avatar,
     this.gradient,
     this.background,
     this.foreground = Colors.white,

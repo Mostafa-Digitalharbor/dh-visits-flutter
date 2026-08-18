@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../app/design/responsive.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -164,7 +166,7 @@ class _ServerSetupPageState extends State<ServerSetupPage> {
                         title: context.s.serverSetupTitle,
                         subtitle: context.s.serverSetupSubtitle,
                       ),
-                      const SizedBox(height: 18),
+                      context.gapH(Insets.x4h),
                       AuthField(
                         controller: _urlCtrl,
                         hint: context.s.serverSetupUrlHint,
@@ -178,7 +180,7 @@ class _ServerSetupPageState extends State<ServerSetupPage> {
                           FilteringTextInputFormatter.deny(RegExp(r'\s')),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      context.gapH(Insets.x2),
                       Align(
                         alignment: AlignmentDirectional.centerEnd,
                         child: TextButton.icon(
@@ -198,7 +200,7 @@ class _ServerSetupPageState extends State<ServerSetupPage> {
                         ),
                       ),
                       if (_needsDatabase) ...[
-                        const SizedBox(height: 4),
+                        context.gapH(Insets.x1),
                         ScaleFadeIn(
                           child: AuthField(
                             controller: _dbCtrl,
@@ -215,16 +217,20 @@ class _ServerSetupPageState extends State<ServerSetupPage> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 12),
+                      context.gapH(Insets.x3),
                       _HelpHint(text: context.s.serverSetupHelp),
-                      const SizedBox(height: 18),
+                      context.gapH(Insets.x4h),
                       AuthPrimaryButton(
                         loading: _saving,
                         onPressed: _submit,
-                        icon: Symbols.arrow_back,
+                        // Forward, not back: this CTA advances to login. The
+                        // icon carries `matchTextDirection`, so Flutter mirrors
+                        // it for Arabic on its own — flipping it by hand here
+                        // would only cancel that out.
+                        icon: Symbols.arrow_forward,
                         label: context.s.serverSetupContinue,
                       ),
-                      const SizedBox(height: 18),
+                      context.gapH(Insets.x4h),
                       AuthSecureFooter(
                         text: context.s.loginSecureFooter,
                         icon: Symbols.lock,
@@ -258,7 +264,7 @@ class _HelpHint extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Symbols.info, size: 16, fill: 1, color: cs.onSurfaceVariant),
-          const SizedBox(width: 8),
+          context.gapW(Insets.x2),
           Expanded(
             child: Text(
               text,

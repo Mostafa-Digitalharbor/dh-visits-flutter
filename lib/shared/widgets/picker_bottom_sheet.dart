@@ -74,7 +74,7 @@ class _PickerSheetState<T> extends State<_PickerSheet<T>> {
 
   void _onSearchChanged(String query) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () {
+    _debounce = Timer(AppDurations.pickerDebounce, () {
       if (!mounted) return;
       setState(() {
         _future = widget.loader(query.isEmpty ? null : query);

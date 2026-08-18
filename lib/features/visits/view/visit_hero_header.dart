@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/design/responsive.dart';
+
 import '../../../app/design/app_colors.dart';
 import '../../../app/design/app_dimens.dart';
 import '../../../shared/extensions/context_extensions.dart';
@@ -53,7 +55,7 @@ class VisitHeroHeader extends StatelessWidget {
                 radius: 13,
                 tintAlpha: 0.14,
               ),
-              const SizedBox(width: 12),
+              context.gapW(Insets.x3),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -69,7 +71,7 @@ class VisitHeroHeader extends StatelessWidget {
                       ),
                     ),
                     if (visit.name != null) ...[
-                      const SizedBox(height: 3),
+                      context.gapH(Insets.x1),
                       Text(
                         visit.name!,
                         style: context.text.bodySmall?.copyWith(
@@ -83,7 +85,7 @@ class VisitHeroHeader extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          context.gapH(Insets.x3h),
           Row(
             children: [
               Expanded(
@@ -94,7 +96,7 @@ class VisitHeroHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              context.gapW(Insets.x2),
               _HeroStateBadge(state: visit.state),
             ],
           ),

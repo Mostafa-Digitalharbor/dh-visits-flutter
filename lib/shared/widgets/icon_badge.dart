@@ -13,6 +13,11 @@ import '../../app/design/app_dimens.dart';
 /// tile's larger badge, the hero header's white-on-gradient one) stay pixel
 /// identical instead of being forced into an average.
 class IconBadge extends StatelessWidget {
+  /// Sits between [IconSz.label] and [IconSz.sm] — the size that centres in a
+  /// [CompSz.badge] square without crowding its corners. Not a rung on the
+  /// shared ladder because nothing else in the app uses it.
+  static const double _defaultIconSize = 19.0;
+
   /// The glyph drawn in the centre.
   final IconData icon;
 
@@ -46,10 +51,10 @@ class IconBadge extends StatelessWidget {
     super.key,
     required this.icon,
     required this.color,
-    this.size = 36,
-    this.iconSize = 19,
+    this.size = CompSz.badge,
+    this.iconSize = _defaultIconSize,
     this.radius = Radii.tile,
-    this.tintAlpha = 0.12,
+    this.tintAlpha = Alphas.tint,
     this.iconColor,
     this.padding,
     this.fill,

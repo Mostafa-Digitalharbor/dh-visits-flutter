@@ -15,7 +15,12 @@ import '../../../shared/extensions/context_extensions.dart';
 // ─── Hero ────────────────────────────────────────────────────────────────────
 
 class AuthHero extends StatelessWidget {
-  const AuthHero({super.key});
+  /// When non-null, a back chip is pinned to the visual start of the hero's
+  /// top row. Login passes this to step back to the server-setup screen; setup
+  /// itself is the entry point of the flow and leaves it null.
+  final VoidCallback? onBack;
+
+  const AuthHero({super.key, this.onBack});
 
   @override
   Widget build(BuildContext context) {
@@ -57,10 +62,10 @@ class AuthHero extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const _HeroChips(),
-              const SizedBox(height: 26),
+              _HeroChips(onBack: onBack),
+              context.gapH(Insets.x6),
               const _LogoTile(),
-              const SizedBox(height: 14),
+              context.gapH(Insets.x3h),
               Text(
                 context.s.loginTitle,
                 style: const TextStyle(
@@ -70,7 +75,7 @@ class AuthHero extends StatelessWidget {
                   color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 6),
+              context.gapH(Insets.x1h),
               Text(
                 context.s.appTagline,
                 textAlign: TextAlign.center,
@@ -129,7 +134,8 @@ class _LogoTile extends StatelessWidget {
 }
 
 class _HeroChips extends StatelessWidget {
-  const _HeroChips();
+  final VoidCallback? onBack;
+  const _HeroChips({this.onBack});
 
   ThemeMode _nextThemeMode(ThemeMode current, Brightness platformBrightness) {
     final effective = current == ThemeMode.system
@@ -147,6 +153,17 @@ class _HeroChips extends StatelessWidget {
         // Pinned to the visual left: theme toggle leftmost, then language.
         return Row(
           children: [
+            if (onBack != null)
+              _GlassChip(
+                onTap: onBack!,
+                circular: true,
+                tooltip: context.s.commonBack,
+                // `arrow_back` carries `matchTextDirection`, so Flutter already
+                // mirrors it for Arabic — it points left in English and right
+                // in Arabic without any help here.
+                child: const Icon(Symbols.arrow_back,
+                    size: 18, color: Colors.white),
+              ),
             const Spacer(),
             _GlassChip(
               onTap: () =>
@@ -155,19 +172,24 @@ class _HeroChips extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    isArabic ? 'EN' : 'ع',
+                    // The chip advertises the language it switches *to*, so
+                    // each label is written in its own script rather than
+                    // translated — see the ARB descriptions.
+                    isArabic
+                        ? context.s.languageCodeShortEnglish
+                        : context.s.languageCodeShortArabic,
                     style: const TextStyle(
                       fontSize: FontSz.sm,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  context.gapW(Insets.x1h),
                   const Icon(Symbols.translate, size: 16, color: Colors.white),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
+            context.gapW(Insets.x2),
             _GlassChip(
               onTap: () => context.read<SettingsCubit>().setThemeMode(
                     _nextThemeMode(state.themeMode, MediaQuery.platformBrightnessOf(context)),
@@ -190,12 +212,22 @@ class _GlassChip extends StatelessWidget {
   final Widget child;
   final VoidCallback onTap;
   final bool circular;
-  const _GlassChip({required this.child, required this.onTap, this.circular = false});
+
+  /// Names an icon-only chip for screen readers (and on long-press). The
+  /// labelled chips carry their own text and leave this null.
+  final String? tooltip;
+
+  const _GlassChip({
+    required this.child,
+    required this.onTap,
+    this.circular = false,
+    this.tooltip,
+  });
 
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(Radii.pill);
-    return Material(
+    final chip = Material(
       color: Colors.white.withValues(alpha: 0.12),
       borderRadius: radius,
       child: InkWell(
@@ -214,6 +246,7 @@ class _GlassChip extends StatelessWidget {
         ),
       ),
     );
+    return tooltip == null ? chip : Tooltip(message: tooltip!, child: chip);
   }
 }
 
@@ -285,7 +318,7 @@ class AuthSheetTitle extends StatelessWidget {
             color: cs.onSurface,
           ),
         ),
-        const SizedBox(height: 4),
+        context.gapH(Insets.x1),
         Text(
           subtitle,
           style: TextStyle(
@@ -406,7 +439,7 @@ class AuthPrimaryButton extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(icon, size: 22, fill: 1, color: cs.onPrimary),
-                        const SizedBox(width: 8),
+                        context.gapW(Insets.x2),
                         Text(
                           label,
                           style: TextStyle(
@@ -439,7 +472,7 @@ class AuthSecureFooter extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Icon(icon, size: 14, color: x.textDisabled),
-        const SizedBox(width: 6),
+        context.gapW(Insets.x1h),
         Flexible(
           child: Text(
             text,

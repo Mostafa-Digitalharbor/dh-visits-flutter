@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../app/design/app_dimens.dart';
+import '../../app/design/responsive.dart';
 import '../extensions/context_extensions.dart';
 
 class InfoRow extends StatelessWidget {
@@ -17,25 +19,27 @@ class InfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: EdgeInsets.symmetric(vertical: context.r(Insets.x1h)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 30,
-            height: 30,
+            // Glyph-only, so it tracks the device width rather than the text
+            // scale — see [IconActionChip] for the same reasoning.
+            width: context.r(CompSz.infoDot),
+            height: context.r(CompSz.infoDot),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: colors.primaryContainer.withValues(alpha: 0.5),
+              color: colors.primaryContainer.withValues(alpha: Alphas.disabled),
             ),
             alignment: Alignment.center,
             child: Icon(
               icon,
-              size: 15,
+              size: context.r(IconSz.pill),
               color: colors.onPrimaryContainer,
             ),
           ),
-          const SizedBox(width: 10),
+          context.gapW(Insets.x2h),
           Expanded(
             child: Text(
               text,

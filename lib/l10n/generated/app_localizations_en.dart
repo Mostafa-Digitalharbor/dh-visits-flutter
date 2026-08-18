@@ -108,6 +108,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languageEnglish => 'English';
 
   @override
+  String get languageCodeShortArabic => 'ع';
+
+  @override
+  String get languageCodeShortEnglish => 'EN';
+
+  @override
   String get commonBack => 'Back';
 
   @override
@@ -217,6 +223,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errValidation => 'Invalid data — please review and try again';
+
+  @override
+  String get errNotVisitApprover =>
+      'You aren\'t an approver for this visit. Only a manager in the owner\'s reporting line can approve or reject it.';
+
+  @override
+  String get errOnlyApprovedCanStart =>
+      'This visit has to be approved before it can be started.';
+
+  @override
+  String get errOnlyInProgressCanEnd =>
+      'Only a visit that is currently in progress can be ended.';
+
+  @override
+  String get errOnlyDraftCanSubmit =>
+      'Only a draft or rescheduled visit can be submitted for approval.';
+
+  @override
+  String get errCannotApproveInState =>
+      'This visit can\'t be approved in its current state. Refresh to see where it stands.';
+
+  @override
+  String get errCannotRejectInState =>
+      'This visit can\'t be rejected in its current state. Refresh to see where it stands.';
+
+  @override
+  String get errOutcomeRequired =>
+      'Add the visit outcome before ending the visit.';
+
+  @override
+  String errMissingRequiredField(String field) {
+    return 'A required field is missing: $field';
+  }
+
+  @override
+  String get errRecordInUse =>
+      'That record is still linked to something else, so it can\'t be changed.';
 
   @override
   String get errNotFound => 'Item not found';
@@ -763,10 +806,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get roleUser => 'Field employee';
 
   @override
+  String get roleProjectManager => 'Project manager';
+
+  @override
+  String get roleAdmin => 'Administrator';
+
+  @override
   String get roleManagerTitle => 'Team manager';
 
   @override
   String get roleEmployeeTitle => 'Field rep';
+
+  @override
+  String get profileTitle => 'Profile';
+
+  @override
+  String get profileTabTitle => 'Profile';
 
   @override
   String get visitsHistoryActiveBadge => 'Active now';

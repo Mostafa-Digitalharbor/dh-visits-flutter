@@ -64,6 +64,13 @@ class FontSz {
 
   /// 32 — customer-detail hero initial.
   static const heroInitial = 32.0;
+
+  /// 26 — the value on an analytics metric tile. Two of these sit side by side,
+  /// so it is a rung below the dashboard's full-width KPI.
+  static const metric = 26.0;
+
+  /// 34 — the dashboard KPI number, the largest figure in the app.
+  static const kpi = 34.0;
 }
 
 class AppType {

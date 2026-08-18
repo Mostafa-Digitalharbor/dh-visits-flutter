@@ -59,7 +59,7 @@ class CvSubAppBar extends StatelessWidget implements PreferredSizeWidget {
                 }
               },
             ),
-            const SizedBox(width: 12),
+            context.gapW(Insets.x3),
             Expanded(
               // The bar is a fixed-height chrome element (PreferredSize). Cap
               // how far the eyebrow + title can scale up so a large system
@@ -95,7 +95,7 @@ class CvSubAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
             ),
-            for (final a in actions) ...[const SizedBox(width: 8), a],
+            for (final a in actions) ...[context.gapW(Insets.x2), a],
           ],
         ),
       ),

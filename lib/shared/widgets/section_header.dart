@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../app/design/app_dimens.dart';
 import '../../app/design/app_typography.dart';
+import '../../app/design/responsive.dart';
 import '../extensions/context_extensions.dart';
 
 /// Small heading above a card or list section.
@@ -62,8 +64,8 @@ class SectionHeader extends StatelessWidget {
     return Row(
       children: [
         if (icon != null) ...[
-          Icon(icon, size: 18, color: context.colors.primary),
-          const SizedBox(width: 8),
+          Icon(icon, size: context.r(IconSz.label), color: context.colors.primary),
+          context.gapW(Insets.x2),
         ],
         // Flexible + ellipsis: these are localized titles that run longer in
         // Arabic and grow with the OS text scale.

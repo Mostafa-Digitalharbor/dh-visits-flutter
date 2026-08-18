@@ -11,6 +11,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../app/theme.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/pending_actions_queue.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../analytics/view/analytics_page.dart';
@@ -19,8 +20,8 @@ import '../../visits/data/visits_repository.dart';
 import '../../dashboard/view/dashboard_page.dart';
 import '../../live_location/bloc/live_location_bloc.dart';
 import '../../live_location/view/live_location_banner.dart';
+import '../../profile/view/profile_page.dart';
 import '../../route/view/route_page.dart';
-import '../../settings/view/settings_page.dart';
 import '../../visits/bloc/visit_bloc.dart';
 import '../../visits/bloc/visits_list_bloc.dart';
 import '../../visits/view/persistent_visit_bar.dart';
@@ -167,9 +168,6 @@ class _RoleShell extends StatefulWidget {
   /// hero tag on screen at once throws.
   final String fabHeroTag;
 
-  final bool showGroups;
-  final bool showSettings;
-
   /// Whether the active-visit bar sits above the nav (field users only —
   /// managers don't go on visits).
   final bool showVisitBar;
@@ -182,8 +180,6 @@ class _RoleShell extends StatefulWidget {
     required this.tabs,
     required this.fabHeroTag,
     this.fabTab,
-    this.showGroups = false,
-    this.showSettings = true,
     this.showVisitBar = false,
     this.onTabSelected,
   });
@@ -209,8 +205,6 @@ class _RoleShellState extends State<_RoleShell> {
     return Scaffold(
       appBar: _AppBar(
         title: tabs[_tab].title,
-        showGroups: widget.showGroups,
-        showSettings: widget.showSettings,
         topInset: MediaQuery.paddingOf(context).top,
         textScale: context.textScale,
       ),
@@ -264,7 +258,7 @@ class _RoleShellState extends State<_RoleShell> {
   }
 }
 
-/// Employee layout: three-tab shell {زياراتي · مسار اليوم · الإعدادات}
+/// Employee layout: three-tab shell {زياراتي · مسار اليوم · حسابي}
 /// (design flows §3). The persistent active-visit bar floats above the nav.
 class _UserShell extends StatelessWidget {
   const _UserShell();
@@ -277,7 +271,6 @@ class _UserShell extends StatelessWidget {
       // Visits tab only.
       fabTab: 0,
       fabHeroTag: 'create-visit-user-hero',
-      showSettings: false,
       showVisitBar: true,
       tabs: [
         _Tab(
@@ -292,20 +285,24 @@ class _UserShell extends StatelessWidget {
           title: s.routeTabTitle,
           page: const RoutePage(),
         ),
-        _Tab(
-          icon: Symbols.settings,
-          label: s.settingsTitle,
-          title: s.settingsTitle,
-          page: const SettingsView(),
-        ),
+        _profileTab(s),
       ],
     );
   }
 }
 
-/// Manager layout: three-tab shell {لوحة التحكم · زيارات الفريق · التحليلات}
-/// with a FAB to create visits on the visits tab, and groups/settings action
-/// chips in the app bar.
+/// The account tab, identical in both shells — same icon, label and body, so
+/// the two role layouts differ only in the tabs that are actually role-specific.
+_Tab _profileTab(AppLocalizations s) => _Tab(
+      icon: Symbols.person,
+      label: s.profileTabTitle,
+      title: s.profileTitle,
+      page: const ProfileView(),
+    );
+
+/// Manager layout: four-tab shell
+/// {لوحة التحكم · زيارات الفريق · التحليلات · حسابي} with a FAB to create
+/// visits on the visits tab.
 class _ManagerShell extends StatefulWidget {
   const _ManagerShell();
 
@@ -363,7 +360,6 @@ class _ManagerShellState extends State<_ManagerShell> {
     return _RoleShell(
       fabTab: _visitsTab,
       fabHeroTag: 'create-visit-hero',
-      showGroups: true,
       onTabSelected: _onTabSelected,
       tabs: [
         _Tab(
@@ -390,6 +386,7 @@ class _ManagerShellState extends State<_ManagerShell> {
             child: const AnalyticsPage(),
           ),
         ),
+        _profileTab(s),
       ],
     );
   }
@@ -399,8 +396,6 @@ class _ManagerShellState extends State<_ManagerShell> {
 /// mark + eyebrow (role) + title, then action chips on the trailing edge.
 class _AppBar extends StatelessWidget implements PreferredSizeWidget {
   final String? title;
-  final bool showGroups;
-  final bool showSettings;
 
   /// The device status-bar inset (`MediaQuery.padding.top`) so the bar's
   /// declared [preferredSize] matches the space it actually paints — keeps the
@@ -414,8 +409,6 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
 
   const _AppBar({
     this.title,
-    this.showGroups = false,
-    this.showSettings = true,
     this.topInset = 0,
     this.textScale = 1.0,
   });
@@ -458,7 +451,7 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
                 child: Image.asset(AppAssets.logoMark,
                     width: 24, height: 24, color: Colors.white),
               ),
-              const SizedBox(width: 12),
+              context.gapW(Insets.x3),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -486,22 +479,12 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
                   ],
                 ),
               ),
-              if (showGroups) ...[
-                IconActionChip(
-                  icon: Symbols.groups,
-                  tooltip: context.s.customersTitle,
-                  onTap: () => context.push(AppRoutes.customers),
-                ),
-                const SizedBox(width: 8),
-              ],
+              // Notifications is the only action left up here. Customers and
+              // settings both moved into the Profile tab: they are places you
+              // go, not things you do to the screen you are on, and a bar that
+              // mixed the two grew a chip per feature. Customers survives as a
+              // row in the manager's profile, where it already was.
               const _NotificationChip(),
-              const SizedBox(width: 8),
-              if (showSettings)
-                IconActionChip(
-                  icon: Symbols.settings,
-                  tooltip: context.s.settingsTitle,
-                  onTap: () => context.push(AppRoutes.settings),
-                ),
             ],
           ),
         ),

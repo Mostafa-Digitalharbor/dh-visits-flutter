@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/design/app_dimens.dart';
+import '../../../app/design/responsive.dart';
+
 import '../../../app/design/app_assets.dart';
 import '../../../shared/extensions/context_extensions.dart';
 
@@ -140,7 +143,7 @@ class _SplashPageState extends State<SplashPage>
                         ],
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    context.gapH(Insets.x8),
                     Opacity(
                       opacity: _fade.value,
                       child: Column(
@@ -153,7 +156,7 @@ class _SplashPageState extends State<SplashPage>
                               letterSpacing: 0.5,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          context.gapH(Insets.x2),
                           Text(
                             context.s.appTagline,
                             style: context.text.bodyMedium?.copyWith(
@@ -163,7 +166,7 @@ class _SplashPageState extends State<SplashPage>
                         ],
                       ),
                     ),
-                    const SizedBox(height: 56),
+                    context.gapH(Insets.x12 + Insets.x2),
                     Opacity(
                       opacity: _fade.value,
                       child: SizedBox(

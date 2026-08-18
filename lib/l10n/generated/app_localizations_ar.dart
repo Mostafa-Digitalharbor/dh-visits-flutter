@@ -108,6 +108,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get languageEnglish => 'English';
 
   @override
+  String get languageCodeShortArabic => 'ع';
+
+  @override
+  String get languageCodeShortEnglish => 'EN';
+
+  @override
   String get commonBack => 'رجوع';
 
   @override
@@ -215,6 +221,40 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get errValidation => 'بيانات غير صحيحة — راجعها وحاول مرة أخرى';
+
+  @override
+  String get errNotVisitApprover =>
+      'لست معتمِدًا لهذه الزيارة. الاعتماد أو الرفض متاح فقط لمدير ضمن التسلسل الإداري لصاحب الزيارة.';
+
+  @override
+  String get errOnlyApprovedCanStart => 'يجب اعتماد الزيارة قبل بدئها.';
+
+  @override
+  String get errOnlyInProgressCanEnd => 'لا يمكن إنهاء إلا زيارة جارية بالفعل.';
+
+  @override
+  String get errOnlyDraftCanSubmit =>
+      'لا يمكن إرسال للاعتماد إلا زيارة مسودة أو معاد جدولتها.';
+
+  @override
+  String get errCannotApproveInState =>
+      'لا يمكن اعتماد هذه الزيارة في حالتها الحالية. حدِّث الصفحة لمعرفة وضعها.';
+
+  @override
+  String get errCannotRejectInState =>
+      'لا يمكن رفض هذه الزيارة في حالتها الحالية. حدِّث الصفحة لمعرفة وضعها.';
+
+  @override
+  String get errOutcomeRequired => 'أضف نتيجة الزيارة قبل إنهائها.';
+
+  @override
+  String errMissingRequiredField(String field) {
+    return 'حقل مطلوب غير مكتمل: $field';
+  }
+
+  @override
+  String get errRecordInUse =>
+      'هذا السجل مرتبط بسجلات أخرى، لذا لا يمكن تعديله.';
 
   @override
   String get errNotFound => 'العنصر غير موجود';
@@ -756,10 +796,22 @@ class AppLocalizationsAr extends AppLocalizations {
   String get roleUser => 'موظف ميداني';
 
   @override
+  String get roleProjectManager => 'مدير المشروع';
+
+  @override
+  String get roleAdmin => 'مسؤول النظام';
+
+  @override
   String get roleManagerTitle => 'مدير الفريق';
 
   @override
   String get roleEmployeeTitle => 'مندوب ميداني';
+
+  @override
+  String get profileTitle => 'الملف الشخصي';
+
+  @override
+  String get profileTabTitle => 'حسابي';
 
   @override
   String get visitsHistoryActiveBadge => 'نشطة الآن';

@@ -22,7 +22,7 @@ class ProgressTrack extends StatelessWidget {
     super.key,
     required this.value,
     required this.color,
-    this.height = 6,
+    this.height = CompSz.trackHeight,
   });
 
   @override

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../app/design/app_dimens.dart';
+import '../../app/design/responsive.dart';
+
 enum AppButtonVariant { primary, secondary, destructive }
 
 class AppButton extends StatelessWidget {
@@ -60,7 +63,7 @@ class AppButton extends StatelessWidget {
             children: [
               if (icon != null) ...[
                 Icon(icon, size: 18),
-                const SizedBox(width: 8),
+                context.gapW(Insets.x2),
               ],
               Flexible(
                 child: Text(

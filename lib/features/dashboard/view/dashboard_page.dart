@@ -61,24 +61,24 @@ class DashboardPage extends StatelessWidget {
                 ));
           },
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            padding: _pagePadding(context),
             children: [
               _DashboardGreeting(summary: summary),
-              const SizedBox(height: 16),
+              context.gapH(Insets.cardGap),
               _KpiGrid(summary: summary),
-              const SizedBox(height: 16),
+              context.gapH(Insets.cardGap),
               // The map is the only child that paints continuously (tile
               // fades, marker layers). Without a boundary its raster is
               // discarded whenever a sibling KPI number animates.
               RepaintBoundary(child: DashboardActiveMapCard(visits: visits)),
-              const SizedBox(height: 16),
+              context.gapH(Insets.cardGap),
               _LeaderboardCard(
                 entries: summary.topCustomers,
                 title: context.s.dashboardTopCustomers,
                 icon: Icons.business_rounded,
                 color: (c) => c.colors.primary,
               ),
-              const SizedBox(height: 16),
+              context.gapH(Insets.cardGap),
               _LeaderboardCard(
                 entries: summary.topEmployees,
                 title: context.s.dashboardTopEmployees,
@@ -269,7 +269,7 @@ class _KpiTile extends StatelessWidget {
                   alignment: AlignmentDirectional.centerStart,
                   child: CountUpText(
                     '$value',
-                    style: AppType.number(34, color).copyWith(height: 1),
+                    style: AppType.number(FontSz.kpi, color).copyWith(height: 1),
                   ),
                 ),
               ),
@@ -326,7 +326,7 @@ class _LeaderboardCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SectionHeader(icon: icon, label: title),
-          const SizedBox(height: 10),
+          context.gapH(Insets.x2h),
           if (entries.isEmpty)
             InlineEmptyRow(text: context.s.dashboardNoData)
           else
@@ -360,65 +360,68 @@ class _LeaderboardRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: color.withValues(alpha: 0.15),
-            child: Icon(icon, size: 14, color: color),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                ProgressTrack(value: fraction, color: color),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            '$count',
-            style: context.text.titleSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-        ],
+    final disc = context.r(CompSz.infoDot);
+    return LeaderboardRow(
+      // A tinted icon disc rather than an initial: these boards rank customers
+      // and employees alike, and a company has no meaningful initial.
+      leading: IconBadge(
+        icon: icon,
+        color: color,
+        size: disc,
+        iconSize: context.r(IconSz.inline),
+        radius: disc / 2,
+        tintAlpha: Alphas.tintStrong,
       ),
+      name: name,
+      figure: '$count',
+      value: fraction,
+      color: color,
     );
   }
 }
 
+
+/// Shared by the page and its skeleton so the two cannot drift. The extra
+/// bottom inset clears the shell's nav bar.
+EdgeInsets _pagePadding(BuildContext context) => EdgeInsets.fromLTRB(
+      context.r(Insets.screen),
+      context.r(Insets.screen),
+      context.r(Insets.screen),
+      context.rh(Insets.x6),
+    );
+
+// Placeholder heights for [_DashboardSkeleton] — measured from the blocks they
+// stand in for.
+
+/// Gradient greeting card: avatar, two text lines and the progress strip.
+const double _greetingHeight = 200.0;
+
+/// The 2×2 KPI grid.
+const double _kpiGridHeight = 280.0;
+
+/// A leaderboard card: header plus five rows.
+const double _boardHeight = 220.0;
 
 class _DashboardSkeleton extends StatelessWidget {
   const _DashboardSkeleton();
 
   @override
   Widget build(BuildContext context) {
+    // Greeting, KPI grid, map card, then the two leaderboards — the real
+    // page's rhythm, so nothing shifts when the data lands.
+    final gap = context.gapH(Insets.cardGap);
+    final board = SkeletonCard(height: context.r(_boardHeight));
     return AppShimmer(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        children: const [
-          SkeletonCard(height: 200),
-          SizedBox(height: 16),
-          SkeletonCard(height: 280),
-          SizedBox(height: 16),
-          SkeletonCard(height: 220),
-          SizedBox(height: 16),
-          SkeletonCard(height: 220),
+        padding: _pagePadding(context),
+        children: [
+          SkeletonCard(height: context.r(_greetingHeight)),
+          gap,
+          SkeletonCard(height: context.r(_kpiGridHeight)),
+          gap,
+          board,
+          gap,
+          board,
         ],
       ),
     );

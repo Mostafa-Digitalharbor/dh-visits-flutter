@@ -60,7 +60,7 @@ class AnalyticsPage extends StatelessWidget {
                 .firstWhere((s) => s.status != VisitsListStatus.loading);
           },
           child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+          padding: _pagePadding(context),
           children: [
             Row(children: [
               Expanded(
@@ -73,7 +73,7 @@ class AnalyticsPage extends StatelessWidget {
                   deltaUnit: context.s.unitPercent,
                 ),
               ),
-              const SizedBox(width: 12),
+              context.gapW(Insets.x3),
               Expanded(
                 child: _MetricTile(
                   icon: Symbols.event_available,
@@ -85,7 +85,7 @@ class AnalyticsPage extends StatelessWidget {
                 ),
               ),
             ]),
-            const SizedBox(height: 12),
+            context.gapH(Insets.x3),
             Row(children: [
               Expanded(
                 child: _MetricTile(
@@ -97,7 +97,7 @@ class AnalyticsPage extends StatelessWidget {
                   deltaUnit: context.s.unitPercent,
                 ),
               ),
-              const SizedBox(width: 12),
+              context.gapW(Insets.x3),
               Expanded(
                 child: _MetricTile(
                   icon: Symbols.timelapse,
@@ -110,11 +110,11 @@ class AnalyticsPage extends StatelessWidget {
                 ),
               ),
             ]),
-            const SizedBox(height: 16),
+            context.gapH(Insets.x4),
             _WeeklyChart(summary: summary),
-            const SizedBox(height: 18),
+            context.gapH(Insets.x4h),
             SectionHeader(icon: Symbols.leaderboard, label: context.s.analyticsByEmployee),
-            const SizedBox(height: 10),
+            context.gapH(Insets.x2h),
             _ByEmployee(rows: summary.byEmployee),
           ],
           ),
@@ -126,6 +126,28 @@ class AnalyticsPage extends StatelessWidget {
   static int _pctDelta(num cur, num prev) => AnalyticsSummary.pctDelta(cur, prev);
 }
 
+/// Shared by the page and its skeleton so the two cannot drift — the whole
+/// point of the skeleton is that the real content lands in the same place.
+/// The extra bottom inset clears the shell's nav bar.
+EdgeInsets _pagePadding(BuildContext context) => EdgeInsets.fromLTRB(
+      context.r(Insets.screen),
+      context.r(Insets.screen),
+      context.r(Insets.screen),
+      context.rh(Insets.x6 + Insets.x1),
+    );
+
+// Placeholder heights for [_AnalyticsSkeleton], named so the relationship to
+// the components they stand in for is stated rather than implied by a literal.
+
+/// A metric tile: badge row + 26dp number + caption, inside 14dp padding.
+const double _tileHeight = 104.0;
+
+/// The weekly card: title row + [CompSz.chartHeight] plot + card padding.
+const double _chartCardHeight = 220.0;
+
+/// Five leaderboard rows at ~42dp plus the gaps between them.
+const double _leaderboardHeight = 240.0;
+
 /// Matches the real layout's rhythm — two tile rows, the weekly chart, then the
 /// employee table — so the screen doesn't jump when the data lands.
 class _AnalyticsSkeleton extends StatelessWidget {
@@ -133,25 +155,26 @@ class _AnalyticsSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Heights are the real components' measured heights, scaled the same way
+    // they are, so the skeleton occupies exactly the box the content will.
+    final tile = context.r(_tileHeight);
+    final gap = context.gapW(Insets.x3);
+    final tileRow = Row(children: [
+      Expanded(child: SkeletonCard(height: tile)),
+      gap,
+      Expanded(child: SkeletonCard(height: tile)),
+    ]);
     return AppShimmer(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-        children: const [
-          Row(children: [
-            Expanded(child: SkeletonCard(height: 104)),
-            SizedBox(width: 12),
-            Expanded(child: SkeletonCard(height: 104)),
-          ]),
-          SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: SkeletonCard(height: 104)),
-            SizedBox(width: 12),
-            Expanded(child: SkeletonCard(height: 104)),
-          ]),
-          SizedBox(height: 16),
-          SkeletonCard(height: 220),
-          SizedBox(height: 18),
-          SkeletonCard(height: 240),
+        padding: _pagePadding(context),
+        children: [
+          tileRow,
+          context.gapH(Insets.x3),
+          tileRow,
+          context.gapH(Insets.x4),
+          SkeletonCard(height: context.r(_chartCardHeight)),
+          context.gapH(Insets.x4h),
+          SkeletonCard(height: context.r(_leaderboardHeight)),
         ],
       ),
     );
@@ -184,7 +207,7 @@ class _MetricTile extends StatelessWidget {
     final deltaColor = good ? x.success : cs.error;
     final up = delta >= 0;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: context.padAll(Insets.x3h),
       decoration: AppDecor.panel(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -194,10 +217,10 @@ class _MetricTile extends StatelessWidget {
               IconBadge(
                 icon: icon,
                 color: tone,
-                size: 38,
-                iconSize: 20,
+                size: context.r(CompSz.badgeLg),
+                iconSize: context.r(IconSz.sm),
                 radius: Radii.sm,
-                tintAlpha: 0.14,
+                tintAlpha: Alphas.tintStrong,
                 fill: 1,
               ),
               const Spacer(),
@@ -218,8 +241,8 @@ class _MetricTile extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(up ? Symbols.trending_up : Symbols.trending_down,
-                          size: 15, color: deltaColor),
-                      const SizedBox(width: 2),
+                          size: IconSz.pill, color: deltaColor),
+                      context.gapW(Insets.hair),
                       Text('${up ? '+' : ''}$delta$deltaUnit',
                           maxLines: 1,
                           style: TextStyle(
@@ -232,9 +255,11 @@ class _MetricTile extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          CountUpText(value, style: AppType.number(26, cs.onSurface).copyWith(height: 1)),
-          const SizedBox(height: 4),
+          context.gapH(Insets.x3),
+          CountUpText(value,
+              style: AppType.number(FontSz.metric, cs.onSurface)
+                  .copyWith(height: 1)),
+          context.gapH(Insets.x1),
           Text(label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -280,7 +305,7 @@ class _WeeklyChart extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: AppType.titleSm.copyWith(fontWeight: FontWeight.w700, color: cs.onSurface)),
               ),
-              const SizedBox(width: 8),
+              context.gapW(Insets.x2),
               // Flexible even though it already ellipsizes: a Row measures its
               // inflexible children at their intrinsic width first, so on a
               // narrow card this subtitle claimed more than was left and the
@@ -293,9 +318,14 @@ class _WeeklyChart extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          context.gapH(Insets.x4),
           SizedBox(
-            height: 148,
+            // fixedH, not r(): the box wraps two text labels, and text does
+            // not shrink on a narrow phone — scaling this by width clipped
+            // them on exactly the 320dp screens that need the room. Growth is
+            // one-way, so a large font setting makes the plot taller and never
+            // shorter than its design height.
+            height: context.fixedH(CompSz.chartHeight),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -317,6 +347,10 @@ class _WeeklyChart extends StatelessWidget {
   }
 }
 
+/// Fraction of the plot height a zero-count day still occupies, so a quiet day
+/// reads as "nothing happened" rather than as a missing bar.
+const double _barFloor = 0.09;
+
 class _Bar extends StatelessWidget {
   final int count;
   final int maxCount;
@@ -336,7 +370,7 @@ class _Bar extends StatelessWidget {
             maxLines: 1,
             style: TextStyle(
                 fontSize: FontSz.sm, fontWeight: FontWeight.w800, color: isToday ? cs.primary : x.textTertiary)),
-        const SizedBox(height: 6),
+        context.gapH(Insets.x1h),
         // The bar takes whatever the two labels leave rather than a hardcoded
         // 8 + 80·v. Those fixed numbers plus the labels' own line heights added
         // up to just over the chart's 148dp box — a one-pixel overflow at the
@@ -345,25 +379,26 @@ class _Bar extends StatelessWidget {
         Expanded(
           child: TweenAnimationBuilder<double>(
             tween: Tween(begin: 0, end: frac),
-            duration: const Duration(milliseconds: 700),
+            duration: AppDurations.barGrow,
             curve: Curves.easeOutCubic,
             builder: (_, v, __) => FractionallySizedBox(
               alignment: Alignment.bottomCenter,
-              // Floor of 0.09 keeps an empty day visible as a stub rather than
+              // The floor keeps an empty day visible as a stub rather than
               // vanishing, which is what the old `8 +` term was for.
-              heightFactor: (0.09 + 0.91 * v).clamp(0.0, 1.0),
+              heightFactor:
+                  (_barFloor + (1 - _barFloor) * v).clamp(0.0, 1.0),
               child: Container(
-                width: 16,
+                width: context.r(CompSz.chartBar),
                 decoration: BoxDecoration(
                   gradient: isToday ? x.avatarGradient : null,
                   color: isToday ? null : cs.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(Radii.xs),
                 ),
               ),
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        context.gapH(Insets.x2),
         Text(label,
             maxLines: 1,
             style: TextStyle(
@@ -399,19 +434,21 @@ class _ByEmployee extends StatelessWidget {
     return AppCard(
       child: Column(
         children: [
-          for (var i = 0; i < shown.length; i++) ...[
-            if (i > 0) const SizedBox(height: 14),
+          for (var i = 0; i < shown.length; i++)
             _EmpRow(
                 rank: i + 1,
                 name: shown[i].name,
                 pct: shown[i].onTimePct,
                 visits: shown[i].visits),
-          ],
         ],
       ),
     );
   }
 }
+
+/// At or above this on-time percentage an employee's bar turns green; below it,
+/// amber. Matches the threshold the Dashboard's leaderboard uses.
+const int _onTimeGoodPct = 90;
 
 class _EmpRow extends StatelessWidget {
   final int rank;
@@ -422,79 +459,18 @@ class _EmpRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = context.colors;
     final x = context.x;
-    final tone = pct >= 90 ? x.success : x.warning;
-    final medal = switch (rank) {
-      1 => AppColors.medalGold,
-      2 => AppColors.medalSilver,
-      3 => AppColors.medalBronze,
-      _ => cs.onSurfaceVariant,
-    };
-    // Ranks 1-3 sit on fixed medal hues that pair with white. Rank 4+ falls
-    // back to the theme-adaptive onSurfaceVariant, which is light in dark mode
-    // — so white text would vanish there. Use the surface tone (its inverse)
-    // for those so the number stays legible in both themes.
-    final medalText = rank <= 3 ? Colors.white : cs.surface;
-    final initial = InitialAvatar.initialOf(name);
-    return Row(
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(gradient: x.avatarGradient, shape: BoxShape.circle),
-              child: Text(initial,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: FontSz.xl)),
-            ),
-            PositionedDirectional(
-              end: -2,
-              top: -2,
-              child: Container(
-                width: 18,
-                height: 18,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: medal,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: cs.surfaceContainerLowest, width: 2),
-                ),
-                child: Text('$rank',
-                    style: TextStyle(color: medalText, fontSize: FontSz.micro, fontWeight: FontWeight.w800)),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppType.titleSm.copyWith(fontWeight: FontWeight.w700, color: cs.onSurface)),
-                  ),
-                  Text('$pct${context.s.unitPercent} · $visits',
-                      style: TextStyle(
-                          fontSize: FontSz.sm,
-                          fontWeight: FontWeight.w700,
-                          color: tone,
-                          fontFeatures: const [FontFeature.tabularFigures()])),
-                ],
-              ),
-              const SizedBox(height: 6),
-              ProgressTrack(value: pct / 100, color: tone),
-            ],
-          ),
-        ),
-      ],
+    final tone = pct >= _onTimeGoodPct ? x.success : x.warning;
+    return LeaderboardRow(
+      leading: RankMedalAvatar(name: name, rank: rank),
+      name: name,
+      // The rate and the sample size together: 100% off two visits is not the
+      // same result as 100% off forty, and the manager needs both to read the
+      // board correctly.
+      figure: '$pct${context.s.unitPercent} · $visits',
+      value: pct / 100,
+      color: tone,
+      placement: LeaderFigurePlacement.inline,
     );
   }
 }

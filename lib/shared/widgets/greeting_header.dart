@@ -58,7 +58,7 @@ class GreetingHeader extends StatelessWidget {
                     style: const TextStyle(
                         color: white, fontSize: FontSz.avatar, fontWeight: FontWeight.w800)),
               ),
-              const SizedBox(width: 12),
+              context.gapW(Insets.x3),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -75,7 +75,7 @@ class GreetingHeader extends StatelessWidget {
                             color: white.withValues(alpha: 0.85),
                             fontSize: FontSz.base,
                             fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 2),
+                    context.gapH(Insets.hair),
                     Text(name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -84,7 +84,7 @@ class GreetingHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              context.gapW(Insets.x2),
               // Flexible, not a bare child: a Row lays its inflexible children
               // out at their intrinsic width *first*, so a long role label
               // ("مدير المشروع") took the space the Expanded above needed and
@@ -92,7 +92,7 @@ class GreetingHeader extends StatelessWidget {
               Flexible(child: _RoleChip(label: roleLabel, icon: roleIcon)),
             ],
           ),
-          const SizedBox(height: 16),
+          context.gapH(Insets.x4),
           Row(
             children: [
               // The label yields; the count must not be truncated — it is the
@@ -107,7 +107,7 @@ class GreetingHeader extends StatelessWidget {
                         fontSize: FontSz.base,
                         fontWeight: FontWeight.w600)),
               ),
-              const SizedBox(width: 8),
+              context.gapW(Insets.x2),
               // ٪ in Arabic, % in English — the one place the sign was hard-coded.
               Text('$done/$total · ${(pct * 100).round()}${context.s.unitPercent}',
                   maxLines: 1,
@@ -118,7 +118,7 @@ class GreetingHeader extends StatelessWidget {
                       fontFeatures: [FontFeature.tabularFigures()])),
             ],
           ),
-          const SizedBox(height: 8),
+          context.gapH(Insets.x2),
           ClipRRect(
             borderRadius: BorderRadius.circular(Radii.pill),
             child: Stack(
@@ -139,7 +139,7 @@ class GreetingHeader extends StatelessWidget {
             ),
           ),
           if (stats.isNotEmpty) ...[
-            const SizedBox(height: 14),
+            context.gapH(Insets.x3h),
             Row(
               children: [
                 for (var i = 0; i < stats.length; i++) ...[
@@ -173,14 +173,14 @@ class _Stat extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(stat.icon, size: 18, color: white.withValues(alpha: 0.85)),
-        const SizedBox(width: 6),
+        context.gapW(Insets.x1h),
         Text(stat.value,
             style: const TextStyle(
                 color: white,
                 fontSize: FontSz.lg,
                 fontWeight: FontWeight.w800,
                 fontFeatures: [FontFeature.tabularFigures()])),
-        const SizedBox(width: 4),
+        context.gapW(Insets.x1),
         Flexible(
           child: Text(stat.label,
               maxLines: 1,
