@@ -2,23 +2,27 @@ import 'package:bloc/bloc.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
-import '../api/api_exceptions.dart';
 import '../utils/app_log.dart';
+import 'sentry_noise_filter.dart';
 
 /// Forwards every unhandled BLoC error to Sentry so we don't have to
 /// sprinkle `Sentry.captureException(...)` inside every `catch (e)` branch.
 ///
 /// Expected failure modes (no network, server-side validation, expired
-/// session) are filtered out -- those are normal user-facing UX, not crashes
-/// worth alerting on. Anything else (parsing errors, null derefs, plugin
-/// failures) is reported with the bloc class name as a tag so we can find
-/// hot-spots quickly.
+/// session) are filtered out by [isSentryNoise] -- those are normal
+/// user-facing UX, not crashes worth alerting on. Anything else (parsing
+/// errors, null derefs, plugin failures) is reported with the bloc class name
+/// as a tag so we can find hot-spots quickly.
+///
+/// The same predicate also runs in `SentryOptions.beforeSend`, which catches
+/// the errors that never pass through a bloc (zone errors, plugin callbacks).
+/// Keeping one predicate means the two paths can't drift apart.
 class SentryBlocObserver extends BlocObserver {
   @override
   void onError(BlocBase bloc, Object error, StackTrace stackTrace) {
     super.onError(bloc, error, stackTrace);
 
-    if (_isExpected(error)) return;
+    if (isSentryNoise(error)) return;
 
     Sentry.captureException(
       error,
@@ -31,32 +35,6 @@ class SentryBlocObserver extends BlocObserver {
     if (kDebugMode) {
       // Mirror to console so devs see it locally without opening Sentry.
       appLog('[Sentry/Bloc] ${bloc.runtimeType}: $error');
-    }
-  }
-
-  bool _isExpected(Object error) {
-    if (error is! ApiException) return false;
-    switch (error.code) {
-      case ApiErrorCode.network:
-      case ApiErrorCode.timeout:
-      case ApiErrorCode.unauthorized:
-      case ApiErrorCode.invalidCredentials:
-      case ApiErrorCode.permissionDenied:
-      case ApiErrorCode.validation:
-      case ApiErrorCode.locationPermission:
-      case ApiErrorCode.locationRequired:
-      case ApiErrorCode.notFound:
-      case ApiErrorCode.notSupported:
-      // Environmental, not a defect: an expired session, a rejected TLS
-      // certificate, or two devices racing on the same visit.
-      case ApiErrorCode.sessionRestoreFailed:
-      case ApiErrorCode.insecureConnection:
-      case ApiErrorCode.conflict:
-        return true;
-      case ApiErrorCode.server:
-      case ApiErrorCode.customerLoadFailed:
-      case ApiErrorCode.unknown:
-        return false;
     }
   }
 }

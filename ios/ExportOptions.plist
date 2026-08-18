@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- app-store-connect is the modern spelling of "app-store"; Xcode 15+
+       accepts both, Xcode 16+ warns on the old one. -->
+  <key>method</key>
+  <string>app-store-connect</string>
+
+  <!-- Digital Harbor. The Xcode project itself has NO DEVELOPMENT_TEAM set
+       (checked: grep found none), so this plist plus the DEVELOPMENT_TEAM
+       passed on the xcodebuild command line is what makes signing resolve. -->
+  <key>teamID</key>
+  <string>P95FNYY2S2</string>
+
+  <key>signingStyle</key>
+  <string>automatic</string>
+
+  <key>destination</key>
+  <string>export</string>
+
+  <!-- Let Apple manage the app's signing assets; combined with
+       -allowProvisioningUpdates this creates/refreshes the App Store profile
+       for net.digitalharbor.visits on the fly, so no .mobileprovision has to
+       live in the repo or in a secret. -->
+  <key>manageAppVersionAndBuildNumber</key>
+  <false/>
+
+  <!-- Bitcode has been dead since Xcode 14; leaving it on makes newer Xcode
+       reject the export outright. -->
+  <key>uploadSymbols</key>
+  <true/>
+  <key>stripSwiftSymbols</key>
+  <true/>
+</dict>
+</plist>

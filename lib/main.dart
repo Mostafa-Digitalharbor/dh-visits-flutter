@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 
@@ -12,6 +13,7 @@ import 'app/app.dart';
 import 'core/config/app_environment.dart';
 import 'core/di/service_locator.dart';
 import 'core/observability/sentry_bloc_observer.dart';
+import 'core/observability/sentry_noise_filter.dart';
 import 'core/push/push_notification_service.dart';
 import 'firebase_options.dart';
 import 'core/utils/app_log.dart';
@@ -22,14 +24,35 @@ Future<void> main() async {
   // (local debug builds) we skip Sentry but still install a Flutter error
   // handler so issues surface in the console.
   if (AppEnvironment.sentryEnabled) {
+    // Reading the version from the bundle rather than hardcoding it means a
+    // release tag becomes the Sentry release automatically -- pubspec.yaml
+    // stays the single source of truth and there is no second number to bump.
+    // PackageInfo needs the platform channels, so bind first; `_bootstrap`
+    // calls this again, which is a no-op.
+    WidgetsFlutterBinding.ensureInitialized();
+    final packageInfo = await PackageInfo.fromPlatform();
+
     await SentryFlutter.init(
       (options) {
         options.dsn = AppEnvironment.sentryDsn;
-        options.environment = AppEnvironment.flavor;
+        options.environment = AppEnvironment.sentryEnvironment;
+        options.release = '${packageInfo.packageName}@${packageInfo.version}'
+            '+${packageInfo.buildNumber}';
+        options.dist = packageInfo.buildNumber;
         options.tracesSampleRate = AppEnvironment.sentryTracesSampleRate;
         // Drop PII the SDK would otherwise auto-attach (device IP, IMEI).
         // We don't need it and most data-protection regimes prefer it off.
         options.sendDefaultPii = false;
+        // A screenshot of this app is a customer's name, address and the rep's
+        // live position -- never worth uploading to a third party for a stack
+        // trace we can already read. Same for the widget tree.
+        options.attachScreenshot = false;
+        options.attachViewHierarchy = false;
+        // Environmental failures (offline, 4xx, expired session) are already
+        // shown to the user as normal messages. Reporting them buries the real
+        // crashes and burns the quota. See [isSentryNoise].
+        options.beforeSend =
+            (event, hint) => isSentryNoise(event.throwable) ? null : event;
         // Don't ship Sentry events from local debug builds even if a DSN
         // somehow leaks into one.
         options.debug = false;

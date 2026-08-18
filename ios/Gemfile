@@ -1,0 +1,18 @@
+source "https://rubygems.org"
+
+gem "fastlane"
+
+# CocoaPods MUST be here, not installed separately.
+#
+# actions/setup-ruby installs a Ruby that is NOT the one the macOS runner image
+# pre-installed CocoaPods into. `flutter build ios` shells out to `pod` directly
+# (never through bundler), so with CocoaPods living in the image's Ruby the
+# build prints a soft "CocoaPods is installed but broken" warning and then dies
+# ~20 minutes later at the link step. Declaring it here puts `pod` in the same
+# gem home as fastlane, on PATH.
+#
+# Corollary: do NOT enable `bundler-cache: true` on ruby/setup-ruby. It sets
+# BUNDLE_PATH=vendor/bundle, which moves the binstubs off PATH and re-creates
+# the exact problem this line solves (and it needs a Gemfile.lock, which is not
+# committed because generating one on Windows pins the wrong platforms).
+gem "cocoapods"

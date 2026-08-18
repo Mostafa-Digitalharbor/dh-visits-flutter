@@ -53,3 +53,21 @@ app.*.map.json
 .env
 .env.*
 !.env.example
+
+# CI/CD credentials. These are handled as GitHub secrets and base64-decoded on
+# the runner into $RUNNER_TEMP; none of them should ever exist inside the repo.
+# Listed anyway because the setup steps in docs/CICD.md have you generate a
+# .p12 locally, and one stray `git add -A` is all it takes.
+**/*.p12
+**/*.p8
+**/*.mobileprovision
+**/*.cer
+**/*.certSigningRequest
+play-service-account*.json
+
+# fastlane leftovers
+ios/fastlane/report.xml
+ios/fastlane/Preview.html
+ios/fastlane/screenshots/
+ios/fastlane/test_output/
+ios/Gemfile.lock

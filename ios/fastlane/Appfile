@@ -1,0 +1,9 @@
+# Bundle id verified against ios/Runner.xcodeproj/project.pbxproj
+# (PRODUCT_BUNDLE_IDENTIFIER = net.digitalharbor.visits).
+app_identifier("net.digitalharbor.visits")
+
+team_id("P95FNYY2S2")
+
+# No apple_id / itc_team_id on purpose: authentication goes through the App
+# Store Connect API key (ASC_KEY_ID / ASC_ISSUER_ID / ASC_KEY_P8), which is
+# 2FA-free and does not expire the way a session cookie does.

@@ -18,12 +18,14 @@
 #     export ODOO_DATABASE='yourcompany-main-12345678'
 #
 # Crash reporting:
-#   Sentry is compiled in only when SENTRY_DSN is non-empty (see AppEnvironment),
-#   so the DSN below is what turns crash reporting ON for store builds. A Sentry
-#   DSN is a write-only, client-side ingest key — it is designed to ship inside
-#   the app binary and is not a secret. Override per-build with:
-#     export SENTRY_DSN='https://...'      # different project
-#     export SENTRY_DSN=''                 # disable Sentry for this build
+#   A RELEASE build always reports, using the project DSN baked into
+#   AppEnvironment._releaseDsn. This script no longer carries its own copy —
+#   two copies drift, and the one that drifts is always the one that mattered.
+#   Point a build at a different Sentry project with:
+#     export SENTRY_DSN='https://...'
+#   There is deliberately no "disable Sentry" switch for a release build: a
+#   store binary with no crash reporting is a silent regression nobody notices
+#   until they need a stack trace and there isn't one.
 #
 # Usage:  scripts/build_release.sh [apk|aab]   (default: apk)
 set -euo pipefail
@@ -32,10 +34,12 @@ cd "$(dirname "$0")/.."
 
 target="${1:-apk}"
 
-# Default production Sentry project (Digital Harbor / visits). `${VAR-default}`
-# (no colon) so an explicitly-exported empty string disables Sentry, while an
-# unset variable still gets the default.
-SENTRY_DSN="${SENTRY_DSN-https://e1c8ae84f3d415fa15d41ec6436c54b5@o4511426995617792.ingest.de.sentry.io/4511485485973584}"
+# Left empty unless the caller overrides it: AppEnvironment owns the default.
+# Note the emptiness test further down — passing `--dart-define=SENTRY_DSN=`
+# with an EMPTY value would NOT fall back to the code's default, it would WIN
+# over it, because String.fromEnvironment only uses its defaultValue when the
+# key is absent.
+SENTRY_DSN="${SENTRY_DSN:-}"
 APP_FLAVOR="${APP_FLAVOR:-production}"
 
 # Pass the backend through only when it was supplied. Absent = the built app
@@ -52,12 +56,12 @@ fi
 
 # Flavour tags every Sentry event, so keep it alongside the DSN.
 defines+=("--dart-define=APP_FLAVOR=${APP_FLAVOR}")
+defines+=("--dart-define=SENTRY_TRACES_PERCENT=${SENTRY_TRACES_PERCENT:-10}")
 if [ -n "${SENTRY_DSN}" ]; then
   defines+=("--dart-define=SENTRY_DSN=${SENTRY_DSN}")
-  defines+=("--dart-define=SENTRY_TRACES_PERCENT=${SENTRY_TRACES_PERCENT:-10}")
-  echo "Sentry ENABLED (environment=${APP_FLAVOR})."
+  echo "Sentry -> overridden project (environment=${APP_FLAVOR})."
 else
-  echo "Sentry DISABLED (SENTRY_DSN is empty)."
+  echo "Sentry -> project default from AppEnvironment (environment=${APP_FLAVOR})."
 fi
 
 # Required, not hygiene. `flutter_native_splash` is a dev_dependency, so its

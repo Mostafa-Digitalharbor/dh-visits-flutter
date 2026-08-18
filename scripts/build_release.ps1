@@ -17,12 +17,14 @@
 #     $env:ODOO_DATABASE = 'yourcompany-main-12345678'
 #
 # Crash reporting:
-#   Sentry is compiled in only when SENTRY_DSN is non-empty (see AppEnvironment),
-#   so the DSN below is what turns crash reporting ON for store builds. A Sentry
-#   DSN is a write-only, client-side ingest key - it is designed to ship inside
-#   the app binary and is not a secret. Override per-build with:
-#     $env:SENTRY_DSN = 'https://...'   # different project
-#     $env:SENTRY_DSN = ''              # disable Sentry for this build
+#   A RELEASE build always reports, using the project DSN baked into
+#   AppEnvironment._releaseDsn. This script no longer carries its own copy -
+#   two copies drift, and the one that drifts is always the one that mattered.
+#   Point a build at a different Sentry project with:
+#     $env:SENTRY_DSN = 'https://...'
+#   There is deliberately no "disable Sentry" switch for a release build: a
+#   store binary with no crash reporting is a silent regression nobody notices
+#   until they need a stack trace and there isn't one.
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File scripts/build_release.ps1          # APK
@@ -37,14 +39,11 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
-# Default production Sentry project (Digital Harbor / visits). Test for the
-# variable's *existence* rather than truthiness, so setting it to '' explicitly
-# disables Sentry while leaving it unset picks up the default.
-if (Test-Path env:SENTRY_DSN) {
-    $sentryDsn = $env:SENTRY_DSN
-} else {
-    $sentryDsn = 'https://e1c8ae84f3d415fa15d41ec6436c54b5@o4511426995617792.ingest.de.sentry.io/4511485485973584'
-}
+# Left empty unless the caller overrides it: AppEnvironment owns the default.
+# Note the emptiness test - passing `--dart-define=SENTRY_DSN=` with an EMPTY
+# value would NOT fall back to the code's default, it would WIN over it, because
+# String.fromEnvironment only uses its defaultValue when the key is absent.
+$sentryDsn = $env:SENTRY_DSN
 if ($env:APP_FLAVOR) { $appFlavor = $env:APP_FLAVOR } else { $appFlavor = 'production' }
 if ($env:SENTRY_TRACES_PERCENT) { $tracesPct = $env:SENTRY_TRACES_PERCENT } else { $tracesPct = '10' }
 
@@ -62,12 +61,12 @@ if ($defines.Count -gt 0) {
 
 # Flavour tags every Sentry event, so keep it alongside the DSN.
 $defines += "--dart-define=APP_FLAVOR=$appFlavor"
+$defines += "--dart-define=SENTRY_TRACES_PERCENT=$tracesPct"
 if ($sentryDsn) {
     $defines += "--dart-define=SENTRY_DSN=$sentryDsn"
-    $defines += "--dart-define=SENTRY_TRACES_PERCENT=$tracesPct"
-    Write-Host "Sentry ENABLED (environment=$appFlavor)." -ForegroundColor Cyan
+    Write-Host "Sentry -> overridden project (environment=$appFlavor)." -ForegroundColor Cyan
 } else {
-    Write-Host "Sentry DISABLED (SENTRY_DSN is empty)." -ForegroundColor Yellow
+    Write-Host "Sentry -> project default from AppEnvironment (environment=$appFlavor)." -ForegroundColor Cyan
 }
 
 # Required, not hygiene. `flutter_native_splash` is a dev_dependency, so its

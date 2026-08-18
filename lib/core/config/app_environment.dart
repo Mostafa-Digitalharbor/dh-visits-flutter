@@ -62,15 +62,53 @@ class AppEnvironment {
 
   static bool get isProduction => flavor == 'production';
 
-  /// Sentry DSN for crash reporting. Empty string disables Sentry entirely
-  /// (so local debug builds don't spam your Sentry quota — only release / CI
-  /// builds pass it via --dart-define-from-file).
-  static const String sentryDsn = String.fromEnvironment(
-    'SENTRY_DSN',
-    defaultValue: '',
-  );
+  /// The Digital Harbor / Visits Sentry project.
+  ///
+  /// Baked into the source rather than injected, because a Sentry DSN is a
+  /// **write-only client ingest key**. It is designed to ship inside the app
+  /// binary — anyone who downloads the APK can read it out — so treating it as
+  /// a secret buys nothing and costs the one thing that matters: a store build
+  /// whose crash reporting was silently off because a CI secret was never set.
+  /// That is not hypothetical; `--dart-define=SENTRY_DSN=` with an *empty*
+  /// value beats a `defaultValue`, so a half-configured pipeline produced
+  /// exactly that.
+  ///
+  /// Keep this in sync with `scripts/build_release.sh`, which is the local
+  /// equivalent of the release workflow.
+  static const String _releaseDsn =
+      'https://e1c8ae84f3d415fa15d41ec6436c54b5@o4511426995617792.ingest.de.sentry.io/4511485485973584';
+
+  static const String _definedSentryDsn = String.fromEnvironment('SENTRY_DSN');
+
+  /// Sentry DSN for crash reporting, or `''` when Sentry should stay off.
+  ///
+  /// Resolution order:
+  ///   1. `--dart-define=SENTRY_DSN=...` — point a build at a different Sentry
+  ///      project (staging, a customer-specific org).
+  ///   2. otherwise a **release** build always reports to [_releaseDsn]. A
+  ///      store binary with no crash reporting is a silent regression nobody
+  ///      notices until they need a stack trace and there isn't one.
+  ///   3. otherwise (debug / profile) Sentry is off, so local runs don't spend
+  ///      the free quota on errors a developer is already staring at.
+  static String get sentryDsn {
+    if (_definedSentryDsn.isNotEmpty) return _definedSentryDsn;
+    return kReleaseMode ? _releaseDsn : '';
+  }
 
   static bool get sentryEnabled => sentryDsn.isNotEmpty;
+
+  /// The `environment` tag on every Sentry event.
+  ///
+  /// Derived rather than taken straight from [flavor] on purpose: a store
+  /// binary is never "dev", and a CI job that passes `--dart-define=APP_FLAVOR=`
+  /// with an *empty* secret would otherwise tag production crashes with an
+  /// empty string. `String.fromEnvironment` only falls back to its
+  /// `defaultValue` when the key is **absent** -- an empty value wins -- so the
+  /// guard has to live here.
+  static String get sentryEnvironment {
+    if (!kReleaseMode) return 'development';
+    return (flavor.isEmpty || flavor == 'dev') ? 'production' : flavor;
+  }
 
   /// Sample rate for performance/transaction monitoring, expressed as a
   /// percentage (0--100). Default 10 keeps Sentry cost low in production;

@@ -1,0 +1,110 @@
+# Uploading only. The archive + export happen in .github/workflows/release.yml
+# with plain xcodebuild, because that is the only way to pass
+# `-allowProvisioningUpdates` together with the App Store Connect key -- which
+# is what lets Apple mint the distribution profile on a runner that has never
+# seen this app before. fastlane's job starts once a signed .ipa exists.
+
+default_platform(:ios)
+
+# Fail loudly and immediately on a missing credential rather than 15 minutes
+# later inside an Apple API call whose error says nothing useful.
+def required_env(name)
+  value = ENV[name]
+  UI.user_error!("Missing required environment variable #{name}") if value.to_s.strip.empty?
+  value
+end
+
+APP_IDENTIFIER = "net.digitalharbor.visits".freeze
+
+def connect_api_key
+  # API-key auth, not Apple ID + password: no 2FA prompt to hang a headless
+  # runner, and no session cookie to expire in 30 days.
+  app_store_connect_api_key(
+    key_id: required_env("ASC_KEY_ID"),
+    issuer_id: required_env("ASC_ISSUER_ID"),
+    key_filepath: required_env("ASC_KEY_PATH"),
+    duration: 1200,
+    in_house: false,
+  )
+end
+
+platform :ios do
+  desc "Fail in seconds if the App Store Connect credentials are wrong"
+  lane :check_credentials do
+    # Runs BEFORE the ~20 minutes of Flutter compile and xcodebuild archive,
+    # because every way these three secrets can be wrong produces a late,
+    # misleading failure:
+    #
+    #   - ASC_KEY_ID paired with a DIFFERENT key's .p8 (easy to do when more
+    #     than one key exists) -> a signing error that says nothing about keys
+    #   - ASC_ISSUER_ID from another App Store Connect organisation -> 401
+    #   - a key with the App Manager role instead of Admin -> "Cloud signing
+    #     permission error / No profiles were found", which reads like a
+    #     provisioning problem
+    #
+    # One real API call settles all three.
+    #
+    # Built from the three documented parameters rather than splatting the hash
+    # `app_store_connect_api_key` returns: that hash carries extra entries which
+    # a future fastlane could rename, and the resulting ArgumentError would fail
+    # this step for a reason that has nothing to do with the credentials it is
+    # meant to be checking.
+    key_id = required_env("ASC_KEY_ID")
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
+      key_id: key_id,
+      issuer_id: required_env("ASC_ISSUER_ID"),
+      filepath: File.absolute_path(required_env("ASC_KEY_PATH")),
+    )
+
+    begin
+      app = Spaceship::ConnectAPI::App.find(APP_IDENTIFIER)
+    rescue StandardError => e
+      UI.user_error!(
+        "App Store Connect rejected key #{key_id}: #{e.message}\n" \
+        "Most likely ASC_KEY_ID does not match the .p8 in ASC_KEY_P8_BASE64, " \
+        "or ASC_ISSUER_ID belongs to a different organisation."
+      )
+    end
+
+    UI.user_error!(
+      "Key #{key_id} authenticated, but cannot see #{APP_IDENTIFIER}. " \
+      "Either the app does not exist in this App Store Connect organisation, " \
+      "or this key's access is limited to other apps."
+    ) if app.nil?
+
+    UI.success("App Store Connect OK -- #{app.name} (#{APP_IDENTIFIER}), Apple ID #{app.id}")
+  end
+
+  desc "Upload a pre-built IPA to TestFlight (internal testers only)"
+  lane :beta do |options|
+    ipa_path = options[:ipa] || ENV["IPA_PATH"]
+    UI.user_error!("Pass ipa:<path> or set IPA_PATH") if ipa_path.to_s.empty?
+    UI.user_error!("IPA not found at #{ipa_path}") unless File.exist?(ipa_path)
+
+    # The key must have the **Admin** role. App Manager is enough to *upload* a
+    # build but not to sign one in the cloud, and the failure surfaces during
+    # exportArchive as "Cloud signing permission error / No profiles were
+    # found" -- which reads like a provisioning problem, not a permissions one.
+    # `check_credentials` runs first in CI and catches that.
+    upload_to_testflight(
+      api_key: connect_api_key,
+      ipa: ipa_path,
+      # Internal testers only. `distribute_external: true` would queue the
+      # build for Apple's Beta App Review, which takes hours to days -- the
+      # whole point of the internal track is that it lands in minutes.
+      distribute_external: false,
+      notify_external_testers: false,
+      # Apple's processing takes 5-30 minutes. Waiting for it burns macOS
+      # runner minutes (billed at 10x) doing nothing; TestFlight notifies the
+      # internal group by itself once processing finishes.
+      #
+      # Note: `changelog:` cannot be combined with this -- fastlane needs a
+      # processed build to attach notes to. Set "What to Test" in App Store
+      # Connect if you need it.
+      skip_waiting_for_build_processing: true,
+      # ITSAppUsesNonExemptEncryption is already declared in Info.plist, so
+      # there is no compliance question to answer interactively.
+      skip_submission: false,
+    )
+  end
+end

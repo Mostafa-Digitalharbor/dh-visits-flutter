@@ -1,0 +1,107 @@
+# Free lane. Runs on every push and PR, builds a debug APK, and uploads
+# NOTHING to any store. Do your experimenting here -- release.yml only fires on
+# a tag, and every tag is a real build on a real store account.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+concurrency:
+  # A newer push to the same branch makes the in-flight run pointless.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned, not "stable". The native iOS code here is the classic
+  # UIApplicationDelegate embedding (no SceneDelegate.swift, no
+  # UIApplicationSceneManifest, no FlutterImplicitEngineDelegate), and
+  # pubspec.lock was resolved against this exact SDK. Floating on `stable`
+  # means a Flutter release can turn this workflow red without a single commit.
+  FLUTTER_VERSION: '3.35.3'
+
+jobs:
+  verify:
+    name: Analyze + test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Generate localizations
+        # lib/l10n/generated/ is committed, so this normally changes nothing --
+        # which is exactly the point: if it *does* change something, the .arb
+        # files and the generated Dart have drifted and the analyze below
+        # catches it here rather than in a release build.
+        run: flutter gen-l10n
+
+      - name: flutter analyze
+        run: flutter analyze
+
+      - name: flutter test
+        run: flutter test --reporter expanded
+
+  android-debug:
+    name: Debug APK
+    runs-on: ubuntu-latest
+    needs: verify
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cap Gradle memory for the runner
+        # android/gradle.properties asks for -Xmx8G, which is right on a dev
+        # box and fatal on a 7 GB runner: the JVM gets OOM-killed, Gradle exits
+        # 143, and GitHub reports "The operation was canceled" -- which looks
+        # like somebody pressed cancel, not like a memory failure.
+        #
+        # A gradle.properties in GRADLE_USER_HOME overrides the project's, so
+        # the project file stays untouched and local builds stay fast.
+        run: |
+          mkdir -p "$HOME/.gradle"
+          printf '%s\n' \
+            'org.gradle.jvmargs=-Xmx3G -XX:MaxMetaspaceSize=768m' \
+            'org.gradle.daemon=false' \
+            'org.gradle.parallel=false' \
+            'org.gradle.workers.max=2' \
+            'kotlin.daemon.jvmargs=-Xmx1G' \
+            > "$HOME/.gradle/gradle.properties"
+          echo "--- effective GRADLE_USER_HOME properties ---"
+          cat "$HOME/.gradle/gradle.properties"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Build debug APK
+        # --no-tree-shake-icons is not optional here either. The app draws its
+        # icons from material_symbols_icons, which ships VARIABLE fonts; the
+        # release tree-shaker drops glyphs from those and icons render blank.
+        # Keeping the flag on debug too means the debug APK matches what the
+        # release lane produces. See docs/ICONS_TREE_SHAKING.md.
+        run: flutter build apk --debug --no-tree-shake-icons
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
