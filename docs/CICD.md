@@ -266,7 +266,24 @@ same notes inline; this is the index.
     secrets on ubuntu in seconds. Missing secret = platform skips; malformed
     secret = loud failure.
 
-17. **Pinned Flutter, not `stable`.** The iOS side here is the classic
+17. **Never pass `CODE_SIGN_IDENTITY` to `xcodebuild`.** The project ships the
+    stock `"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer"`, and
+    naming the distribution identity on the command line looks like the obvious
+    correction. It fails all 59 targets at once:
+
+    > `PromisesObjC has conflicting provisioning settings. PromisesObjC is
+    > automatically signed, but code signing identity Apple Distribution: … has
+    > been manually specified.`
+
+    Two reasons. A command-line build setting applies to **every** target, pods
+    included. And naming an identity *is* manual signing to Xcode, which
+    contradicts `CODE_SIGN_STYLE=Automatic`. Automatic signing already resolves
+    the identity from the profile `-allowProvisioningUpdates` mints, so the
+    project's stale value never gets used. Pass only `DEVELOPMENT_TEAM` and
+    `CODE_SIGN_STYLE=Automatic`; assert the distribution certificate is present
+    in the keychain instead of trying to select it.
+
+18. **Pinned Flutter, not `stable`.** The iOS side here is the classic
     `UIApplicationDelegate` embedding — no `SceneDelegate.swift`, no
     `UIApplicationSceneManifest`, no `FlutterImplicitEngineDelegate` — and
     `pubspec.lock` was resolved against 3.35.3. Floating on `stable` lets a

@@ -490,16 +490,28 @@ jobs:
           identities="$(security find-identity -v -p codesigning "$kc")"
           echo "$identities"
 
-          # The checked-in Release configuration pins
-          #   "CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer"
-          # (project.pbxproj line 519 -- it is the stock Flutter template
-          # value). Only a DISTRIBUTION certificate is imported here, so if
-          # that setting survives into the archive, codesign goes looking for a
-          # development identity that does not exist. Overriding it on the
-          # xcodebuild command line wins over the project, but the exact name
-          # differs by certificate age -- "Apple Distribution: ..." on anything
-          # issued recently, "iPhone Distribution: ..." on older ones -- so
-          # read it back out of the keychain instead of guessing.
+          # Assert a DISTRIBUTION certificate actually landed in the keychain.
+          # A Development certificate imports just as happily and only reveals
+          # itself much later, during export, as a profile error.
+          #
+          # This is a check, NOT a value to pass on. Handing the identity to
+          # xcodebuild as `CODE_SIGN_IDENTITY=...` looks like the obvious fix
+          # for the stock `"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone
+          # Developer"` in project.pbxproj, and it fails every target at once:
+          #
+          #   PromisesObjC has conflicting provisioning settings.
+          #   PromisesObjC is automatically signed, but code signing identity
+          #   Apple Distribution: ... has been manually specified.
+          #
+          # A command-line build setting applies to EVERY target, pods
+          # included, and naming an identity is what Xcode calls manual
+          # signing -- which contradicts CODE_SIGN_STYLE=Automatic. Automatic
+          # signing already resolves the right identity from the profile it
+          # mints, so the project's stale value is overridden anyway. Leave it
+          # alone; the certificate just has to be present.
+          #
+          # The name differs by certificate age: "Apple Distribution: ..." on
+          # anything issued recently, "iPhone Distribution: ..." on older ones.
           signing_identity="$(printf '%s\n' "$identities" \
             | sed -nE 's/.*"((Apple|iPhone) Distribution:[^"]*)".*/\1/p' \
             | head -n 1)"
@@ -507,8 +519,7 @@ jobs:
             echo "::error::No Apple/iPhone Distribution identity in the imported .p12. A Development certificate cannot sign an App Store build."
             exit 1
           fi
-          echo "Using signing identity: $signing_identity"
-          echo "SIGNING_IDENTITY=$signing_identity" >> "$GITHUB_ENV"
+          echo "Distribution identity present: $signing_identity"
 
       - name: Write the App Store Connect API key
         env:
@@ -619,8 +630,7 @@ jobs:
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             DEVELOPMENT_TEAM=P95FNYY2S2 \
-            CODE_SIGN_STYLE=Automatic \
-            "CODE_SIGN_IDENTITY=$SIGNING_IDENTITY"
+            CODE_SIGN_STYLE=Automatic
 
       - name: Guard MinimumOSVersion before exporting
         # The archive builds, exports and uploads perfectly happily with an
