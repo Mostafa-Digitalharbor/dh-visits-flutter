@@ -644,6 +644,45 @@ jobs:
             DEVELOPMENT_TEAM=P95FNYY2S2 \
             CODE_SIGN_STYLE=Automatic
 
+      - name: Guard the purpose strings before exporting
+        # Apple runs a static check for protected-resource APIs and rejects the
+        # upload if any referenced one lacks a purpose string:
+        #
+        #   90683: Missing purpose string in Info.plist ... should contain a
+        #   NSPhotoLibraryUsageDescription key ... While your app might not use
+        #   these APIs, a purpose string is still required.
+        #
+        # That verdict lands AFTER a clean archive, a clean export and a
+        # two-minute upload -- roughly 25 minutes of macOS runner, billed at
+        # 10x. This step costs one second.
+        #
+        # NSPhotoLibraryUsageDescription is on the list even though the app only
+        # ever calls ImagePicker with ImageSource.camera: image_picker_ios and
+        # file_picker link PHPhotoLibrary symbols regardless, and the reference
+        # alone is what Apple checks.
+        #
+        # Add a key here whenever a new plugin pulls in a protected API. The
+        # list is deliberately hand-maintained -- an automatic scan would have
+        # to reimplement Apple's own analysis to be trustworthy.
+        run: |
+          set -euo pipefail
+          plist="$RUNNER_TEMP/Runner.xcarchive/Products/Applications/Runner.app/Info.plist"
+          missing=0
+          for key in \
+            NSLocationWhenInUseUsageDescription \
+            NSCameraUsageDescription \
+            NSPhotoLibraryUsageDescription; do
+            value="$(/usr/libexec/PlistBuddy -c "Print :$key" "$plist" 2>/dev/null || true)"
+            if [ -z "$value" ]; then
+              echo "::error::$key is missing from the built Info.plist. Apple rejects the upload with error 90683 after the whole build has run."
+              missing=1
+            else
+              echo "  $key = $value"
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+          echo "All purpose strings present."
+
       - name: Guard MinimumOSVersion before exporting
         # The archive builds, exports and uploads perfectly happily with an
         # empty MinimumOSVersion, and Apple only rejects it minutes later

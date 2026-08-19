@@ -61,6 +61,17 @@
 		<!-- Camera: proof-of-visit photos attached to a visit. -->
 		<key>NSCameraUsageDescription</key>
 		<string>We use the camera so you can attach proof-of-visit photos to a customer visit.</string>
+		<!-- Required even though the app never opens the photo library: it only
+		     calls ImagePicker with ImageSource.camera. The image_picker_ios and
+		     file_picker plugins link PHPhotoLibrary symbols regardless, and
+		     Apple's static check rejects the upload on the reference alone —
+		     "90683: Missing purpose string in Info.plist … While your app might
+		     not use these APIs, a purpose string is still required."
+		     It arrives after a clean archive, export and upload, so it costs a
+		     full macOS build to learn. Keep the wording honest about what the
+		     access is for; a vague string draws a 5.1.1 review rejection. -->
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>We ask for photo library access so you can attach an existing photo or file to a customer visit as proof of the visit.</string>
 		<!-- App Transport Security: enforce HTTPS only (matches Android usesCleartextTraffic=false). -->
 		<key>NSAppTransportSecurity</key>
 		<dict>

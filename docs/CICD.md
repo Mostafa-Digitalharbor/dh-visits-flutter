@@ -89,6 +89,14 @@ no `run:` block has swallowed the step below it through bad indentation.
 | Play — bundle explorer (used versionCodes) | <https://play.google.com/console/u/2/developers/7574373484861523453/app/4973467961658297850/bundle-explorer> |
 | Play — users & permissions | <https://play.google.com/console/u/2/developers/7574373484861523453/users-and-permissions> |
 | App Store Connect — API keys | <https://appstoreconnect.apple.com/access/integrations/api> |
+| App Store Connect — TestFlight | <https://appstoreconnect.apple.com/apps/6793164809/testflight/ios> |
+| App Store Connect — distribution | <https://appstoreconnect.apple.com/apps/6793164809/distribution> |
+| Sentry — issues | <https://digital-harbor.sentry.io/issues/> |
+
+The App Store listing is **DHVisitsKSA**, Apple ID `6793164809`, bundle id
+`net.digitalharbor.visits`. Apple emails build-processing verdicts to the
+account holder minutes after upload — those mails are the fastest way to see
+why a build that uploaded cleanly never appeared in TestFlight.
 
 ### Signing identities
 
@@ -312,7 +320,35 @@ same notes inline; this is the index.
     Consequence for App Store submission (not TestFlight): the listing needs
     iPad screenshots.
 
-19. **Pinned Flutter, not `stable`.** The iOS side here is the classic
+19. **A purpose string is required for an API you merely link.** The app only
+    ever calls `ImagePicker` with `ImageSource.camera` and never opens the photo
+    library — and Apple still refused build 1.0.8 (106):
+
+    > `90683: Missing purpose string in Info.plist … should contain a
+    > NSPhotoLibraryUsageDescription key … While your app might not use these
+    > APIs, a purpose string is still required.`
+
+    `image_picker_ios` and `file_picker` link `PHPhotoLibrary` symbols, and the
+    reference alone is what the static check sees. The verdict arrives *after*
+    a clean archive, export and upload — ~25 minutes of macOS runner, billed at
+    10×. A guard step now reads the archive's `Info.plist` before exporting.
+
+    Its key list is hand-maintained on purpose: an automatic scan would have to
+    reimplement Apple's own analysis to be worth trusting. Add to it whenever a
+    plugin pulls in a new protected API.
+
+    **`NSLocationAlwaysAndWhenInUseUsageDescription` is deliberately absent.**
+    The same upload reported it too, as a *warning* rather than an error, for
+    the same reason — `geolocator_apple` links `requestAlwaysAuthorization`.
+    The app never calls it: `LocationService` uses
+    `Geolocator.requestPermission()`, and `UIBackgroundModes` is only
+    `remote-notification` and `fetch`, with no `location`. Adding the string
+    would be inert (iOS would never show that prompt) while declaring to App
+    Review that a workforce-tracking app may follow staff in the background —
+    exactly the claim guideline 5.1.1 scrutinises hardest. A warning that
+    blocks nothing is the cheaper side of that trade.
+
+20. **Pinned Flutter, not `stable`.** The iOS side here is the classic
     `UIApplicationDelegate` embedding — no `SceneDelegate.swift`, no
     `UIApplicationSceneManifest`, no `FlutterImplicitEngineDelegate` — and
     `pubspec.lock` was resolved against 3.35.3. Floating on `stable` lets a

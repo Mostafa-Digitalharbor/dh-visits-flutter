@@ -2,3 +2,5 @@
 
 CFBundleDisplayName = "Visits";
 NSLocationWhenInUseUsageDescription = "We use your location to record customer visit check-in/out and to share your live position with your manager while you are using the app.";
+NSCameraUsageDescription = "We use the camera so you can attach proof-of-visit photos to a customer visit.";
+NSPhotoLibraryUsageDescription = "We ask for photo library access so you can attach an existing photo or file to a customer visit as proof of the visit.";
