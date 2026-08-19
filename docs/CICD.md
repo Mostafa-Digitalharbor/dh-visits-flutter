@@ -171,11 +171,23 @@ same notes inline; this is the index.
         \( -iname "com.android.support*" -o -iname "android.arch*" \) | wc -l
    ```
 
-3. **Disk.** A release AAB needs more than the ~14 GB left once Gradle unpacks
-   the NDK and CMake. Running out surfaces as
+3. **Disk — and the debug lane runs out first.** The runner installs NDK 27,
+   SDK Platform 33 and CMake 3.22.1 *during* the build, several GB on top of
+   whatever the image already holds. `ci.yml` hit the wall before `release.yml`
+   did, because a debug APK keeps the x86 and x86_64 ABIs that a release AAB
+   splits out:
+
+   ```
+   LLVM ERROR: IO failure on output stream: No space left on device
+   Execution failed for task ':app:stripDebugDebugSymbols'
+   ```
+
+   It can also surface as
    `Could not add entry '.../transforms/...' to cache file-access.bin`, which
-   reads like a corrupted cache. The android job deletes dotnet, ghc, ghcup and
-   CodeQL first and prints `df -h` either side.
+   reads like a corrupted cache rather than a full disk. Both workflows now run
+   the same cleanup first — dotnet, swift, powershell, node_modules, ghc,
+   ghcup, CodeQL, and `docker image prune` — and print `df -h` either side so
+   the log answers the question next time instead of posing it.
 
 4. **Firebase config.** `android/app/google-services.json` and
    `ios/Runner/GoogleService-Info.plist` are **committed** in this repo, so
