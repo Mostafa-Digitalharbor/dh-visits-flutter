@@ -94,7 +94,19 @@ no `run:` block has swallowed the step below it through bad indentation.
 | Sentry — issues | <https://digital-harbor.sentry.io/issues/> |
 
 The App Store listing is **DHVisitsKSA**, Apple ID `6793164809`, bundle id
-`net.digitalharbor.visits`. Apple emails build-processing verdicts to the
+`net.digitalharbor.visits`.
+
+**Turn on "Automatically distribute builds to this group" for the `dh` internal
+group.** The `beta` lane uploads with `skip_waiting_for_build_processing: true`
+and therefore cannot assign a group itself — Apple needs the build processed
+first, and waiting 5–30 minutes for that burns macOS runner time billed at 10×
+to do nothing. The one-time toggle in App Store Connect does the same job for
+free, on every future build.
+
+A green check with a small **yellow triangle** on a build means processed
+successfully *with warnings* — not a failure. Here it is the deliberately
+omitted `NSLocationAlwaysAndWhenInUseUsageDescription` (see trap 19). A build
+that actually failed shows a red ✕ and never becomes installable. Apple emails build-processing verdicts to the
 account holder minutes after upload — those mails are the fastest way to see
 why a build that uploaded cleanly never appeared in TestFlight.
 
@@ -337,16 +349,34 @@ same notes inline; this is the index.
     reimplement Apple's own analysis to be worth trusting. Add to it whenever a
     plugin pulls in a new protected API.
 
-    **`NSLocationAlwaysAndWhenInUseUsageDescription` is deliberately absent.**
-    The same upload reported it too, as a *warning* rather than an error, for
-    the same reason — `geolocator_apple` links `requestAlwaysAuthorization`.
-    The app never calls it: `LocationService` uses
-    `Geolocator.requestPermission()`, and `UIBackgroundModes` is only
-    `remote-notification` and `fetch`, with no `location`. Adding the string
-    would be inert (iOS would never show that prompt) while declaring to App
-    Review that a workforce-tracking app may follow staff in the background —
-    exactly the claim guideline 5.1.1 scrutinises hardest. A warning that
-    blocks nothing is the cheaper side of that trade.
+    **`NSLocationAlwaysAndWhenInUseUsageDescription` is deliberately absent —
+    do not "fix" it.** Every upload reports it, and Apple's own wording is
+    *"Although delivery was successful, you may want to correct…"*. It is what
+    puts the yellow triangle next to a green check in TestFlight.
+
+    Two plugins link `requestAlwaysAuthorization`, which is all the static
+    check needs to see:
+
+    - `geolocator_apple/Handlers/PermissionHandler.m:68,77`
+    - `permission_handler_apple/strategies/LocationPermissionStrategy.m:69`
+
+    But look at what guards those calls:
+
+    ```objc
+    // geolocator_apple/Handlers/PermissionHandler.m:98
+    containsAlwaysDescription = [[NSBundle mainBundle]
+        objectForInfoDictionaryKey:@"NSLocationAlwaysAndWhenInUseUsageDescription"] != nil;
+    ```
+
+    Both plugins call it **only when the key is present**. Omitting the key is
+    what makes that line dead code. Adding it would not silence a warning — it
+    would *enable* the always-authorization path in both plugins, so a field
+    rep could be shown a background-tracking prompt by an app that tracks
+    staff. That is the claim App Review guideline 5.1.1 scrutinises hardest,
+    and `UIBackgroundModes` here is only `remote-notification` and `fetch`
+    anyway. `LocationService` calls plain `Geolocator.requestPermission()`.
+
+    A warning that blocks nothing is the cheap side of that trade.
 
 20. **Pinned Flutter, not `stable`.** The iOS side here is the classic
     `UIApplicationDelegate` embedding — no `SceneDelegate.swift`, no
