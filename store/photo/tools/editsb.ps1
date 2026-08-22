@@ -1,5 +1,5 @@
 . "C:\Users\NINJAZ~1\AppData\Local\Temp\claude\e--mostafa-Companies-Digital-Harbor-Visits-location-gps\91b2d9bf-4d8e-4f62-9bc4-3b9f86930cbd\scratchpad\edit\imglib.ps1"
-$ed="e:\mostafa\Companies\Digital_Harbor\Visits\location_gps\store\photo\edited"
+$ed="c:\mostafa\Companies\Digital_Harbor\Visits\location_gps\store\photo\edited"
 $out="C:\Users\NINJAZ~1\AppData\Local\Temp\claude\e--mostafa-Companies-Digital-Harbor-Visits-location-gps\91b2d9bf-4d8e-4f62-9bc4-3b9f86930cbd\scratchpad\edit"
 $files="01_visit_detail.png","02_visits_list.png","03_dashboard.png","04_analytics.png"
 
