@@ -14,6 +14,8 @@ import '../../../core/utils/distance.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../data/models/visit.dart';
+import '../data/models/visit_location_log.dart';
+import 'visit_trail_layers.dart';
 import '../data/visits_repository.dart';
 
 /// A compact geofence map on the visit-detail page.
@@ -23,13 +25,32 @@ import '../data/visits_repository.dart';
 /// in-range / out-of-range badge, and a **Directions** button that hands off to
 /// the system maps app.
 ///
+/// Once the visit has been started it also draws the **GPS trail** — the thread
+/// of every position logged between Start and End — so the same card answers
+/// both "was the rep at the customer?" and "what route did they take to get
+/// there?". [onOpenTrail] surfaces the full-screen version of it.
+///
 /// The customer centre is resolved from, in order: the customer's `res.partner`
 /// coordinates (fetched best-effort), then the visit's planned coordinates. The
 /// whole card hides itself when there isn't a single coordinate to show, so it
 /// never renders an empty grey box.
 class VisitMapCard extends StatefulWidget {
   final Visit visit;
-  const VisitMapCard({super.key, required this.visit});
+
+  /// The path to draw between the start and end pins. Null while it is still
+  /// loading; empty when the visit has no logged positions.
+  final VisitTrack? trail;
+
+  /// Opens the full-screen trail. The button only appears when there is a path
+  /// worth opening.
+  final VoidCallback? onOpenTrail;
+
+  const VisitMapCard({
+    super.key,
+    required this.visit,
+    this.trail,
+    this.onOpenTrail,
+  });
 
   @override
   State<VisitMapCard> createState() => _VisitMapCardState();
@@ -96,7 +117,15 @@ class _VisitMapCardState extends State<VisitMapCard> {
     final customer = _customer;
     final checkIn = _checkIn;
     final checkOut = _checkOut;
-    final points = [customer, checkIn, checkOut].whereType<LatLng>().toList();
+    final trail = widget.trail ?? VisitTrack.empty;
+    final trailPoints = TrailLayers.points(trail);
+    // The trail's own vertices go into the camera fit, not just its endpoints:
+    // a route that loops away from the customer would otherwise be framed out
+    // of the card and the thread would run off the edge.
+    final points = [
+      ...[customer, checkIn, checkOut].whereType<LatLng>(),
+      ...trailPoints,
+    ];
 
     // Nothing to plot — hide the whole card rather than show an empty map.
     if (points.isEmpty) return const SizedBox.shrink();
@@ -187,6 +216,15 @@ class _VisitMapCardState extends State<VisitMapCard> {
                         ],
                       ),
                     ],
+                    // Under the pins: the thread is context for them, and a
+                    // line drawn over a pin reads as crossing it out.
+                    TrailLayers.polyline(context, trail),
+                    TrailLayers.endpoints(
+                      context,
+                      trail,
+                      live: widget.visit.isTrackingLive,
+                      size: 28,
+                    ),
                     MarkerLayer(
                       markers: [
                         if (customer != null)
@@ -199,7 +237,12 @@ class _VisitMapCardState extends State<VisitMapCard> {
                               color: primary,
                             ),
                           ),
-                        if (checkIn != null)
+                        // Suppressed once the trail is drawn: its own start
+                        // and end pins sit on the very same coordinates (the
+                        // Start/End actions write the first and last points of
+                        // the trail), so keeping both stacks two pins on one
+                        // spot and hides whichever draws first.
+                        if (checkIn != null && !trail.hasPath)
                           Marker(
                             point: checkIn,
                             width: 40,
@@ -218,7 +261,7 @@ class _VisitMapCardState extends State<VisitMapCard> {
                               ),
                             ),
                           ),
-                        if (checkOut != null)
+                        if (checkOut != null && !trail.hasPath)
                           Marker(
                             point: checkOut,
                             width: 40,
@@ -253,14 +296,28 @@ class _VisitMapCardState extends State<VisitMapCard> {
                       color: Colors.black.withValues(alpha: 0.22),
                     ),
                   ),
-                // Directions hand-off.
+                // Directions hand-off, plus the full-screen trail when there
+                // is a path to expand.
                 Positioned(
                   right: 12,
                   bottom: 12,
-                  child: MapFab.rounded(
-                    icon: Symbols.assistant_direction,
-                    onTap: () => _openDirections(context),
-                    semanticLabel: context.s.mapOpenDirections,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (trail.hasPath && widget.onOpenTrail != null) ...[
+                        MapFab.rounded(
+                          icon: Symbols.timeline,
+                          onTap: widget.onOpenTrail!,
+                          semanticLabel: context.s.trailOpenFull,
+                        ),
+                        context.gapH(Insets.x2),
+                      ],
+                      MapFab.rounded(
+                        icon: Symbols.assistant_direction,
+                        onTap: () => _openDirections(context),
+                        semanticLabel: context.s.mapOpenDirections,
+                      ),
+                    ],
                   ),
                 ),
               ],

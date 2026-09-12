@@ -22,8 +22,13 @@ class AppRoutes {
   static const String customerNearbyPath = '/customers/:id/nearby';
   static const String visitDetailPath = '/visits/:id';
 
+  /// Full-screen GPS trail of one visit. Nested under the detail path so the
+  /// back gesture returns to the visit rather than to the visits list.
+  static const String visitTrailPath = '/visits/:id/trail';
+
   // ---- Path builders (for navigation call sites) ----
   static String customerDetail(int id) => '/customers/$id';
   static String customerNearby(int id) => '/customers/$id/nearby';
   static String visitDetail(int id) => '/visits/$id';
+  static String visitTrail(int id) => '/visits/$id/trail';
 }

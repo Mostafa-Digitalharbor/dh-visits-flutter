@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/api/api_exceptions.dart';
 import '../../../core/api/endpoints.dart';
 import '../../../core/api/odoo_rpc.dart';
 import '../../../core/constants.dart';
@@ -13,6 +14,7 @@ import 'mock_location_note.dart';
 import 'models/visit.dart';
 import 'models/visit_activity.dart';
 import 'models/visit_attachment.dart';
+import 'models/visit_location_log.dart';
 import 'models/visit_participant.dart';
 import '../../../core/utils/app_log.dart';
 
@@ -295,6 +297,103 @@ class VisitsRepository {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // GPS trail (/api/visit/log_location · log_locations · track)
+  // ---------------------------------------------------------------------------
+
+  /// Reads a visit's trail, oldest fix first — ready to feed straight into a
+  /// polyline.
+  ///
+  /// [limit]/[offset] page the points and [dateFrom]/[dateTo] window them; with
+  /// none of them the whole trail comes back. The counters on [VisitTrack]
+  /// always describe the *full* trail even when the points are a slice.
+  Future<VisitTrack> readTrack(
+    int visitId, {
+    int? limit,
+    int offset = 0,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+  }) async {
+    final result = await api.jsonRpc(
+      Endpoints.visitTrack,
+      params: {
+        'visit_id': visitId,
+        if (limit != null) 'limit': limit,
+        if (offset > 0) 'offset': offset,
+        if (dateFrom != null) 'date_from': formatOdooUtc(dateFrom),
+        if (dateTo != null) 'date_to': formatOdooUtc(dateTo),
+      },
+    );
+    if (result is! Map) return VisitTrack(visitId: visitId);
+    return VisitTrack.fromApi(Map<String, dynamic>.from(result));
+  }
+
+  /// Appends a single fix to the trail.
+  ///
+  /// Prefer [logLocations] for anything the tracker collects: one round trip
+  /// per fix is wasteful on a field connection, and a batch reports bad points
+  /// individually instead of failing whole. This exists for the one-off case
+  /// (a manual "record my position" tap) and as the fallback when a batch of
+  /// one is all there is.
+  Future<VisitLocationLog?> logLocation(
+    int visitId, {
+    required double latitude,
+    required double longitude,
+    DateTime? loggedAt,
+    double? accuracy,
+    double? altitude,
+    double? speed,
+    double? heading,
+    String? location,
+    String? deviceId,
+  }) async {
+    final result = await api.jsonRpc(
+      Endpoints.visitLogLocation,
+      params: {
+        'visit_id': visitId,
+        'latitude': latitude,
+        'longitude': longitude,
+        // Always sent, never left to the server's "now" default: a fix that
+        // waited out a dead zone has to keep the time it was actually taken or
+        // it lands in the wrong place in the path.
+        'logged_at': formatOdooUtc(loggedAt ?? DateTime.now()),
+        if (accuracy != null) 'accuracy': accuracy,
+        if (altitude != null) 'altitude': altitude,
+        if (speed != null) 'speed': speed,
+        if (heading != null) 'heading': heading,
+        if (location != null) 'location': location,
+        if (deviceId != null) 'device_id': deviceId,
+      },
+    );
+    final log = (result is Map ? result['log'] : null);
+    if (log is! Map) return null;
+    return VisitLocationLog.tryFromApi(Map<String, dynamic>.from(log));
+  }
+
+  /// Flushes a buffer of fixes in one round trip.
+  ///
+  /// Points may be sent in any order — the server files them by `logged_at`.
+  /// A malformed point is refused on its own and reported in
+  /// [TrailFlushResult.rejected] by its index in [points], so one bad fix never
+  /// costs the caller the rest of its queue.
+  Future<TrailFlushResult> logLocations(
+    int visitId,
+    List<TrailPoint> points,
+  ) async {
+    if (points.isEmpty) return const TrailFlushResult();
+    final result = await api.jsonRpc(
+      Endpoints.visitLogLocations,
+      params: {
+        'visit_id': visitId,
+        'points': [
+          for (final p in points) p.toApi(formatUtc: formatOdooUtc),
+        ],
+      },
+    );
+    if (result is! Map) return const TrailFlushResult();
+    return TrailFlushResult.fromApi(Map<String, dynamic>.from(result));
+  }
+
   /// Uploads a base64-encoded attachment to a visit. Returns the attachment id.
   Future<int?> uploadAttachment(
     int visitId, {
@@ -431,26 +530,75 @@ class VisitsRepository {
     return rows.map((r) => VisitParticipant.fromOdooRow(r)).toList();
   }
 
-  /// Participant-manager approves one participant line (`action_approve`).
-  Future<void> approveParticipant(int participantId) async {
-    await _participantAction('action_approve', participantId);
-  }
-
-  /// Participant-manager rejects one participant line. The reason is written to
-  /// the line first, then `action_reject` is invoked (which reads it / triggers
-  /// the configured rejection policy). Writing the reason is best-effort in
-  /// case record rules only allow the action method.
-  Future<void> rejectParticipant(int participantId, String reason) async {
-    try {
-      await api.writeRecord(
-        AppConstants.visitParticipantModel,
-        [participantId],
-        {'reject_reason': reason},
+  /// Participant-manager approves one attendee line (approval track 2).
+  ///
+  /// Goes through `/api/visit/attendee/approve` where the server has it, since
+  /// that route is what enforces "nobody approves their own participation" and
+  /// returns the visit's resulting state. Falls back to `action_approve` over
+  /// `call_kw` — the path this app used before the module exposed the route —
+  /// so a company still on an older `dh_visit_management` keeps working.
+  Future<void> approveParticipant(int participantId) =>
+      _attendeeDecision(
+        Endpoints.visitAttendeeApprove,
+        'action_approve',
+        participantId,
       );
-    } catch (e) {
-      appLog('[VisitsRepository] participant reason write failed: $e');
+
+  /// Participant-manager rejects one attendee line. The reason travels with the
+  /// call; on the `call_kw` fallback it has to be written to the line first
+  /// (best-effort, in case record rules only allow the action method) because
+  /// `action_reject` reads it back off the record.
+  ///
+  /// The visit's own state afterwards follows the server's *Participant
+  /// Rejection Policy* setting — `draft` by default, or `rejected`.
+  Future<void> rejectParticipant(int participantId, String reason) =>
+      _attendeeDecision(
+        Endpoints.visitAttendeeReject,
+        'action_reject',
+        participantId,
+        extra: {'reason': reason},
+        beforeFallback: () async {
+          try {
+            await api.writeRecord(
+              AppConstants.visitParticipantModel,
+              [participantId],
+              {'reject_reason': reason},
+            );
+          } catch (e) {
+            appLog('[VisitsRepository] participant reason write failed: $e');
+          }
+        },
+      );
+
+  /// Runs an attendee decision over REST, degrading to `call_kw` only when the
+  /// route is missing from this server.
+  ///
+  /// The fallback is deliberately narrow: [ApiErrorCode.notSupported] is what
+  /// `ApiClient` raises for a route Odoo has no controller for. A `UserError`
+  /// ("you cannot approve your own participation") or an `AccessError` is a
+  /// real verdict that must reach the user — retrying it through `call_kw`
+  /// would either fail again with a worse message or, worse, succeed and route
+  /// around the rule the endpoint exists to enforce.
+  Future<void> _attendeeDecision(
+    String path,
+    String fallbackMethod,
+    int participantId, {
+    Map<String, dynamic> extra = const {},
+    Future<void> Function()? beforeFallback,
+  }) async {
+    try {
+      await api.jsonRpc(
+        path,
+        params: {'participant_id': participantId, ...extra},
+      );
+      return;
+    } on ApiException catch (e) {
+      if (e.code != ApiErrorCode.notSupported) rethrow;
+      appLog('[VisitsRepository] $path not deployed; '
+          'falling back to $fallbackMethod');
     }
-    await _participantAction('action_reject', participantId);
+    await beforeFallback?.call();
+    await _participantAction(fallbackMethod, participantId);
   }
 
   Future<void> _participantAction(String method, int participantId) async {

@@ -11,6 +11,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../app/theme.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/pending_actions_queue.dart';
+import '../../visits/data/visit_trail_tracker.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
@@ -43,6 +44,7 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   StreamSubscription<int>? _syncedSub;
   StreamSubscription<DroppedAction>? _droppedSub;
+  StreamSubscription<int>? _trailDroppedSub;
 
   @override
   void initState() {
@@ -65,6 +67,19 @@ class _HomeShellState extends State<HomeShell> {
         kind: SnackKind.error,
       );
       context.read<VisitsListBloc>().add(const VisitsListLoadRequested());
+    });
+
+    // Same promise as above, for the GPS trail: positions were recorded on the
+    // device and the server then refused them for good (a fix stamped outside
+    // the visit's start-end window, most often). The rep believes their route
+    // is on the record, so the gap in it has to be said out loud.
+    final tracker = slMaybe<VisitTrailTracker>();
+    _trailDroppedSub = tracker?.onPointsDropped.listen((count) {
+      if (!mounted || count <= 0) return;
+      context.showSnack(
+        context.s.trailPointsDropped(count),
+        kind: SnackKind.error,
+      );
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -97,6 +112,7 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   void dispose() {
+    _trailDroppedSub?.cancel();
     _syncedSub?.cancel();
     _droppedSub?.cancel();
     super.dispose();

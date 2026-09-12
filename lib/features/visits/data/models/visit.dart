@@ -158,6 +158,24 @@ class Visit extends Equatable {
   /// Number of attachments (from `attachment_ids` length on the full read).
   final int attachmentCount;
 
+  // -- GPS trail counters ------------------------------------------------------
+  // Present on the REST payload (`/api/visit/my`, `get`, `create`). The full
+  // `call_kw` read does NOT request them: they'd have to be added to
+  // [odooReadFields], and a server whose `dh_visit_management` predates the
+  // trail would then fail the entire detail read over two summary numbers. The
+  // detail screen gets its counters from `/api/visit/track` instead, which
+  // returns them alongside the points it is fetching anyway.
+
+  /// Points currently on the trail.
+  final int locationLogCount;
+
+  /// Path length through those points, in kilometres, as measured by the
+  /// server (we do not recompute it — the server owns the trail).
+  final double trackedDistanceKm;
+
+  /// Timestamp of the newest fix.
+  final DateTime? lastLocationDatetime;
+
   const Visit({
     required this.id,
     this.name,
@@ -199,6 +217,9 @@ class Visit extends Equatable {
     this.escalationDate,
     this.participants = const [],
     this.attachmentCount = 0,
+    this.locationLogCount = 0,
+    this.trackedDistanceKm = 0.0,
+    this.lastLocationDatetime,
   });
 
   // --------------------------------------------------------------- derived
@@ -262,6 +283,14 @@ class Visit extends Equatable {
 
   bool get hasStartLocation => startLat != null && startLng != null;
   bool get hasEndLocation => endLat != null && endLng != null;
+
+  /// Whether this visit has a GPS trail worth drawing. One lone point is a
+  /// marker, not a path — the trail UI needs two to draw a line between.
+  bool get hasTrail => locationLogCount > 1;
+
+  /// A visit that is running right now is still collecting fixes, so anything
+  /// read off it is a snapshot rather than the final path.
+  bool get isTrackingLive => isInProgress;
 
   // -- Backward-compat aliases -------------------------------------------------
   // Peripheral, display-only screens (dashboard / analytics / route / customers)
@@ -370,6 +399,10 @@ class Visit extends Equatable {
       state: visitStateFromWire(json['state']?.toString()),
       startDatetime: parseOdooUtc(json['start_datetime']),
       endDatetime: parseOdooUtc(json['end_datetime']),
+      locationLogCount: (json['location_log_count'] as num?)?.toInt() ?? 0,
+      trackedDistanceKm:
+          (json['tracked_distance_km'] as num?)?.toDouble() ?? 0.0,
+      lastLocationDatetime: parseOdooUtc(json['last_location_datetime']),
     );
   }
 
@@ -440,6 +473,9 @@ class Visit extends Equatable {
     DateTime? startDatetime,
     DateTime? endDatetime,
     List<VisitParticipant>? participants,
+    int? locationLogCount,
+    double? trackedDistanceKm,
+    DateTime? lastLocationDatetime,
   }) =>
       Visit(
         id: id,
@@ -482,6 +518,10 @@ class Visit extends Equatable {
         escalationDate: escalationDate,
         participants: participants ?? this.participants,
         attachmentCount: attachmentCount,
+        locationLogCount: locationLogCount ?? this.locationLogCount,
+        trackedDistanceKm: trackedDistanceKm ?? this.trackedDistanceKm,
+        lastLocationDatetime:
+            lastLocationDatetime ?? this.lastLocationDatetime,
       );
 
   /// Fields fetched by the full `call_kw` detail/manager-list read.

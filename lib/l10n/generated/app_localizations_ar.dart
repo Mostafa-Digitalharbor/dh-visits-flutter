@@ -1631,4 +1631,116 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get wfMockFlagBannerBody =>
       'الجهاز بلّغ عن موقع GPS وهمي وقت بدء أو إنهاء الزيارة. راجعها كويس قبل الموافقة.';
+
+  @override
+  String get trailSectionTitle => 'المسار المقطوع';
+
+  @override
+  String get trailMapTitle => 'مسار GPS';
+
+  @override
+  String get trailEmpty => 'لم يتم تسجيل أي مواقع بعد';
+
+  @override
+  String get trailEmptyRunning => 'جارٍ تسجيل مسارك — يظهر الخط أثناء تحركك';
+
+  @override
+  String get trailEmptyFinished => 'لم يتم تسجيل أي مواقع خلال هذه الزيارة';
+
+  @override
+  String get trailLive => 'جارٍ التسجيل';
+
+  @override
+  String trailPoints(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count نقطة',
+      many: '$count نقطة',
+      few: '$count نقاط',
+      two: 'نقطتان',
+      one: 'نقطة واحدة',
+      zero: 'لا توجد نقاط',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get trailDistance => 'المسافة';
+
+  @override
+  String trailDistanceKm(String value) {
+    return '$value كم';
+  }
+
+  @override
+  String get trailAvgSpeed => 'متوسط السرعة';
+
+  @override
+  String trailSpeedKmh(String value) {
+    return '$value كم/س';
+  }
+
+  @override
+  String get trailLastFix => 'آخر موقع';
+
+  @override
+  String get trailFirstFix => 'أول موقع';
+
+  @override
+  String get trailOpenFull => 'عرض المسار كاملاً';
+
+  @override
+  String get trailPointStart => 'البداية';
+
+  @override
+  String get trailPointEnd => 'النهاية';
+
+  @override
+  String get trailPointTrack => 'أثناء الطريق';
+
+  @override
+  String get trailPointManual => 'مضافة يدويًا';
+
+  @override
+  String trailAccuracy(String meters) {
+    return '±$meters م';
+  }
+
+  @override
+  String trailPendingUploads(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count موقع في انتظار الرفع',
+      many: '$count موقعًا في انتظار الرفع',
+      few: '$count مواقع في انتظار الرفع',
+      two: 'موقعان في انتظار الرفع',
+      one: 'موقع واحد في انتظار الرفع',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get trailUploadNow => 'ارفع الآن';
+
+  @override
+  String trailPointsDropped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تعذّر حفظ $count موقع مسجَّل',
+      many: 'تعذّر حفظ $count موقعًا مسجَّلاً',
+      few: 'تعذّر حفظ $count مواقع مسجَّلة',
+      two: 'تعذّر حفظ موقعين مسجَّلين',
+      one: 'تعذّر حفظ موقع واحد مسجَّل',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get trailPointsList => 'المواقع';
+
+  @override
+  String get trailFitRoute => 'ملء المسار';
 }

@@ -1645,4 +1645,109 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get wfMockFlagBannerBody =>
       'The device reported a mock (fake) GPS location when this visit was started or ended. Review it before approving.';
+
+  @override
+  String get trailSectionTitle => 'Route travelled';
+
+  @override
+  String get trailMapTitle => 'GPS trail';
+
+  @override
+  String get trailEmpty => 'No positions recorded yet';
+
+  @override
+  String get trailEmptyRunning =>
+      'Recording your route — the path appears as you move';
+
+  @override
+  String get trailEmptyFinished =>
+      'No positions were recorded during this visit';
+
+  @override
+  String get trailLive => 'Recording';
+
+  @override
+  String trailPoints(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count points',
+      one: '1 point',
+      zero: 'No points',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get trailDistance => 'Distance';
+
+  @override
+  String trailDistanceKm(String value) {
+    return '$value km';
+  }
+
+  @override
+  String get trailAvgSpeed => 'Average speed';
+
+  @override
+  String trailSpeedKmh(String value) {
+    return '$value km/h';
+  }
+
+  @override
+  String get trailLastFix => 'Last position';
+
+  @override
+  String get trailFirstFix => 'First position';
+
+  @override
+  String get trailOpenFull => 'View full route';
+
+  @override
+  String get trailPointStart => 'Start';
+
+  @override
+  String get trailPointEnd => 'End';
+
+  @override
+  String get trailPointTrack => 'On the way';
+
+  @override
+  String get trailPointManual => 'Added manually';
+
+  @override
+  String trailAccuracy(String meters) {
+    return '±$meters m';
+  }
+
+  @override
+  String trailPendingUploads(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count positions waiting to upload',
+      one: '1 position waiting to upload',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get trailUploadNow => 'Upload now';
+
+  @override
+  String trailPointsDropped(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count recorded positions could not be saved',
+      one: '1 recorded position could not be saved',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get trailPointsList => 'Positions';
+
+  @override
+  String get trailFitRoute => 'Fit route';
 }

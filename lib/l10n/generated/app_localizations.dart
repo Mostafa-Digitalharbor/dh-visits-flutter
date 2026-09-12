@@ -3157,6 +3157,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The device reported a mock (fake) GPS location when this visit was started or ended. Review it before approving.'**
   String get wfMockFlagBannerBody;
+
+  /// No description provided for @trailSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Route travelled'**
+  String get trailSectionTitle;
+
+  /// No description provided for @trailMapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'GPS trail'**
+  String get trailMapTitle;
+
+  /// No description provided for @trailEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No positions recorded yet'**
+  String get trailEmpty;
+
+  /// No description provided for @trailEmptyRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording your route — the path appears as you move'**
+  String get trailEmptyRunning;
+
+  /// No description provided for @trailEmptyFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'No positions were recorded during this visit'**
+  String get trailEmptyFinished;
+
+  /// No description provided for @trailLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording'**
+  String get trailLive;
+
+  /// No description provided for @trailPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No points} =1{1 point} other{{count} points}}'**
+  String trailPoints(int count);
+
+  /// No description provided for @trailDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance'**
+  String get trailDistance;
+
+  /// No description provided for @trailDistanceKm.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} km'**
+  String trailDistanceKm(String value);
+
+  /// No description provided for @trailAvgSpeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Average speed'**
+  String get trailAvgSpeed;
+
+  /// No description provided for @trailSpeedKmh.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} km/h'**
+  String trailSpeedKmh(String value);
+
+  /// No description provided for @trailLastFix.
+  ///
+  /// In en, this message translates to:
+  /// **'Last position'**
+  String get trailLastFix;
+
+  /// No description provided for @trailFirstFix.
+  ///
+  /// In en, this message translates to:
+  /// **'First position'**
+  String get trailFirstFix;
+
+  /// No description provided for @trailOpenFull.
+  ///
+  /// In en, this message translates to:
+  /// **'View full route'**
+  String get trailOpenFull;
+
+  /// No description provided for @trailPointStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get trailPointStart;
+
+  /// No description provided for @trailPointEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get trailPointEnd;
+
+  /// No description provided for @trailPointTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'On the way'**
+  String get trailPointTrack;
+
+  /// No description provided for @trailPointManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Added manually'**
+  String get trailPointManual;
+
+  /// No description provided for @trailAccuracy.
+  ///
+  /// In en, this message translates to:
+  /// **'±{meters} m'**
+  String trailAccuracy(String meters);
+
+  /// No description provided for @trailPendingUploads.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 position waiting to upload} other{{count} positions waiting to upload}}'**
+  String trailPendingUploads(int count);
+
+  /// No description provided for @trailUploadNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload now'**
+  String get trailUploadNow;
+
+  /// No description provided for @trailPointsDropped.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 recorded position could not be saved} other{{count} recorded positions could not be saved}}'**
+  String trailPointsDropped(int count);
+
+  /// No description provided for @trailPointsList.
+  ///
+  /// In en, this message translates to:
+  /// **'Positions'**
+  String get trailPointsList;
+
+  /// No description provided for @trailFitRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit route'**
+  String get trailFitRoute;
 }
 
 class _AppLocalizationsDelegate

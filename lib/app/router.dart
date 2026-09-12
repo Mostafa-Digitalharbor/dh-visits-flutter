@@ -21,6 +21,7 @@ import '../features/server_config/view/server_setup_page.dart';
 import '../features/visits/data/models/visit.dart';
 import '../features/visits/view/create_visit_page.dart';
 import '../features/visits/view/visit_detail_page.dart';
+import '../features/visits/view/visit_trail_page.dart';
 import 'routes.dart';
 import 'transitions.dart';
 
@@ -153,6 +154,23 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
             state,
             VisitDetailPage(visitId: id, initial: initial),
           );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.visitTrailPath,
+        pageBuilder: (_, state) {
+          // The visit travels as `extra`: the trail page needs its state (is it
+          // still running?) to decide whether to poll, and re-reading the
+          // record here just to learn that would put a spinner in front of a
+          // map we can already draw. A direct hit with no `extra` — a pasted
+          // link — has nothing to show, so it bounces to the detail page, which
+          // knows how to load the visit and offers the trail from there.
+          final visit = state.extra is Visit ? state.extra as Visit : null;
+          if (visit == null) {
+            final id = int.parse(state.pathParameters['id']!);
+            return slideTransition(state, VisitDetailPage(visitId: id));
+          }
+          return slideTransition(state, VisitTrailPage(visit: visit));
         },
       ),
     ],

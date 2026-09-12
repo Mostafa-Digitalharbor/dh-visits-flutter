@@ -19,9 +19,20 @@ import '../../features/customers/data/customers_repository.dart';
 import '../../features/employees/data/employees_repository.dart';
 import '../../features/live_location/data/live_location_repository.dart';
 import '../../features/nearby/data/nearby_repository.dart';
+import '../../features/visits/data/visit_trail_tracker.dart';
 import '../../features/visits/data/visits_repository.dart';
 
 final GetIt sl = GetIt.instance;
+
+/// Resolves [T] from the locator, or null when nothing is registered for it.
+///
+/// The app registers everything in [setupServiceLocator], but a widget test
+/// registers only what the screen under test actually needs. A screen reaching
+/// for an *optional* collaborator — the GPS-trail tracker, which a detail page
+/// renders without but works better with — must degrade to "not available"
+/// instead of throwing `GetIt: not registered` out of a `BlocProvider.create`,
+/// which takes the whole screen down rather than the one feature.
+T? slMaybe<T extends Object>() => sl.isRegistered<T>() ? sl<T>() : null;
 
 Future<void> setupServiceLocator() async {
   final dir = await getApplicationSupportDirectory();
@@ -75,4 +86,17 @@ Future<void> setupServiceLocator() async {
   );
   queue.startBackgroundFlush();
   sl.registerSingleton<PendingActionsQueue>(queue);
+
+  // Collects the GPS trail while a visit is running. Registered after the
+  // queue because it consults it before every flush: points for a visit whose
+  // Start is still queued offline have nothing to attach to server-side.
+  // Resolved lazily through a closure rather than passed directly so the
+  // dependency stays one-way — the queue knows nothing about the tracker.
+  sl.registerSingleton<VisitTrailTracker>(VisitTrailTracker(
+    prefs: prefs,
+    repository: sl<VisitsRepository>(),
+    locationService: sl<LocationService>(),
+    connectivity: connectivity,
+    pendingActions: () => sl<PendingActionsQueue>(),
+  ));
 }

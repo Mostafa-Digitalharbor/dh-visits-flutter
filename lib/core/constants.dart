@@ -19,6 +19,49 @@ class AppConstants {
   /// Even if not moving, send at least this often to stay "online" server-side.
   static const Duration locationHeartbeatInterval = Duration(minutes: 2);
 
+  // ---- Visit GPS trail ----
+  // The thread drawn on the map between a visit's Start and End. Tuned for a
+  // rep moving by car through a city: dense enough that the path follows the
+  // road, sparse enough that an hour of driving is a few hundred points rather
+  // than a few thousand.
+
+  /// Minimum movement between two kept fixes. Also the position stream's
+  /// `distanceFilter`, so most samples are discarded by the OS before they ever
+  /// reach the app.
+  static const double trailMinDistanceMeters = 20.0;
+
+  /// Minimum time between two kept fixes, applied together with the distance
+  /// rule so crawling traffic doesn't pack the path with near-identical points.
+  static const Duration trailMinInterval = Duration(seconds: 20);
+
+  /// A fix less certain than this is discarded rather than drawn: it would put
+  /// a vertex hundreds of metres off the route and inflate the server's
+  /// `tracked_distance_km` along with it.
+  static const double trailMaxAccuracyMeters = 100.0;
+
+  /// How often the buffered fixes are pushed to the server.
+  static const Duration trailFlushInterval = Duration(minutes: 2);
+
+  /// Buffer size that triggers an immediate flush without waiting for the timer.
+  static const int trailFlushBatchSize = 20;
+
+  /// Upper bound on one `log_locations` call, so a long offline stretch uploads
+  /// across several requests instead of one that times out.
+  static const int trailMaxBatchSize = 100;
+
+  /// Hard ceiling on the on-device buffer (~10h of driving at the sampling
+  /// rates above). Past this the oldest fixes are dropped: the recent path is
+  /// the part still worth uploading.
+  static const int trailMaxBufferedPoints = 2000;
+
+  /// How many times a batch the server *refuses* is retried before its points
+  /// are abandoned. Covers the window where a Start is still replaying from the
+  /// offline queue, without retrying a genuinely impossible point forever.
+  static const int trailMaxFlushAttempts = 5;
+
+  /// How often an open trail screen re-reads a visit that is still running.
+  static const Duration trailLiveRefreshInterval = Duration(seconds: 30);
+
   static const double defaultRadiusMeters = 10.0;
   static const double defaultMapZoom = 19.0;
 

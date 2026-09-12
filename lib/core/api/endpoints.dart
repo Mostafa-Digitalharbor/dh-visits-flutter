@@ -40,6 +40,22 @@ class Endpoints {
   static const String visitEnd = '/api/visit/end';
   static const String visitUploadAttachment = '/api/visit/upload_attachment';
 
+  // Attendee (track-2) approval. The participant lines are also actionable via
+  // `call_kw` on `dh.visit.participant`, which is what this app used before the
+  // module exposed these routes; `VisitsRepository` still falls back to that
+  // path when a server predates them.
+  static const String visitAttendeeApprove = '/api/visit/attendee/approve';
+  static const String visitAttendeeReject = '/api/visit/attendee/reject';
+
+  // ---- GPS trail (append-only path between start and end) -----------------
+  // `log_location` posts a single fix; `log_locations` flushes a buffer in one
+  // round trip and reports malformed points individually (by their index in the
+  // request) so one bad fix never costs the rest of the queue. `track` reads the
+  // trail back, always oldest-first, ready to feed straight into a polyline.
+  static const String visitLogLocation = '/api/visit/log_location';
+  static const String visitLogLocations = '/api/visit/log_locations';
+  static const String visitTrack = '/api/visit/track';
+
   // ---- Push notifications (device token registration) ---------------------
   // The app registers its FCM token after login so the backend can push visit
   // workflow events. See docs/BACKEND_PUSH_NOTIFICATIONS.md.

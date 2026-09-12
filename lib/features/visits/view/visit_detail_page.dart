@@ -3,22 +3,27 @@ import 'package:flutter/material.dart';
 import '../../../app/design/app_dimens.dart';
 import '../../../app/design/responsive.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/design/app_colors.dart';
+import '../../../app/routes.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/app_refresh_indicator.dart';
 import '../../../shared/widgets/error_view.dart';
 import '../bloc/visit_bloc.dart' hide VisitState;
 import '../bloc/visit_detail_cubit.dart';
+import '../bloc/visit_trail_cubit.dart';
 import '../bloc/visits_list_bloc.dart';
 import '../data/models/visit.dart';
+import '../data/visit_trail_tracker.dart';
 import '../data/visits_repository.dart';
 import 'visit_action_bar.dart';
 import 'visit_attachments_section.dart';
 import 'visit_detail_sections.dart';
 import 'visit_hero_header.dart';
 import 'visit_map_card.dart';
+import 'visit_trail_section.dart';
 
 class VisitDetailPage extends StatelessWidget {
   final int visitId;
@@ -27,10 +32,27 @@ class VisitDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) =>
-          VisitDetailCubit(repository: sl<VisitsRepository>(), visitId: visitId)
-            ..load(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => VisitDetailCubit(
+            repository: sl<VisitsRepository>(),
+            visitId: visitId,
+          )..load(),
+        ),
+        BlocProvider(
+          // `live` is seeded from whatever the caller already knows. A visit
+          // opened from the list as `approved` and started from this very page
+          // is handled by the reload below, which recreates nothing but does
+          // refetch the trail after every action.
+          create: (_) => VisitTrailCubit(
+            repository: sl<VisitsRepository>(),
+            tracker: slMaybe<VisitTrailTracker>(),
+            visitId: visitId,
+            live: initial?.isTrackingLive ?? false,
+          )..load(),
+        ),
+      ],
       child: _VisitDetailView(initial: initial),
     );
   }
@@ -101,6 +123,16 @@ class _VisitDetailView extends StatelessWidget {
         // named `'attachment'` — so every upload refetched the whole list.)
         if (action != 'attachment') {
           context.read<VisitsListBloc>().add(const VisitsListLoadRequested());
+        }
+
+        // Start and End each write a point onto the trail server-side (the
+        // first and the last), so the drawn path is stale the moment either
+        // lands. Everything else leaves it untouched.
+        if (action == 'start' ||
+            action == 'end' ||
+            action == 'start_queued' ||
+            action == 'end_queued') {
+          context.read<VisitTrailCubit>().load(silent: true);
         }
 
         // Keep the persistent bar in sync with Start/End.
@@ -182,7 +214,13 @@ class _VisitDetailBodyState extends State<_VisitDetailBody> {
                 const VisitMockLocationBanner(),
               ],
               context.gapH(Insets.x3h),
-              VisitMapCard(visit: visit),
+              BlocBuilder<VisitTrailCubit, VisitTrailState>(
+                builder: (context, trail) => VisitMapCard(
+                  visit: visit,
+                  trail: trail.track,
+                  onOpenTrail: () => _openTrail(context, visit),
+                ),
+              ),
               context.gapH(Insets.x3h),
               VisitInfoSection(visit: visit),
               context.gapH(Insets.x3h),
@@ -190,6 +228,11 @@ class _VisitDetailBodyState extends State<_VisitDetailBody> {
               if (visit.startDatetime != null) ...[
                 context.gapH(Insets.x3h),
                 VisitExecutionSection(visit: visit),
+                context.gapH(Insets.x3h),
+                VisitTrailSection(
+                  visit: visit,
+                  onOpenTrail: () => _openTrail(context, visit),
+                ),
               ],
               if (visit.participants.isNotEmpty) ...[
                 context.gapH(Insets.x3h),
@@ -234,6 +277,12 @@ class _VisitDetailBodyState extends State<_VisitDetailBody> {
       ],
     );
   }
+}
+
+/// Opens the full-screen trail, handing the visit over so the page knows
+/// whether it is watching a live route or reading a finished one.
+void _openTrail(BuildContext context, Visit visit) {
+  context.push(AppRoutes.visitTrail(visit.id), extra: visit);
 }
 
 /// Reports its child's rendered height via [onChange] after each layout.

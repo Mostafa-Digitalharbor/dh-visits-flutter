@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 
@@ -6,6 +8,7 @@ import '../../../core/di/service_locator.dart';
 import '../../../core/network/pending_actions_queue.dart';
 import '../data/models/visit.dart';
 import '../data/models/visit_attachment.dart';
+import '../data/visit_trail_tracker.dart';
 import '../data/visits_repository.dart';
 
 enum VisitDetailStatus { loading, ready, acting, error }
@@ -85,8 +88,20 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
   final VisitsRepository repository;
   final int visitId;
 
-  VisitDetailCubit({required this.repository, required this.visitId})
-      : super(const VisitDetailState());
+  /// Collects the GPS trail between Start and End. Injectable, and resolved
+  /// from the locator only when it is actually registered: a cubit under test
+  /// exercises the workflow without a tracker, and a hard `sl<>()` lookup in
+  /// [start] / [end] threw `GetIt: not registered` before either action ran.
+  final VisitTrailTracker? _tracker;
+
+  VisitDetailCubit({
+    required this.repository,
+    required this.visitId,
+    VisitTrailTracker? tracker,
+  })  : _tracker = tracker,
+        super(const VisitDetailState());
+
+  VisitTrailTracker? get _trail => _tracker ?? slMaybe<VisitTrailTracker>();
 
   /// Guards every post-`await` emit. Each action here is fire-and-forget from
   /// an `onPressed`, so the user can pop the page (disposing the cubit) while
@@ -286,22 +301,29 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
     required double longitude,
     String? location,
     bool isMocked = false,
-  }) =>
-      _runQueueable(
-        'start',
-        {
-          'type': 'start',
-          'latitude': latitude,
-          'longitude': longitude,
-          if (location != null) 'location': location,
-          if (isMocked) 'is_mocked': true,
-        },
-        () => repository.start(visitId,
-            latitude: latitude,
-            longitude: longitude,
-            location: location,
-            isMocked: isMocked),
-      );
+  }) async {
+    final ok = await _runQueueable(
+      'start',
+      {
+        'type': 'start',
+        'latitude': latitude,
+        'longitude': longitude,
+        if (location != null) 'location': location,
+        if (isMocked) 'is_mocked': true,
+      },
+      () => repository.start(visitId,
+          latitude: latitude,
+          longitude: longitude,
+          location: location,
+          isMocked: isMocked),
+    );
+    // The trail starts the moment the visit does — including when the Start
+    // itself only reached the offline queue. The fixes buffer on the device and
+    // upload once the queued Start has replayed, which is the whole reason the
+    // tracker checks that queue before it flushes.
+    if (ok) unawaited(_trail?.start(visitId) ?? Future<void>.value());
+    return ok;
+  }
 
   /// See [start] on why the coordinates are required.
   Future<bool> end({
@@ -310,24 +332,35 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
     required double longitude,
     String? location,
     bool isMocked = false,
-  }) =>
-      _runQueueable(
-        'end',
-        {
-          'type': 'end',
-          'outcome': outcome,
-          'latitude': latitude,
-          'longitude': longitude,
-          if (location != null) 'location': location,
-          if (isMocked) 'is_mocked': true,
-        },
-        () => repository.end(visitId,
-            outcome: outcome,
-            latitude: latitude,
-            longitude: longitude,
-            location: location,
-            isMocked: isMocked),
-      );
+  }) async {
+    if (_busy) return false;
+    final tracker = _trail;
+    // Push what is still buffered *before* the visit closes. A late flush is
+    // supported — the server accepts a point transmitted after the end as long
+    // as its `logged_at` falls inside the start–end window — but the End also
+    // stamps `end_datetime`, so anything sampled during the request itself
+    // would land outside it and be refused for good.
+    await tracker?.flushNow();
+    final ok = await _runQueueable(
+      'end',
+      {
+        'type': 'end',
+        'outcome': outcome,
+        'latitude': latitude,
+        'longitude': longitude,
+        if (location != null) 'location': location,
+        if (isMocked) 'is_mocked': true,
+      },
+      () => repository.end(visitId,
+          outcome: outcome,
+          latitude: latitude,
+          longitude: longitude,
+          location: location,
+          isMocked: isMocked),
+    );
+    if (ok) await tracker?.stop();
+    return ok;
+  }
 
   /// Like [_run] but for the GPS-stamped Start / End actions: if the network is
   /// down we persist the action to the offline queue and report a soft success
