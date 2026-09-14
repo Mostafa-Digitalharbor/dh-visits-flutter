@@ -27,8 +27,12 @@ import '../../visits/bloc/visit_bloc.dart';
 import '../../visits/bloc/visits_list_bloc.dart';
 import '../../visits/view/persistent_visit_bar.dart';
 import '../../visits/view/visits_list_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../workday/bloc/workday_cubit.dart';
 import '../../workday/data/workday_tracker.dart';
 import '../../workday/view/workday_bar.dart';
+import '../../workday/view/workday_disclosure_dialog.dart';
 
 /// Root shell after login. Branches on the user's role:
 ///
@@ -103,6 +107,20 @@ class _HomeShellState extends State<HomeShell> {
       unawaited(workday?.restore(
         notificationTitle: context.s.workdayNotificationTitle,
         notificationText: context.s.workdayNotificationText,
+        // Restoring resumes background recording. On an install that has not
+        // shown the disclosure yet (a day started on another device, or before
+        // the disclosure existed) it is shown first, exactly as on Start.
+        beforeCapture: () async {
+          final prefs = slMaybe<SharedPreferences>();
+          if (prefs == null ||
+              (prefs.getBool(WorkdayCubit.disclosureKey) ?? false)) {
+            return true;
+          }
+          if (!mounted) return false;
+          final agreed = await WorkdayDisclosureDialog.show(context);
+          if (agreed) await prefs.setBool(WorkdayCubit.disclosureKey, true);
+          return agreed;
+        },
       ));
       final user = context.read<AuthBloc>().state.user;
       final isManager = user?.canEditVisits ?? false;

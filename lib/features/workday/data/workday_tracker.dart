@@ -144,6 +144,12 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
   int? _userId;
   bool _unsupported = false;
   bool _capturing = false;
+
+  /// True while a restored day waits for the user's agreement to the
+  /// background-location disclosure, and after they declined it: no app resume
+  /// may start capture meanwhile. Cleared when capture starts legitimately
+  /// (Start, or Retry after agreeing) and on sign-out.
+  bool _consentHeld = false;
   bool _disposed = false;
   String? _deviceIdValue;
   Timer? _drainTimer;
@@ -194,10 +200,19 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
   /// Restores the work day after login or an app restart: resumes capture for
   /// a day still open on this device, adopts one still open on the server
   /// (never creating a second), and uploads whatever is waiting.
+  ///
+  /// [beforeCapture] runs right before capture resumes; returning false keeps
+  /// the day open but not recording (the work-day bar then offers Retry). The
+  /// shell uses it to show the background-location disclosure on an install
+  /// that has not shown it yet, e.g. a day started on another device.
   Future<void> restore({
     required String notificationTitle,
     required String notificationText,
+    Future<bool> Function()? beforeCapture,
   }) async {
+    // Set before the first await: an app resume while this runs (a permission
+    // prompt closing) must not start capture ahead of the user's answer.
+    _consentHeld = beforeCapture != null;
     final user = await _currentUser();
     if (user == null) return;
     _userId = user.uid;
@@ -252,12 +267,25 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
         ..title = notificationTitle
         ..text = notificationText;
       await _saveDay(day);
-      if (await locationService.ensurePermission()) {
-        await _startCapture(day);
-      } else {
+      // Disclosure before any permission prompt, as on Start. Declining keeps
+      // the day open but not recording (the bar offers Retry), and the hold
+      // stops app resumes from starting capture meanwhile.
+      if (beforeCapture != null && !await beforeCapture()) {
+        await _stopCapture();
         _capturing = false;
-        appLog('[WorkdayTracker] location permission missing; capture paused');
+        _consentHeld = true;
+        appLog('[WorkdayTracker] disclosure not accepted on this install; capture paused');
+      } else {
+        _consentHeld = false;
+        if (!await locationService.ensurePermission()) {
+          _capturing = false;
+          appLog('[WorkdayTracker] location permission missing; capture paused');
+        } else {
+          await _startCapture(day);
+        }
       }
+    } else {
+      _consentHeld = false;
     }
     if (_readDays().isNotEmpty) _startTimers();
     _publish();
@@ -389,6 +417,7 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
     _flushTimer?.cancel();
     _flushTimer = null;
     _userId = null;
+    _consentHeld = false;
     _publish();
   }
 
@@ -432,6 +461,9 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
   // ---------------------------------------------------------------------------
 
   Future<void> _startCapture(_DayRecord day) async {
+    // Every caller has the user's agreement (Start after the disclosure, or a
+    // restore that passed it); the resume path checks [_consentHeld] first.
+    _consentHeld = false;
     if (channel.isAvailable) {
       try {
         final st = await channel.status();
@@ -473,6 +505,8 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
   /// The system may have killed the service with the process; bring it back
   /// when the app is opened again.
   Future<void> _ensureNativeRunning(_DayRecord day) async {
+    // Waiting for, or refused, the disclosure on this install: nothing starts.
+    if (_consentHeld) return;
     await _guard('ensure capture', () async {
       final st = await channel.status();
       if (st.active && st.running) return;
@@ -550,6 +584,24 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
     }());
   }
 
+  static const String _installKey = 'workday_install_v1';
+
+  /// Random per install, cleared with the app's data. Native fix uids carry
+  /// it because the capture journal's sequence restarts at 1 after a reinstall
+  /// or a data clear: a plain `<day>-<seq>` would then repeat a uid the server
+  /// already holds for the same day, and the backend's unique index would
+  /// discard the new fix as a duplicate.
+  Future<String> _installToken() async {
+    final saved = prefs.getString(_installKey);
+    if (saved != null) return saved;
+    final r = Random.secure();
+    final token = [
+      for (var i = 0; i < 4; i++) r.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ].join();
+    await prefs.setString(_installKey, token);
+    return token;
+  }
+
   Future<void> _drain() async {
     if (!channel.isAvailable) return;
     final List<CapturedFix> fixes;
@@ -561,6 +613,7 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
     }
     if (fixes.isEmpty) return;
 
+    final install = await _installToken();
     final lastSeq = prefs.getInt(_seqKey) ?? 0;
     final days = _readDays();
     final taken = <WorkdayPoint>[];
@@ -592,7 +645,7 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
         deviceId: _deviceIdValue,
       );
       taken.add(WorkdayPoint(
-        uid: '${day.uid}-${f.seq}',
+        uid: '${day.uid}-$install-${f.seq}',
         sessionUid: day.uid,
         visitId: f.visitId,
         source: WorkdayPointSource.track,

@@ -137,10 +137,17 @@ class _WorkdayBarBody extends StatelessWidget {
           );
         } else if (active && !status.capturing) {
           action = TextButton(
-            onPressed: () => cubit.resumeCapture(
-              notificationTitle: s.workdayNotificationTitle,
-              notificationText: s.workdayNotificationText,
-            ),
+            onPressed: () async {
+              // Resuming records in the background: disclosure first, as on Start.
+              if (!cubit.disclosureAccepted) {
+                if (!await WorkdayDisclosureDialog.show(context)) return;
+                await cubit.acceptDisclosure();
+              }
+              await cubit.resumeCapture(
+                notificationTitle: s.workdayNotificationTitle,
+                notificationText: s.workdayNotificationText,
+              );
+            },
             child: Text(s.commonRetry),
           );
         } else if (active) {

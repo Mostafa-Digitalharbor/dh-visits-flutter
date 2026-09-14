@@ -86,6 +86,15 @@ contract: [backend/dh_workday_tracking/README.md](../backend/dh_workday_tracking
   the days and points of employees below them in the `hr.employee` hierarchy
   (`child_of`, evaluated at query time); Visit Administrator reads all and may
   close a day; multi-company rule on both models.
+- **Manager scope vs. the real module (read over RPC, 2026-09-14):**
+  `dh.visit.manager_user_ids` on the real `dh_visit_management` 19.0.2.1.0 is a
+  stored many2many that is not always the HR hierarchy: on the regression
+  server 13 of 15 visits match it, but two visits of an employee with no HR
+  manager list a manager explicitly. A work day deliberately follows the HR
+  hierarchy only — being added to one visit does not expose that employee's
+  whole-day movements. If the business wants visit managers to see the day
+  too, that is a product decision for the manager rule in
+  `security/workday_security.xml`, not a fix.
 
 **Verified** on a local Odoo 19 (community) with a test stub of
 `dh_visit_management` (its groups, `dh.visit` and record rules as probed on the
@@ -139,7 +148,12 @@ module. They never existed in production, so no production data migrates.
    every journal write, and the day's start position is seeded as the first.
    Capture restarted by the system or after the process died continues from
    it, so the cached position is not recorded again. Each queued point keeps
-   its client id (`<session>-<seq>`), and the server dedupes on it.
+   its client id (`<session>-<install>-<seq>`), and the server dedupes on it.
+   `<install>` is a random token kept with the app's data
+   (`workday_install_v1`): after a reinstall or data clear mid-day the journal
+   numbers fixes from 1 again, and a plain `<session>-<seq>` then repeated uids
+   the server already held — the real module's unique index would discard
+   those fixes as duplicates (found in the 2026-09-14 Android E2E).
 3. **Drain (every 15 s while the process lives, on resume/pause, before a visit
    ends):** journal → persistent queue (SharedPreferences), `logged_at`
    converted to server time with `ServerClock`; visit-stamped fixes also go to
@@ -270,6 +284,15 @@ recorded GPS fixes (server, unchanged) → RouteMatcher → OSRM /match → draw
    is bumped): `WorkdayDisclosureDialog` — what is collected, background and
    locked screen, when it stops, offline storage, road matching, the Android
    notification / the iOS "Always" choice. **Not now** requests nothing.
+   The same dialog is shown before recording resumes for a day **restored**
+   on an install that has not accepted it (`WorkdayTracker.restore`'s
+   `beforeCapture`, passed by the home shell): a day started on another
+   device, or a reinstall mid-day. The disclosure comes before the location
+   permission check, and while it is open — or after it was declined — no
+   app resume restarts capture (`_consentHeld` blocks `_ensureNativeRunning`).
+   Declining keeps the day open but not recording; **Retry** on the bar shows
+   the dialog again. Found in the 2026-09-14 Android E2E on a clean install:
+   before this, capture started behind the dialog.
 2. Location permission (While Using) through geolocator. Denied → message;
    permanently denied → Settings; location services off → message.
 3. Approximate only → iOS temporary full accuracy request; still approximate →

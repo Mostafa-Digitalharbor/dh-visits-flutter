@@ -8,6 +8,7 @@
 // * End: capture stops first, and not one point is recorded afterwards.
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:location_gps/core/api/api_exceptions.dart';
@@ -477,6 +478,39 @@ void main() {
     second.dispose();
   });
 
+  test('a reinstall in the middle of a day never reuses a fix uid the server '
+      'already holds', () async {
+    final prefs = await SharedPreferences.getInstance();
+    final server = _Server();
+    final first = _rig(prefs, server, _Channel());
+    await _startDay(first.day);
+    await _tick();
+    final oldChannel = first.day.channel as _Channel;
+    oldChannel.capture(24.7010, 46.6010); // journal seq 1
+    await first.day.drain();
+    await first.day.flushNow();
+    first.dispose();
+
+    // App data cleared: local days, queue and journal position are gone, and
+    // the new install's journal numbers its fixes from 1 again.
+    await prefs.clear();
+    final channel = _Channel();
+    final second = _rig(prefs, server, channel);
+    await second.day.restore(notificationTitle: 't', notificationText: 'x');
+    await _tick();
+    channel.capture(24.7020, 46.6020); // journal seq 1 again
+    await second.day.drain();
+    await second.day.flushNow();
+
+    final uids = server.points.map((p) => p.point.uid).toList();
+    expect(uids.toSet().length, uids.length, reason: 'uids stay unique: $uids');
+    expect(server.points.map((p) => p.point.point.latitude),
+        containsAll([24.7010, 24.7020]),
+        reason: 'the fix after the reinstall is stored, not dropped');
+    expect(server.createSessionCalls, 1);
+    second.dispose();
+  });
+
   test('a work day open on the server is adopted, not duplicated', () async {
     final prefs = await SharedPreferences.getInstance();
     final server = _Server()
@@ -495,6 +529,69 @@ void main() {
     await rig.day.flushNow();
     expect(server.createSessionCalls, 0);
     expect(server.points.single.session, 7);
+    rig.dispose();
+  });
+
+  test('a restored work day records nothing until this install has agreed to '
+      'the disclosure', () async {
+    final prefs = await SharedPreferences.getInstance();
+    final server = _Server()
+      ..sessions[7] = _StoredSession(7, 'wd-other-device', DateTime.utc(2026, 9, 13, 8));
+    final channel = _Channel();
+    final rig = _rig(prefs, server, channel);
+
+    await rig.day.restore(
+      notificationTitle: 't',
+      notificationText: 'x',
+      beforeCapture: () async => false,
+    );
+    expect(rig.day.status.value.isActive, isTrue, reason: 'the day stays open');
+    expect(rig.day.status.value.capturing, isFalse);
+    expect(channel.starts, 0, reason: 'no background capture without agreement');
+
+    await rig.day.restore(
+      notificationTitle: 't',
+      notificationText: 'x',
+      beforeCapture: () async => true,
+    );
+    expect(rig.day.status.value.capturing, isTrue);
+    expect(channel.starts, 1);
+    expect(channel.session, 'wd-other-device');
+    expect(server.createSessionCalls, 0);
+    rig.dispose();
+  });
+
+  test('no app resume starts capture while the disclosure is pending or after '
+      'it was declined', () async {
+    final prefs = await SharedPreferences.getInstance();
+    final server = _Server()
+      ..sessions[7] = _StoredSession(7, 'wd-other-device', DateTime.utc(2026, 9, 13, 8));
+    final channel = _Channel();
+    final rig = _rig(prefs, server, channel);
+
+    await rig.day.restore(
+      notificationTitle: 't',
+      notificationText: 'x',
+      beforeCapture: () async {
+        // A permission prompt closing resumes the app while the user is still
+        // reading the disclosure.
+        rig.day.didChangeAppLifecycleState(AppLifecycleState.resumed);
+        await _tick();
+        expect(channel.starts, 0, reason: 'nothing starts before the answer');
+        return false;
+      },
+    );
+    rig.day.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await _tick();
+    expect(channel.starts, 0, reason: 'a declined disclosure holds across resumes');
+    expect(rig.day.status.value.isActive, isTrue);
+
+    // Retry on the bar, after agreeing there.
+    await rig.day.restore(notificationTitle: 't', notificationText: 'x');
+    expect(channel.starts, 1);
+    rig.day.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await _tick();
+    expect(channel.starts, 1, reason: 'running capture is left alone');
     rig.dispose();
   });
 

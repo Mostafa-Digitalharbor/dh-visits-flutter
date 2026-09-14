@@ -85,7 +85,9 @@ Play requires an in-app disclosure, shown before the runtime permission
 prompt, when location is used in a way users might not expect — continuing in
 the background qualifies. Implemented in
 `lib/features/workday/view/workday_disclosure_dialog.dart`, shown before the
-first Start work day (and again if the text version changes), with an
+first Start work day (and again if the text version changes), and also before
+recording resumes for a work day restored on an install that has not shown it
+yet (a day started on another device, or a reinstall mid-day), with an
 explicit **Agree and continue** / **Not now**. Text (English; Arabic in
 `app_ar.arb`):
 
