@@ -70,13 +70,20 @@ iPad Air 11″ — وشاشة الإعداد على الآيباد بيظهر ت
   (planned / in progress / done / submitted للموافقة)
 - زيارة واحدة على الأقل مكتملة بإحداثيات بداية ونهاية عشان الخريطة والنطاق يبانوا
 
+> **تحديث أمني 2026-09-14:** كلمة مرور `admin` لهذه النسخة كانت مكتوبة هنا ودخلت
+> تاريخ Git (commits `4a7b540` و`7412701`)، فهي تُعامَل كمكشوفة، واتشالت من الملف.
+> النسخة `thedigitalharbor-dh-visits-new.odoo.com` نفسها بترجع 404 على كل المسارات
+> (قاعدة البيانات مش موجودة)، والكلمة القديمة مرفوضة على `visits-dhh`. لو القاعدة
+> اترجعت من backup أو اتعملت نسخة مراجعة جديدة: كلمة مرور جديدة قوية، محفوظة في
+> password manager الشركة، وتتكتب في App Store Connect مباشرة — **مش في الريبو**.
+
 **القيم المعتمدة (متأكَّد منها بطلب `/web/session/authenticate` يوم 2026-08-09 —
 رجع `uid: 2` و`is_admin: true` على Odoo 19):**
 
 ```
 Server address : https://thedigitalharbor-dh-visits-new.odoo.com
 Database       : thedigitalharbor-dh-visits-new-main-35787218
-Login          : admin  /  2kPTclrLkh66DYmBCAFA
+Login          : admin  /  ‹from the team password manager — never in Git›
 ```
 
 الحساب ده صلاحياته مدير، فالمراجع هيشوف شاشات المندوب وشاشات المدير من نفس
@@ -157,7 +164,7 @@ bash store/photo/tools/ios_shots.sh          # iPhone 16 Pro Max → 1290×2796
 | الخانة | القيمة |
 |---|---|
 | User name | `admin` |
-| Password | `2kPTclrLkh66DYmBCAFA` |
+| Password | `‹from the team password manager — never in Git›` |
 
 > الخانتين دول لوحدهم **مش كفاية** — البند 2.1 اترفض بالظبط عشان كده. عنوان
 > السيرفر واسم الـ database لازم يبقوا في الـ Notes تحت، لأن أول شاشة في التطبيق
@@ -196,7 +203,7 @@ HOW TO SIGN IN (please follow these exact steps)
 5. Sign in with:
 
        Email / Username: admin
-       Password:         2kPTclrLkh66DYmBCAFA
+       Password:         ‹from the team password manager — never in Git›
 
 6. When the location permission prompt appears, please tap Allow. The app opens
    without it, but a visit cannot be checked in, which is the core feature.
@@ -271,7 +278,7 @@ Information notes, with step-by-step instructions. In short:
   Database       : thedigitalharbor-dh-visits-new-main-35787218
                    (the "Detect database" button fills this in automatically)
   Email / Username: admin
-  Password        : 2kPTclrLkh66DYmBCAFA
+  Password        : ‹from the team password manager — never in Git›
 
 The account has manager rights, so every screen — visits, GPS check-in/out, the team
 dashboard, and analytics — is reachable from it. The demo server stays online until
