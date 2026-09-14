@@ -59,6 +59,21 @@ if ($defines.Count -gt 0) {
     Write-Host "No backend seeded - the app will open on the server-setup screen." -ForegroundColor Yellow
 }
 
+# Road matching for route display: the company-controlled OSRM server
+# (docs/MAP_MATCHING_DEPLOYMENT.md). Unset = routes drawn as recorded GPS.
+# A release build never uses a public demo router, so refuse one here.
+#   $env:MAP_MATCHING_URL = 'https://osrm.yourcompany.com'
+if ($env:MAP_MATCHING_URL -match 'project-osrm\.org|routing\.openstreetmap\.de') {
+    throw 'MAP_MATCHING_URL points at a public OSRM demo server; use the company server.'
+}
+if ($env:MAP_MATCHING_URL) {
+    $defines += "--dart-define=MAP_MATCHING_URL=$($env:MAP_MATCHING_URL)"
+    Write-Host "Road matching -> $($env:MAP_MATCHING_URL)" -ForegroundColor Cyan
+} else {
+    Write-Host "Road matching -> off (no MAP_MATCHING_URL); routes show recorded GPS." -ForegroundColor Yellow
+}
+if ($env:MAP_MATCHING_MAX_POINTS) { $defines += "--dart-define=MAP_MATCHING_MAX_POINTS=$($env:MAP_MATCHING_MAX_POINTS)" }
+
 # Flavour tags every Sentry event, so keep it alongside the DSN.
 $defines += "--dart-define=APP_FLAVOR=$appFlavor"
 $defines += "--dart-define=SENTRY_TRACES_PERCENT=$tracesPct"

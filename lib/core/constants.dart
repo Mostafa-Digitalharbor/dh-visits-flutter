@@ -62,6 +62,44 @@ class AppConstants {
   /// How often an open trail screen re-reads a visit that is still running.
   static const Duration trailLiveRefreshInterval = Duration(seconds: 30);
 
+  // ---- Work-day route ----
+  // The employee's movement for the whole of a work day, visits included. One
+  // location source feeds both it and a running visit's trail. Batch sizes are
+  // the visit trail's above; sampling is denser, because the drawn route is
+  // matched to roads and needs the turns to be in the data.
+
+  /// Server models holding the work day and its points. See WorkdayRepository.
+  static const String workSessionModel = 'x_dh_work_session';
+  static const String workLocationModel = 'x_dh_work_location';
+
+  /// Minimum movement between two recorded work-day fixes. Below it a fix is
+  /// standing still (or GPS jitter), not movement.
+  static const double workdayMinDistanceMeters = 5.0;
+
+  /// Minimum time between two recorded fixes. Just under the native service's
+  /// 5 s request interval, so delivery jitter never skips a sample: while
+  /// moving, about one fix every 5 s is recorded.
+  static const Duration workdayMinInterval = Duration(seconds: 4);
+
+  /// A fix within [workdayMinInterval] of the last is still kept when it is at
+  /// least this far away. Mirrors `BURST_DISTANCE_M` in WorkdayLocationService.
+  static const double workdayBurstDistanceMeters = 15.0;
+
+  /// Fixes less certain than this are skipped: at road-matching scale a 50 m
+  /// error already puts a fix on the wrong street.
+  static const double workdayMaxAccuracyMeters = 50.0;
+
+  /// How often fixes captured by the native service are moved into the upload
+  /// queue while the app process is alive (foreground or background).
+  static const Duration workdayDrainInterval = Duration(seconds: 15);
+
+  /// How often the work-day queue is pushed to the server.
+  static const Duration workdayFlushInterval = Duration(minutes: 1);
+
+  /// Hard ceiling on the on-device work-day queue: about 11 hours of
+  /// continuous movement offline at the sampling rate above.
+  static const int workdayMaxBufferedPoints = 8000;
+
   static const double defaultRadiusMeters = 10.0;
   static const double defaultMapZoom = 19.0;
 

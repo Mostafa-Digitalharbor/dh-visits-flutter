@@ -202,16 +202,20 @@ SENTRY_TRACES_PERCENT=10
 
   KEY FEATURES:
   • Check-in / check-out at customer sites with GPS verification
+  • Work-day route: Start work day / End work day records your route,
+    including travel between visits
   • Live location sharing with your manager while using the app
   • Customer database with map view
   • Visit history and notes
   • Works offline -- queues actions and syncs when back online
   • Arabic and English support
 
-  PRIVACY:
-  This app collects your precise location ONLY while you are actively using it.
-  No background tracking. No third-party analytics. No advertising. Your data
-  goes directly to your employer's private Odoo instance.
+  PRIVACY AND LOCATION:
+  The app uses your precise location for visits and while you use it. While a
+  work day you started is active, it also records your route in the
+  background and with the screen locked, with a notification visible the whole
+  time; recording stops when you end the work day. No third-party analytics.
+  No advertising. Your data goes to your employer's own server.
 
   REQUIREMENTS:
   • Active employee account on your company's Odoo instance
@@ -241,37 +245,43 @@ SENTRY_TRACES_PERCENT=10
 
 تبويب "App content" -> "Data safety". ده اللي بيتسبب في معظم الرفض.
 
-**Data collection**:
-- ✅ **Location -> Precise location**:
+> الإجابات الكاملة (Data safety + Foreground service + الإفصاح داخل التطبيق) في
+> [store/play/location-and-foreground-service-declarations.md](../store/play/location-and-foreground-service-declarations.md).
+
+**Data collection** (الجدول الكامل في ملف الإعلانات، § 5 — ده ملخصه ولازم يفضل مطابق له):
+- ✅ **Location -> Precise location** و **Approximate location**:
   - Collected: **Yes**
-  - Shared with third parties: **No** (الـ Odoo instance بتاع الشركة مش third party)
+  - Shared with third parties: **No** (الـ Odoo بتاع الشركة وسيرفر مطابقة الطرق التابع للشركة مش third party)
   - Required: **Yes**
   - Purpose: **App functionality**
-  - **هل بتجمعها في background؟** -> **No** (مهم جداً)
-- ✅ **Personal info -> Name / Email address**:
-  - Collected: Yes (للـ login)
-  - Required: Yes
-  - Purpose: Account management
-- ✅ **App activity -> App interactions**:
-  - Collected: Yes (visit history)
-  - Purpose: App functionality
-- ❌ **Photos/Videos**: No
-- ❌ **Contacts**: No
-- ❌ **Financial info**: No
-- ❌ **Health & fitness**: No
-- ❌ **Messages**: No
-- ❌ **Files & docs**: No
-- ❌ **Calendar / Audio / Web browsing / Other**: No
+  - نموذج Data safety **مفيهوش سؤال عن الـ background**. التتبع في الخلفية أثناء يوم العمل بيتغطّى في Privacy Policy وفي إعلان Foreground service (3.6-ب) وفي الإفصاح داخل التطبيق.
+- ✅ **Personal info -> Name / Email address / User IDs**: Yes، Required، App functionality + Account management
+- ✅ **Photos and videos -> Photos**: Yes، **Optional** (صورة إثبات الزيارة من الكاميرا)
+- ✅ **Files and docs**: Yes، **Optional** (مرفق الزيارة)
+- ✅ **App activity -> Other user-generated content**: Yes (ملاحظات الزيارة)، Required، App functionality
+- ✅ **App info and performance -> Crash logs / Diagnostics**: Yes (Sentry بدون PII)
+- ✅ **Device or other IDs**: Yes (توكن FCM)
+- ❌ **Contacts / Financial info / Health & fitness / Messages / Calendar / Audio / Web browsing**: No
 
 **Data handling practices**:
 - ✅ Data is encrypted in transit (HTTPS only)
 - ✅ Users can request that their data be deleted (عبر admin شركتهم)
 
+### 3.6-ب إعلان Foreground service (Location)
+
+تبويب "App content" -> **Foreground service permissions**. مطلوب لأن التطبيق (targetSdk 35) بيعلن `FOREGROUND_SERVICE_LOCATION` لخدمة `WorkdayLocationService`:
+
+1. اختار النوع **Location**.
+2. انسخ وصف المهمة وأثر المقاطعة من ملف الإعلانات.
+3. **فيديو** (رابط unlisted) على جهاز حقيقي: Start work day → الإفصاح → الإذن → الإشعار ظاهر → Home وقفل الشاشة والحركة → فتح Today's Route → End work day والإشعار يختفي.
+
+**مش محتاج** نموذج Location permissions (background location) لأن التطبيق مش بيطلب `ACCESS_BACKGROUND_LOCATION` — الخدمة بتبدأ دايمًا والتطبيق في المقدمة.
+
 ### 3.7 املأ الـ Privacy Policy URL
 
 تبويب "App content" -> "Privacy Policy".
 
-- **URL**: `https://digital-harbor.net/privacy/visits` (بعد ما ترفع الـ `PRIVACY_POLICY.docx` على موقع الشركة، حط الـ URL هنا)
+- **URL**: `https://digitalharbor.com.sa/ar/visit-app` — الصفحة موجودة بس **لسه النسخة القديمة** ("No background tracking"، فُحصت 2026-09-14). استبدل محتواها بـ `PRIVACY_POLICY.md` / `.docx` الأول. (`digital-harbor.net/privacy/visits` بيرجع 404.)
 
 ### 3.8 ارفع الـ AAB
 
@@ -328,7 +338,7 @@ sentry-cli debug-files upload --org digital-harbor --project customer-visits-mob
 2. **+** -> App IDs -> App
 3. **Description**: Customer Visits
 4. **Bundle ID**: Explicit -> `net.digitalharbor.visits`
-5. Capabilities: مش محتاج تفعّل أي حاجة (مفيش push notifications، مفيش in-app purchases)
+5. Capabilities: فعّل **Push Notifications** (`aps-environment` في `Runner.entitlements`). الـ Background Modes (`location`، `remote-notification`) متعرّفة في `Info.plist` ومش محتاجة capability في الـ App ID. مفيش in-app purchases.
 6. Continue -> Register
 
 ### 4.3 إنشاء التطبيق في App Store Connect
@@ -353,10 +363,11 @@ sentry-cli debug-files upload --org digital-harbor --project customer-visits-mob
 
 نفس فكرة Google Data Safety بس بنموذج مختلف:
 
-- ✅ **Location -> Precise Location**:
+- ✅ **Location -> Precise Location** (و **Coarse Location**):
   - Used to: App Functionality
   - Linked to user: Yes
   - Used for tracking: **No** (مهم جداً -- "tracking" عند Apple معناه استخدامها للإعلانات، مش للمدير)
+  - التطبيق بيعلن `UIBackgroundModes = location` (تسجيل مسار يوم العمل في الخلفية) — لازم يتشرح في **App Review Notes** (4.10).
 - ✅ **Contact Info -> Name + Email Address**:
   - Used to: App Functionality
   - Linked to user: Yes
@@ -369,8 +380,10 @@ sentry-cli debug-files upload --org digital-harbor --project customer-visits-mob
   - Used to: App Functionality
   - Linked to user: Yes
   - Used for tracking: No
+- ✅ **Identifiers -> Device ID** (توكن FCM) و **User Content -> Photos or Videos** (صورة الإثبات): App Functionality، Linked، No tracking
+- ✅ **Diagnostics -> Crash Data / Performance Data** (Sentry): App Functionality، **Not linked**، No tracking
 
-كل اللي تاني: Not Collected.
+كل اللي تاني: Not Collected. الجدول المرجعي في [store/appstore/app-privacy.md](../store/appstore/app-privacy.md)، ولازم يطابق `ios/Runner/PrivacyInfo.xcprivacy` (الـ privacy manifest بتاع التطبيق: `UserDefaults` بسبب `CA92.1` + نفس أنواع البيانات).
 
 ### 4.6 إعداد Pricing & Availability
 
@@ -433,7 +446,7 @@ xcrun altool --upload-app -f build/ios/ipa/*.ipa \
    - **Sign-In Information** (مهم جداً للـ Apple reviewer):
      - Username: `reviewer@digital-harbor.net` (اعمل حساب test في الـ Odoo)
      - Password: شيء قوي بس مش حقيقي
-     - Notes: "Please use these credentials to test the app. The app requires location permission."
+     - Notes: عنوان السيرفر + الـ database + شرح استخدام الموقع في الخلفية أثناء يوم العمل — النص الجاهز في [store/appstore/listing-en.md](../store/appstore/listing-en.md) (قسم LOCATION USE).
    - **Contact Information**: اسم وإيميل
 4. **Submit for Review**
 
@@ -455,10 +468,9 @@ sentry-cli debug-files upload --org digital-harbor --project customer-visits-mob
 ### 5.1 ارفع الـ document
 
 1. الملف جاهز في [PRIVACY_POLICY.docx](PRIVACY_POLICY.docx) (و [PRIVACY_POLICY.md](PRIVACY_POLICY.md))
-2. عدّل الـ placeholders:
-   - `_Replace with the date you publish this policy_` -> التاريخ الفعلي
-3. ارفعه على موقع الشركة. خيارات:
-   - **الأبسط**: ارفع HTML أو PDF على `https://digital-harbor.net/privacy/visits/`
+2. التواريخ مكتوبة `14 September 2026`. لو نشرت في يوم تاني، غيّر **Effective date** و**Last updated** للتاريخ الفعلي وأعد توليد الـ docx (`scripts/build_privacy_policy_docx.ps1`).
+3. استبدل محتوى الصفحة المنشورة `https://digitalharbor.com.sa/ar/visit-app` (لسه النسخة القديمة اللي بتنفي التتبع في الخلفية). خيارات تانية لو لزم:
+   - HTML أو PDF على موقع الشركة (`digital-harbor.net` بيحوّل لـ `digitalharbor.com.sa`)
    - **بـ Markdown viewer**: استخدم Notion / GitBook ووفّر public link
    - **GitHub Pages**: لو مش هتلاقي مكان بسرعة، ارفع `PRIVACY_POLICY.md` لـ repo public وفعّل GitHub Pages
 
@@ -506,7 +518,8 @@ sentry-cli debug-files upload --org digital-harbor --project customer-visits-mob
 | "Data Safety doesn't match app behavior" | راجع نموذج Data Safety -- أكيد فيه حاجة معلنة غلط |
 | "App targeting older API" | غيّر `targetSdk` في `build.gradle.kts` -- لازم >= 34 |
 | "Missing privacy policy" | حط الـ URL في App content -> Privacy Policy |
-| "Background location declared but no foreground service" | **مش حالتنا** -- إحنا foreground-only |
+| "Foreground service permission declaration incomplete / video missing" | املأ App content -> Foreground service permissions بنوع Location + الفيديو (3.6-ب) |
+| "Prominent disclosure missing for location" | الإفصاح بيظهر قبل أول Start work day (`WorkdayDisclosureDialog`) — ورّيه في الفيديو |
 
 ### Apple
 
@@ -522,7 +535,7 @@ sentry-cli debug-files upload --org digital-harbor --project customer-visits-mob
 | "Guideline 2.1 - App Completeness" | فيه bug أو الـ login مش شغّال للـ reviewer -- وفّر credentials صحيحة |
 | "Guideline 4.0 - Design" | الـ UI مش متبع iOS HIG -- نادراً يحصل لتطبيق Flutter |
 | "Missing Demo Account" | لازم تحط user/pass في Sign-In Information |
-| "Background Location Usage" | مش حالتنا -- مفيش بـ `UIBackgroundModes` |
+| "Guideline 2.5.4 / 5.1.5 - Background location" | التطبيق بيستخدم `UIBackgroundModes = location` لتسجيل مسار يوم العمل بين Start وEnd فقط — اشرحه في Review Notes وخلّي حساب الـ demo يقدر يبدأ ويُنهي يوم عمل |
 
 ---
 
@@ -533,4 +546,4 @@ sentry-cli debug-files upload --org digital-harbor --project customer-visits-mob
 3. **الـ keystore تضيع = التطبيق يضيع**. اعمل backup في 3 أماكن مختلفة (vault + cloud + USB في الخزنة).
 4. **اعمل version bump بعد كل رفع**. الـ Play Console بيرفض أي AAB versionCode يساوي أو أصغر من المرفوع قبله.
 5. **خلي عينك على Sentry أول أسبوع بعد الإطلاق**. الـ crashes اللي ما تظهرش في الـ testing بتظهر في الـ wild.
-6. **متضفش Background location لـ V1**. لو احتجته بعدين، اعمله في V1.1 مع flutter_foreground_task. شوف [RELEASE.md](RELEASE.md) -- الـ refactor موثّق.
+6. **الموقع في الخلفية موجود دلوقتي (يوم العمل)**. أي تغيير في طريقة التتبع لازم يتعكس في نفس الوقت في: Privacy Policy، إعلان Foreground service على Play، الإفصاح داخل التطبيق، App Review Notes، ونصوص `Info.plist`. أي تناقض بينهم = رفض.

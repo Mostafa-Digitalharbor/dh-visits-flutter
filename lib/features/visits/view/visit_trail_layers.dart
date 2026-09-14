@@ -25,12 +25,16 @@ class TrailLayers {
   /// A single-colour line disappears over pale roads and river polygons on the
   /// OSM raster tiles — the casing is what keeps it readable over any of them,
   /// and is the same trick the route map uses.
+  ///
+  /// [path] replaces the straight joins between the recorded fixes with a
+  /// derived line — the road-matched geometry of the same trail.
   static Widget polyline(
     BuildContext context,
     VisitTrack track, {
     double strokeWidth = 4.5,
+    List<LatLng>? path,
   }) {
-    final pts = points(track);
+    final pts = path ?? points(track);
     if (pts.length < 2) return const SizedBox.shrink();
     final color = context.colors.primary;
     return PolylineLayer(
@@ -96,8 +100,15 @@ class TrailLayers {
   }) {
     final logs = track.logs;
     if (logs.isEmpty) return const SizedBox.shrink();
-    final first = logs.first;
-    final last = logs.last;
+    // The server tags the points the Start and End actions wrote (`source`),
+    // so those pins mark the real check-in and check-out even if a fix ever
+    // sorts before the Start or after the End. A trail without them (a visit
+    // started with no coordinates) falls back to its first and last points.
+    // On a live visit the far pin is the newest fix — where the rep is now.
+    final first = logs.firstWhere((l) => l.isStart, orElse: () => logs.first);
+    final last = live
+        ? logs.last
+        : logs.lastWhere((l) => l.isEnd, orElse: () => logs.last);
     final s = context.s;
 
     return MarkerLayer(
@@ -113,7 +124,7 @@ class TrailLayers {
             tooltip: s.trailPointStart,
           ),
         ),
-        if (logs.length > 1)
+        if (logs.length > 1 && !identical(first, last))
           Marker(
             point: LatLng(last.latitude, last.longitude),
             width: size + 18,

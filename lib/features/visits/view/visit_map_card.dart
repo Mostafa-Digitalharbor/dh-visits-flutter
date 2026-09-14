@@ -218,7 +218,16 @@ class _VisitMapCardState extends State<VisitMapCard> {
                     ],
                     // Under the pins: the thread is context for them, and a
                     // line drawn over a pin reads as crossing it out.
-                    TrailLayers.polyline(context, trail),
+                    // Road-matched where a match exists; the recorded
+                    // fixes joined otherwise.
+                    MatchedRouteBuilder(
+                      traces: [trail.logs.trace],
+                      builder: (context, geometries) => TrailLayers.polyline(
+                        context,
+                        trail,
+                        path: geometries.first.path(),
+                      ),
+                    ),
                     TrailLayers.endpoints(
                       context,
                       trail,

@@ -41,13 +41,20 @@
          post notifications; requested via firebase_messaging on first launch. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
-    <!-- Location: foreground only.
-         The app collects GPS while the user is actively using it (check-in/out
-         and live sharing during work hours while the app is open). It does NOT
-         track location once backgrounded, so we deliberately do not request
-         ACCESS_BACKGROUND_LOCATION or FOREGROUND_SERVICE_LOCATION. -->
+    <!-- Location.
+         While a visit is open, GPS is read with the app in use. Between "Start
+         work day" and "End work day" the route is also captured with the app in
+         the background or the screen locked, by WorkdayLocationService: a
+         foreground service of type `location` with an ongoing notification.
+         That service is always started from the foreground (the Start tap, or
+         the app being reopened), so the while-in-use grant covers it and
+         ACCESS_BACKGROUND_LOCATION is deliberately NOT requested.
+         FOREGROUND_SERVICE_LOCATION is required from Android 14 (API 34) for a
+         service of that type; FOREGROUND_SERVICE from Android 9. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
 
     <!-- Hardware features (so Play Store filters non-GPS devices correctly). -->
     <uses-feature
@@ -89,6 +96,13 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Work-day route capture (see the location permissions above). Not
+             exported: only this app starts or stops it. -->
+        <service
+            android:name=".workday.WorkdayLocationService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
         <!-- Route background/terminated FCM notifications (which the OS renders
              itself) into our high-importance "visit_events" channel instead of
              a silent default one. The channel is created at runtime in

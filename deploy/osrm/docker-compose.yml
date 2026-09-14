@@ -1,0 +1,32 @@
+# Company-controlled OSRM for the Visits app's road-matched route display.
+# Read docs/MAP_MATCHING_DEPLOYMENT.md first. Run ./prepare.sh once (and on
+# every map refresh) before `docker compose up -d`.
+services:
+  osrm:
+    # Pinned. /match/v1 is the API the app speaks; re-run smoke_test.sh after
+    # any upgrade.
+    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
+    command: >
+      osrm-routed --algorithm mld
+      --max-matching-size 100
+      --ip 0.0.0.0 --port 5000
+      /data/region.osrm
+    volumes:
+      - ./data:/data:ro
+    # Not published: only the proxy below reaches it.
+    expose:
+      - "5000"
+    restart: unless-stopped
+
+  proxy:
+    image: nginx:1.27-alpine
+    depends_on:
+      - osrm
+    ports:
+      - "443:443"
+    volumes:
+      - ./nginx/osrm.conf:/etc/nginx/conf.d/default.conf:ro
+      # fullchain.pem + privkey.pem of a publicly trusted certificate:
+      # Android and iOS refuse self-signed ones.
+      - ./certs:/etc/nginx/certs:ro
+    restart: unless-stopped

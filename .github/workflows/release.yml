@@ -281,8 +281,19 @@ jobs:
           # only to point a build at a DIFFERENT Sentry project.
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_TRACES_PERCENT: ${{ vars.SENTRY_TRACES_PERCENT }}
+          # Company-controlled OSRM for road-matched route display. Unset =
+          # routes drawn as recorded GPS. See docs/MAP_MATCHING_DEPLOYMENT.md.
+          MAP_MATCHING_URL: ${{ vars.MAP_MATCHING_URL }}
+          MAP_MATCHING_MAX_POINTS: ${{ vars.MAP_MATCHING_MAX_POINTS }}
         run: |
           set -euo pipefail
+          # Employee coordinates never go to a public demo router from a store
+          # build. AppEnvironment refuses it too; failing here says why.
+          case "${MAP_MATCHING_URL:-}" in
+            *project-osrm.org*|*routing.openstreetmap.de*)
+              echo "::error::MAP_MATCHING_URL points at a public OSRM demo server. Use the company-controlled server."
+              exit 1 ;;
+          esac
           # `--dart-define=K=` with an EMPTY value is NOT the same as omitting
           # it. String.fromEnvironment falls back to its defaultValue only when
           # the key is ABSENT; an empty string is a value and wins. Passing an
@@ -310,6 +321,8 @@ jobs:
           add ODOO_DATABASE         "${ODOO_DATABASE:-}"
           add SENTRY_DSN            "${SENTRY_DSN:-}"
           add SENTRY_TRACES_PERCENT "${SENTRY_TRACES_PERCENT:-}"
+          add MAP_MATCHING_URL        "${MAP_MATCHING_URL:-}"
+          add MAP_MATCHING_MAX_POINTS "${MAP_MATCHING_MAX_POINTS:-}"
 
           flutter build appbundle --release --no-tree-shake-icons \
             --build-name=${{ needs.version.outputs.build_name }} \
@@ -585,8 +598,15 @@ jobs:
           # only to point a build at a DIFFERENT Sentry project.
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_TRACES_PERCENT: ${{ vars.SENTRY_TRACES_PERCENT }}
+          MAP_MATCHING_URL: ${{ vars.MAP_MATCHING_URL }}
+          MAP_MATCHING_MAX_POINTS: ${{ vars.MAP_MATCHING_MAX_POINTS }}
         run: |
           set -euo pipefail
+          case "${MAP_MATCHING_URL:-}" in
+            *project-osrm.org*|*routing.openstreetmap.de*)
+              echo "::error::MAP_MATCHING_URL points at a public OSRM demo server. Use the company-controlled server."
+              exit 1 ;;
+          esac
           # Same empty-value trap as the Android job -- an empty
           # `--dart-define=SENTRY_DSN=` beats the code's default and ships a
           # release with crash reporting off. See the comment there.
@@ -605,6 +625,8 @@ jobs:
           add ODOO_DATABASE         "${ODOO_DATABASE:-}"
           add SENTRY_DSN            "${SENTRY_DSN:-}"
           add SENTRY_TRACES_PERCENT "${SENTRY_TRACES_PERCENT:-}"
+          add MAP_MATCHING_URL        "${MAP_MATCHING_URL:-}"
+          add MAP_MATCHING_MAX_POINTS "${MAP_MATCHING_MAX_POINTS:-}"
 
           flutter build ios --release --no-codesign --no-tree-shake-icons \
             --build-name=${{ needs.version.outputs.build_name }} \
@@ -668,8 +690,14 @@ jobs:
           set -euo pipefail
           plist="$RUNNER_TEMP/Runner.xcarchive/Products/Applications/Runner.app/Info.plist"
           missing=0
+          # Work-day tracking records the route in the background: the Always
+          # and temporary-accuracy strings and the `location` background mode
+          # have to ship together with WorkdayLocation.swift, or App Review
+          # (and allowsBackgroundLocationUpdates) fails.
           for key in \
             NSLocationWhenInUseUsageDescription \
+            NSLocationAlwaysAndWhenInUseUsageDescription \
+            NSLocationTemporaryUsageDescriptionDictionary:WorkdayRoute \
             NSCameraUsageDescription \
             NSPhotoLibraryUsageDescription; do
             value="$(/usr/libexec/PlistBuddy -c "Print :$key" "$plist" 2>/dev/null || true)"
@@ -680,6 +708,10 @@ jobs:
               echo "  $key = $value"
             fi
           done
+          if ! /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$plist" 2>/dev/null | grep -q '^ *location$'; then
+            echo "::error::UIBackgroundModes lacks 'location'; work-day tracking would stop in the background."
+            missing=1
+          fi
           [ "$missing" -eq 0 ] || exit 1
           echo "All purpose strings present."
 

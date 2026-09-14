@@ -54,6 +54,23 @@ else
   echo "No backend seeded - the app will open on the server-setup screen."
 fi
 
+# Road matching for route display: the company-controlled OSRM server
+# (docs/MAP_MATCHING_DEPLOYMENT.md). Unset = routes drawn as recorded GPS.
+# A release build never uses a public demo router, so refuse one here.
+#   export MAP_MATCHING_URL='https://osrm.yourcompany.com'
+case "${MAP_MATCHING_URL:-}" in
+  *project-osrm.org*|*routing.openstreetmap.de*)
+    echo "MAP_MATCHING_URL points at a public OSRM demo server; use the company server." >&2
+    exit 1 ;;
+esac
+if [ -n "${MAP_MATCHING_URL:-}" ]; then
+  defines+=("--dart-define=MAP_MATCHING_URL=${MAP_MATCHING_URL}")
+  echo "Road matching -> ${MAP_MATCHING_URL}"
+else
+  echo "Road matching -> off (no MAP_MATCHING_URL); routes show recorded GPS."
+fi
+[ -n "${MAP_MATCHING_MAX_POINTS:-}" ] && defines+=("--dart-define=MAP_MATCHING_MAX_POINTS=${MAP_MATCHING_MAX_POINTS}")
+
 # Flavour tags every Sentry event, so keep it alongside the DSN.
 defines+=("--dart-define=APP_FLAVOR=${APP_FLAVOR}")
 defines+=("--dart-define=SENTRY_TRACES_PERCENT=${SENTRY_TRACES_PERCENT:-10}")

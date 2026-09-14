@@ -63,6 +63,15 @@ class AuthRepository {
 
     var user = AuthUser.fromJson(Map<String, dynamic>.from(result));
 
+    // Kept (in the secure keystore only) so an expired session can be renewed
+    // by [reauthenticate] instead of logging the rep out mid-visit. Best-effort:
+    // a keystore failure costs that convenience, never the login itself.
+    try {
+      await session.saveCredentials(login: login, password: password);
+    } catch (e) {
+      appLog('[AuthRepository] could not store credentials for renewal: $e');
+    }
+
     // The session_info payload doesn't carry the tz (sometimes `false`) nor the
     // visit security groups, so read both directly from the user model right
     // after login in a single `call_kw`.
@@ -99,6 +108,30 @@ class AuthRepository {
         Endpoints.authenticate,
         params: {'db': db, 'login': login, 'password': password},
       );
+
+  /// Signs back in with the stored credentials after the server answered
+  /// `odoo.http.SessionExpiredException`, so `ApiClient` can retry the refused
+  /// call once. Returns whether a fresh session cookie is now in the jar.
+  ///
+  /// Never throws, and refuses to "renew" into a different account: if the
+  /// credentials now resolve to another uid (the login was reassigned
+  /// server-side), the caller must fall through to a real logout rather than
+  /// keep showing the previous user's data under someone else's session.
+  Future<bool> reauthenticate() async {
+    try {
+      final creds = await session.readCredentials();
+      final stored = await session.getUser();
+      if (creds == null || stored == null) return false;
+      final db = serverConfig.read().database ?? AppConstants.database;
+      final result = await _authenticate(db, creds.login, creds.password);
+      if (result is! Map || result['uid'] is! num) return false;
+      final storedUid = (stored['uid'] as num?)?.toInt();
+      return storedUid == null || (result['uid'] as num).toInt() == storedUid;
+    } catch (e) {
+      appLog('[AuthRepository] session renewal failed: $e');
+      return false;
+    }
+  }
 
   static bool _isMissingDatabase(ApiException error) =>
       error.serverMessage?.trim().toLowerCase() == 'database not found.';

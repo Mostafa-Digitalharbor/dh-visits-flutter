@@ -56,6 +56,19 @@ class Endpoints {
   static const String visitLogLocations = '/api/visit/log_locations';
   static const String visitTrack = '/api/visit/track';
 
+  // ---- Whole work day (dh_workday_tracking) --------------------------------
+  // Start Work Day -> End Work Day, including the movement between visits.
+  // Same JSON-RPC conventions as /api/visit/*. `start` is idempotent on the
+  // app's client uid and never opens a second active day; `log_locations`
+  // reports refused points by index and already-stored ones as duplicates.
+  // See docs/WORKDAY_TRACKING.md.
+  static const String workdayStart = '/api/workday/start';
+  static const String workdayActive = '/api/workday/active';
+  static const String workdayGet = '/api/workday/get';
+  static const String workdayLogLocations = '/api/workday/log_locations';
+  static const String workdayEnd = '/api/workday/end';
+  static const String workdayTrack = '/api/workday/track';
+
   // ---- Push notifications (device token registration) ---------------------
   // The app registers its FCM token after login so the backend can push visit
   // workflow events. See docs/BACKEND_PUSH_NOTIFICATIONS.md.

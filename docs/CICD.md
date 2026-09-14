@@ -104,8 +104,9 @@ to do nothing. The one-time toggle in App Store Connect does the same job for
 free, on every future build.
 
 A green check with a small **yellow triangle** on a build means processed
-successfully *with warnings* — not a failure. Here it is the deliberately
-omitted `NSLocationAlwaysAndWhenInUseUsageDescription` (see trap 19). A build
+successfully *with warnings* — not a failure. Builds before work-day tracking
+showed it for the then-omitted `NSLocationAlwaysAndWhenInUseUsageDescription`
+(see trap 19; the key is present now). A build
 that actually failed shows a red ✕ and never becomes installable. Apple emails build-processing verdicts to the
 account holder minutes after upload — those mails are the fastest way to see
 why a build that uploaded cleanly never appeared in TestFlight.
@@ -349,34 +350,30 @@ same notes inline; this is the index.
     reimplement Apple's own analysis to be worth trusting. Add to it whenever a
     plugin pulls in a new protected API.
 
-    **`NSLocationAlwaysAndWhenInUseUsageDescription` is deliberately absent —
-    do not "fix" it.** Every upload reports it, and Apple's own wording is
-    *"Although delivery was successful, you may want to correct…"*. It is what
-    puts the yellow triangle next to a green check in TestFlight.
+    **`NSLocationAlwaysAndWhenInUseUsageDescription` is present since work-day
+    tracking (background location).** It used to be omitted on purpose, and
+    before re-examining that decision read what actually changed:
 
-    Two plugins link `requestAlwaysAuthorization`, which is all the static
-    check needs to see:
+    - The app now records the work-day route in the background
+      (`UIBackgroundModes` contains `location`, `WorkdayLocation.swift`), and
+      asks for "Always" once, after an in-app explanation, through its own
+      channel (`requestAlways`). Background capture works with "While Using"
+      too; "Always" only adds relaunch after iOS terminated the app.
+    - The fear was that the key would make the plugins ask for "Always"
+      instead of "While Using". It does not for `Geolocator.requestPermission()`
+      in `geolocator_apple` 2.3.13:
 
-    - `geolocator_apple/Handlers/PermissionHandler.m:68,77`
-    - `permission_handler_apple/strategies/LocationPermissionStrategy.m:69`
+      ```objc
+      // darwin/geolocator_apple/Sources/geolocator_apple/Handlers/PermissionHandler.m:72-77
+      if (NSLocationWhenInUseUsageDescription is present)  -> requestWhenInUseAuthorization
+      else if (containsLocationAlwaysDescription)            -> requestAlwaysAuthorization
+      ```
 
-    But look at what guards those calls:
+      The When-In-Use key is checked first, so the first prompt is still "While
+      Using". Re-check this after any geolocator upgrade.
 
-    ```objc
-    // geolocator_apple/Handlers/PermissionHandler.m:98
-    containsAlwaysDescription = [[NSBundle mainBundle]
-        objectForInfoDictionaryKey:@"NSLocationAlwaysAndWhenInUseUsageDescription"] != nil;
-    ```
-
-    Both plugins call it **only when the key is present**. Omitting the key is
-    what makes that line dead code. Adding it would not silence a warning — it
-    would *enable* the always-authorization path in both plugins, so a field
-    rep could be shown a background-tracking prompt by an app that tracks
-    staff. That is the claim App Review guideline 5.1.1 scrutinises hardest,
-    and `UIBackgroundModes` here is only `remote-notification` and `fetch`
-    anyway. `LocationService` calls plain `Geolocator.requestPermission()`.
-
-    A warning that blocks nothing is the cheap side of that trade.
+    The purpose-string guard in `release.yml` now also requires the Always and
+    temporary-accuracy keys and the `location` background mode.
 
 20. **Pinned Flutter, not `stable`.** The iOS side here is the classic
     `UIApplicationDelegate` embedding — no `SceneDelegate.swift`, no

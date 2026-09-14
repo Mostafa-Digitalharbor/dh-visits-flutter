@@ -9,7 +9,10 @@ import 'package:flutter/foundation.dart';
 
 import '../constants.dart';
 import '../network/connectivity_status.dart';
+import '../network/server_clock.dart';
+import '../utils/app_log.dart';
 import 'api_exceptions.dart';
+import 'endpoints.dart';
 import 'pretty_log_interceptor.dart';
 
 class ApiClient {
@@ -21,16 +24,37 @@ class ApiClient {
   /// working — `null` means "don't bother updating connectivity".
   final ConnectivityStatus? connectivity;
 
+  /// Learns the device-vs-server clock offset from each response's `Date`
+  /// header. Optional for the same reason as [connectivity].
+  final ServerClock? serverClock;
+
+  /// Signs back in after Odoo reports `SessionExpiredException`, returning
+  /// whether a fresh `session_id` cookie is now in the jar. Wired in the
+  /// service locator to `AuthRepository.reauthenticate`; a setter rather than a
+  /// constructor argument because the auth repository itself needs this client.
+  ///
+  /// Null disables the retry: the expiry then surfaces straight away through
+  /// [onUnauthorized], which is what it always did.
+  Future<bool> Function()? reauthenticate;
+
+  /// The re-login currently in flight, shared by every call that hit the same
+  /// expired session — a screen that fans out six requests must produce one
+  /// `/web/session/authenticate`, not six racing ones that overwrite each
+  /// other's cookie.
+  Future<bool>? _reauthInFlight;
+
   final _unauthorizedController = StreamController<void>.broadcast();
 
   /// Fires whenever the server rejects a request as unauthorized
-  /// (HTTP 401/403 or `AUTH_REQUIRED`). Listen once from the app shell to
+  /// (HTTP 401/403 or `AUTH_REQUIRED`), or a session expiry could not be
+  /// repaired by re-authenticating. Listen once from the app shell to
   /// trigger an automatic logout.
   Stream<void> get onUnauthorized => _unauthorizedController.stream;
 
   ApiClient({
     required this.cookieJar,
     this.connectivity,
+    this.serverClock,
     String baseUrl = '',
   }) {
     dio = Dio(
@@ -64,6 +88,16 @@ class ApiClient {
 
     dio.interceptors.add(CookieManager(cookieJar));
 
+    final clock = serverClock;
+    if (clock != null) {
+      dio.interceptors.add(InterceptorsWrapper(
+        onResponse: (response, handler) {
+          clock.observeHttpDate(response.headers.value('date'));
+          handler.next(response);
+        },
+      ));
+    }
+
     if (kDebugMode) {
       dio.interceptors.add(PrettyLogInterceptor());
     }
@@ -79,9 +113,22 @@ class ApiClient {
   }
 
   /// Odoo JSON-RPC call.
+  ///
+  /// Success and failure are decided by the body, never the status code: Odoo
+  /// answers a refused call with HTTP 200 and an `error` block in place of
+  /// `result`. When that error is `odoo.http.SessionExpiredException` the
+  /// session is re-established via [reauthenticate] and the call is retried
+  /// **once**; a second failure of any kind propagates.
   Future<dynamic> jsonRpc(
     String path, {
     Map<String, dynamic>? params,
+  }) =>
+      _jsonRpc(path, params, allowReauth: true);
+
+  Future<dynamic> _jsonRpc(
+    String path,
+    Map<String, dynamic>? params, {
+    required bool allowReauth,
   }) async {
     // Request/response tracing is deliberately left to PrettyLogInterceptor,
     // which is registered only under kDebugMode. `debugPrint` is NOT stripped
@@ -116,9 +163,41 @@ class ApiClient {
     } on DioException catch (e) {
       throw _mapDioError(e);
     } on ApiException catch (e) {
+      if (allowReauth && e.isSessionExpired && _canReauthenticate(path)) {
+        if (await _reauthenticateOnce()) {
+          appLog('[ApiClient] session renewed; retrying $path once');
+          // `allowReauth: false` is what bounds this to a single retry: if the
+          // fresh session is refused too, the error falls through below.
+          return _jsonRpc(path, params, allowReauth: false);
+        }
+      }
       _notifyIfUnauthorized(e);
       rethrow;
     }
+  }
+
+  /// The auth routes themselves never trigger a re-login: an expired session
+  /// on `/web/session/authenticate` means the credentials are the problem, and
+  /// retrying `destroy` would sign the user straight back in on logout.
+  bool _canReauthenticate(String path) =>
+      reauthenticate != null &&
+      path != Endpoints.authenticate &&
+      path != Endpoints.destroySession;
+
+  Future<bool> _reauthenticateOnce() {
+    final running = _reauthInFlight;
+    if (running != null) return running;
+    final attempt = () async {
+      try {
+        return await reauthenticate!();
+      } catch (e) {
+        appLog('[ApiClient] re-authentication failed: $e');
+        return false;
+      }
+    }();
+    _reauthInFlight = attempt;
+    attempt.whenComplete(() => _reauthInFlight = null);
+    return attempt;
   }
 
   Future<dynamic> get(

@@ -28,9 +28,9 @@ $tmpRoot  = Join-Path ([System.IO.Path]::GetTempPath()) ("policy_docx_" + [Syste
 
 $sections = @(
     @{ kind='h1'; text='Privacy Policy -- Customer Visits' }
-    @{ kind='p';  text='**Effective date:** _Replace with the date you publish this policy_' }
-    @{ kind='p';  text='**Last updated:** _Same as effective date for the first version_' }
-    @{ kind='p';  text='This Privacy Policy describes how **Digital Harbor** ("we", "us", "our") collects, uses, and protects information when you use the **Customer Visits** mobile application ("the App"). The App is a field workforce tool: employees of our customer organisations use it to check in and out of customer site visits, and to share their live work location with their direct manager during working hours.' }
+    @{ kind='p';  text='**Effective date:** 14 September 2026' }
+    @{ kind='p';  text='**Last updated:** 14 September 2026' }
+    @{ kind='p';  text='This Privacy Policy describes how **Digital Harbor** ("we", "us", "our") collects, uses, and protects information when you use the **Customer Visits** mobile application ("the App"). The App is a field workforce tool: employees of our customer organisations use it to plan and record customer site visits, to record their route during a work day, and to share their work location with their manager during working hours.' }
     @{ kind='p';  text='If you have any question about this policy, contact us at: **ai-tools@digital-harbor.net**' }
     @{ kind='hr' }
 
@@ -48,82 +48,103 @@ $sections = @(
     @{ kind='p';  text='When your employer creates your account on the backend (Odoo) you provide:' }
     @{ kind='bullet'; items=@(
         'Your name, email or username, and an internal employee ID.',
-        'Authentication credentials (password). Passwords are never stored on the device in plain text; only an authenticated session token is kept in the device''s secure storage.'
+        'Authentication credentials (password). The password is kept only in the device''s secure storage (Android Keystore / iOS Keychain) so the App can renew your session, and is never written to logs or crash reports.'
     )}
 
     @{ kind='h3'; text='2.2 Location information' }
-    @{ kind='p';  text='The App collects your device''s GPS coordinates (latitude, longitude, accuracy radius and timestamp) in the following cases:' }
+    @{ kind='p';  text='The App collects your device''s location -- latitude, longitude, accuracy, and, for route recording, altitude, speed, heading and the time of each position -- in the following cases:' }
     @{ kind='table';
         header=@('When', 'Why', 'Stored where');
         rows=@(
-            @('When you tap "Check-in" or "Check-out" of a visit', 'To prove you were at the customer site and to record arrival/departure times', 'Visit record on your employer''s Odoo backend'),
-            @('Approximately every 30 seconds while the App is open on your screen', 'To share your live position with your manager so they know where the field team is during the work day', '"Live employee location" record on your employer''s Odoo backend, overwriting the previous value')
+            @('When you start or end a customer visit', 'To prove you were at the customer site and record arrival/departure times', 'Visit record on your employer''s backend'),
+            @('While a visit you started is in progress', 'To record the visit''s route', 'Visit route on your employer''s backend'),
+            @('About every 30 seconds while the App is open on your screen', 'To share your current position with your manager', 'Your "live location" record on your employer''s backend (the previous value is overwritten)'),
+            @('**During an active work day** -- from Start work day until End work day or sign-out, including while the App is in the background, closed from the screen, or the screen is locked', 'To record your work-day route: the whole day, including the movement between visits', 'Work-day route on your employer''s backend')
         )
     }
-    @{ kind='p';  text='**The App does not collect or transmit your location when it is in the background, closed, or when you are not logged in.** Live sharing pauses automatically the moment you leave the App and resumes when you return to it. There is no persistent background tracking.' }
+    @{ kind='p';  text='**Work-day route recording.** While your work day is active, the App records a position about every 5 seconds while you are moving (at least 5 metres apart, and nothing while you stand still), also when you switch to another app or lock your screen. On Android a notification ("Workday tracking active") is shown for as long as recording runs; on iOS the system shows its location indicator. Before the first work day, the App explains this on screen and asks for your agreement before any permission prompt.' }
+    @{ kind='p';  text='**When the App does not collect location:**' }
+    @{ kind='bullet'; items=@(
+        'when no work day is active and the App is not open on your screen;',
+        'after you tap End work day -- recording stops immediately;',
+        'after you sign out;',
+        'when you have not granted location permission, or have revoked it.'
+    )}
+    @{ kind='p';  text='**Offline storage.** Without a network, recorded positions are kept in the App''s private storage on your device until they can be uploaded to your employer''s backend, and are removed from the device once uploaded.' }
+    @{ kind='p';  text='**Road matching (map display).** To draw your recorded routes along roads, the App may send recorded positions (coordinates, their accuracy, heading, and time offsets relative to the first position -- not the actual date and time) to a road-matching service. It only returns a line to draw; your recorded positions are not changed. No name, employee ID, device ID, credential or session is sent. In the production App this service is operated by Digital Harbor on infrastructure it controls (directly or through a hosting provider acting on its behalf), never by a public routing service; if none is configured, routes are drawn as recorded and nothing is sent. Map lines are cached on the device for up to 30 days and deleted when you sign out.' }
 
     @{ kind='h3'; text='2.3 Visit content' }
-    @{ kind='p';  text='You create visit records that include: the customer being visited, visit type, free-text notes you choose to write, and the visit state (draft / submitted / under review / done / cancelled). This content is stored on your employer''s Odoo backend.' }
+    @{ kind='p';  text='You create visit records that include: the customer being visited, visit type, free-text notes you choose to write, the outcome, and the visit state. You may optionally capture a photo with the camera or attach a file as proof of the visit; only what you choose at that moment is uploaded. This content is stored on your employer''s backend.' }
 
     @{ kind='h3'; text='2.4 Device & technical data' }
-    @{ kind='p';  text='For diagnostics, the App may transmit:' }
     @{ kind='bullet'; items=@(
-        'The HTTP request needed to call the backend API (URL, headers, JSON body), over HTTPS only.',
+        'The requests needed to call your employer''s backend, over HTTPS only.',
+        'A device-specific push notification token (Firebase Cloud Messaging), stored on your employer''s backend against your account.',
+        'Crash reports and performance measurements sent to Sentry, configured to exclude personal information (no name, email, location or IP address).',
         'Generic device locale (so the App displays in Arabic or English).'
     )}
-    @{ kind='p';  text='The App does **not** collect: contact lists, photos, microphone audio, files outside its own sandbox, the IMEI, ad identifiers, or any analytics fingerprint.' }
+    @{ kind='p';  text='The App does **not** collect: contact lists, microphone audio, your photo library, files outside what you choose to attach, the IMEI, advertising identifiers, or any analytics fingerprint.' }
 
     @{ kind='h2'; text='3. How we use the information' }
     @{ kind='p';  text='We use the information described above strictly to provide the App''s features:' }
     @{ kind='bullet'; items=@(
-        '**Authenticate you** against your employer''s Odoo instance.',
+        '**Authenticate you** against your employer''s backend.',
         '**Record visits** and prove you were physically at the customer''s location.',
-        '**Share your live location with your manager** during the work day.',
-        '**Show maps** of customers, nearby employees and your own position.',
-        '**Queue offline actions** (a check-in performed while offline is stored locally and re-sent automatically when connectivity returns).'
+        '**Record your work-day route** between Start work day and End work day, including travel between visits.',
+        '**Share your live location with your manager** while the App is open.',
+        '**Show maps** of customers, routes and positions, with routes drawn along roads where road matching is available.',
+        '**Keep working offline** -- actions and recorded positions are stored on the device and sent automatically when connectivity returns.'
     )}
     @{ kind='p';  text='We do **not** use your data for advertising, profiling, behavioural analytics, or sale to third parties.' }
 
-    @{ kind='h2'; text='4. No background tracking' }
-    @{ kind='p';  text='The App **does not** track your location in the background.' }
+    @{ kind='h2'; text='4. Background location during an active work day' }
+    @{ kind='p';  text='The App uses your location in the background **only while a work day you started is active**.' }
     @{ kind='bullet'; items=@(
-        'The App requests only "While Using the App" location access -- both on iOS (When In Use) and on Android (Precise location, only while using the app).',
-        'The App does not declare the Android ACCESS_BACKGROUND_LOCATION permission, and does not declare the iOS "location" background mode.',
-        'The instant you switch to another app, lock your screen, or close the App, the live-location ticker stops. It restarts automatically when you bring the App back to the foreground.',
-        'You can revoke location access at any time from Settings -> Apps -> Customer Visits -> Permissions (Android) or Settings -> Privacy -> Location -> Visits (iOS). If you do, check-in/out and live sharing will both stop working until you re-grant it.'
+        '**Android:** recording runs in a foreground service of type "location", started when you tap Start work day, with a notification visible for as long as it runs. The App requests location access "while using the app" and does not request the Android background location permission.',
+        '**iOS:** the App declares the iOS "location" background mode. With "While Using the App" access, recording continues in the background once you started the work day in the App. The App may also ask you to allow "Always"; this is optional and only lets recording resume if iOS closes the App during your work day.',
+        '**Stopping:** tap End work day, or sign out. You can also revoke location access at any time in your device Settings; visit check-in/out, live sharing and work-day recording then stop until access is granted again.'
     )}
 
     @{ kind='h2'; text='5. Permissions the App requests' }
     @{ kind='table';
         header=@('Permission', 'Reason');
         rows=@(
-            @('Precise location (foreground / "while using")', 'Record visit check-in/out coordinates; share live position with manager while App is open'),
+            @('Precise and approximate location (while using the app)', 'Visit coordinates, visit routes, live sharing while the App is open, and the work-day route'),
+            @('Android: foreground service (location)', 'Keep recording the work-day route in the background or with the screen locked, with a visible notification'),
+            @('iOS: location background mode; optional "Always" access', 'Keep recording the work-day route in the background; "Always" lets recording resume if iOS closes the App'),
+            @('iOS: temporary precise location', 'Asked only if Precise Location is off, because a route cannot be recorded accurately without it'),
+            @('Notifications', 'Visit workflow notifications; on Android also the work-day recording notification'),
+            @('Camera', 'Optional proof-of-visit photos'),
             @('Internet / network state', 'Talk to the backend; detect offline state to queue actions')
         )
     }
-    @{ kind='p';  text='The App does **not** request: background location, foreground service, camera, microphone, contacts, calendar, SMS, phone, or files/photos.' }
+    @{ kind='p';  text='The App does **not** request: the Android background location permission, microphone, contacts, calendar, SMS or phone.' }
 
     @{ kind='h2'; text='6. Data sharing' }
     @{ kind='p';  text='We share your data only with the following parties:' }
     @{ kind='bullet'; items=@(
-        '**Your employer**, who is the controller of the data. Anyone in your employer''s organisation that your employer has granted manager privileges to can see your live location and visit history.',
-        '**Our cloud hosting provider** (Odoo SH / equivalent), strictly to operate the backend. No marketing or third-party processing.',
+        '**Your employer**, who is the controller of the data. Anyone your employer grants manager rights can see the live location, work-day routes and visit history of the employees they manage.',
+        '**Our hosting providers**, strictly to operate the backend and, where configured, the road-matching service.',
+        '**Sentry** (crash and performance reports without personal information) and **Firebase Cloud Messaging** (push notification delivery).',
         '**Authorities**, only if we are legally compelled by a valid court order.'
     )}
     @{ kind='p';  text='We do **not** sell or share your data with advertisers, analytics platforms, or data brokers.' }
 
     @{ kind='h2'; text='7. Data retention' }
     @{ kind='bullet'; items=@(
-        '**Session token** stored on the device: cleared automatically on logout, or when the OS evicts the secure storage.',
-        '**Live location** on the backend: overwrites the previous value, so we keep only your most recent live position, not a track history. Older values are not retained.',
-        '**Visit records**: retained according to your employer''s retention schedule. Contact your employer to request deletion.'
+        '**Session and credentials** stored on the device: deleted on sign-out.',
+        '**Positions waiting to upload** on the device: removed once uploaded; at most about 8,000 waiting work-day positions are kept, the oldest discarded beyond that.',
+        '**Road-matched map lines** cached on the device: up to 30 days, deleted on sign-out.',
+        '**Live location** on the backend: only your most recent position is kept.',
+        '**Visit records, visit routes and work-day routes** on the backend: retained according to your employer''s retention schedule. Work-day positions cannot be edited or deleted from the App. Contact your employer to request deletion.'
     )}
 
     @{ kind='h2'; text='8. Security' }
     @{ kind='bullet'; items=@(
-        'All traffic between the App and the backend is over HTTPS (TLS). Cleartext HTTP is blocked at the OS level on both Android (usesCleartextTraffic=false) and iOS (App Transport Security).',
-        'The session token is stored using the device''s secure storage (Android KeyStore / iOS Keychain).',
-        'The App is excluded from automatic Android cloud backups so the session secret is never copied to a different device.'
+        'All traffic between the App and the backend and road-matching service is over HTTPS (TLS). Cleartext HTTP is blocked on both Android and iOS.',
+        'Credentials are stored in the device''s secure storage (Android Keystore / iOS Keychain).',
+        'Positions waiting to upload are stored in the App''s private storage (on iOS protected until the device is first unlocked after a restart), and the App is excluded from Android cloud backups.',
+        'On the backend, employees can only add positions to their own active work day, managers can only see the employees they manage, and recorded positions cannot be changed.'
     )}
     @{ kind='p';  text='No system is 100% secure. If you suspect your account is compromised, change your password from your employer''s Odoo portal immediately.' }
 
@@ -133,7 +154,7 @@ $sections = @(
     @{ kind='h2'; text='10. Your rights' }
     @{ kind='p';  text='Because your employer is the controller of the data:' }
     @{ kind='bullet'; items=@(
-        'To request **access, correction, or deletion** of your visit history or live-location record, contact your employer''s HR or IT.',
+        'To request **access, correction, or deletion** of your visit history, work-day routes or live-location record, contact your employer''s HR or IT.',
         'For complaints about how Digital Harbor (the processor) handles your data, contact us at **ai-tools@digital-harbor.net**.',
         'Depending on your country, you may also have the right to lodge a complaint with your local data protection authority.'
     )}
@@ -144,9 +165,7 @@ $sections = @(
     @{ kind='h2'; text='12. Contact' }
     @{ kind='p';  text='**Digital Harbor**' }
     @{ kind='p';  text='Email: **ai-tools@digital-harbor.net**' }
-    @{ kind='p';  text='Website: **https://digital-harbor.net**' }
-    @{ kind='hr' }
-    @{ kind='p';  text='_This policy is provided as a template tailored to the Customer Visits App''s actual data flows. Please review it with your legal counsel before publishing publicly. Replace all italic placeholder text (effective date, etc.) before going live._' }
+    @{ kind='p';  text='Website: **https://digitalharbor.com.sa**' }
 )
 
 # --- OOXML builders ----------------------------------------------------------

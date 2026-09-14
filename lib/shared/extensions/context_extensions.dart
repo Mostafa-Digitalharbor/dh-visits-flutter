@@ -125,7 +125,9 @@ extension ApiExceptionL10n on ApiException {
       case ApiErrorCode.unauthorized:
         return s.errAuthRequired;
       case ApiErrorCode.permissionDenied:
-        return s.errPermissionDenied;
+        // An Odoo `AccessError` names what was refused ("you may not add
+        // positions to this visit"); docs/API.md says to show it.
+        return _serverText(context) ?? s.errPermissionDenied;
       case ApiErrorCode.timeout:
         return s.errNetworkTimeout;
       case ApiErrorCode.network:

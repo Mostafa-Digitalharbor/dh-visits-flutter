@@ -41,6 +41,7 @@
 | Check-in / Check-out | يلتقط موقع GPS فعلي ويرسل للسيرفر ويتحقق من المسافة من مقر العميل. |
 | Persistent Visit Bar | شريط ثابت أسفل الشاشة بيعرض الزيارة المفتوحة الحالية + الزمن الجاري. |
 | لايف لوكيشن (foreground-only) | إرسال موقع الموظف كل 30 ثانية أثناء استخدام التطبيق + heartbeat كل دقيقتين + فلتر مسافة 5م لتوفير البطارية. **يتوقّف تلقائياً لما التطبيق يدخل background**. |
+| مسار يوم العمل (background) | بين "بدء يوم العمل" و"إنهاء يوم العمل" بيتسجّل المسار كله حتى والتطبيق في الخلفية أو الشاشة مقفولة — Android: foreground service من نوع location بإشعار ظاهر، iOS: `UIBackgroundModes=location`. Offline queue + Today's Route (Roads / Raw GPS). التفاصيل في [docs/WORKDAY_TRACKING.md](docs/WORKDAY_TRACKING.md). |
 | Nearby Employees (للمديرين) | يجيب كل الموظفين على بُعد 10م من مقر عميل معيّن، يحدّث كل 10ث. |
 | سجل الزيارات | تاريخ زيارات الموظف + فلاتر بالتاريخ/الحالة. |
 | Dashboard (للمديرين) | KPIs عامة + خريطة فيها الموظفين النشطين دلوقتي. |
@@ -58,7 +59,7 @@
 - **DI:** [`get_it`](https://pub.dev/packages/get_it) — الـ service locator في [lib/core/di/service_locator.dart](lib/core/di/service_locator.dart)
 - **Routing:** [`go_router`](https://pub.dev/packages/go_router) — راوتر مركزي مع redirect على حسب حالة الـ auth
 - **Storage:** `shared_preferences` (للإعدادات) + `flutter_secure_storage` (للـ session) + `cookie_jar` persistent
-- **Location:** `geolocator` + `permission_handler` — *foreground-only* (لا `ACCESS_BACKGROUND_LOCATION` ولا `UIBackgroundModes`)
+- **Location:** `geolocator` + `permission_handler` للزيارات واللايف لوكيشن (foreground). مسار يوم العمل native: `WorkdayLocationService.kt` (foreground service، بدون `ACCESS_BACKGROUND_LOCATION`) و`WorkdayLocation.swift` (`UIBackgroundModes=location`)
 - **Maps:** `flutter_map` + `latlong2` (OpenStreetMap tiles، مش Google)
 - **i18n:** Flutter gen-l10n من `.arb` files
 - **UI:** Material 3 — Theme مبني على ألوان الشركة (Digital Harbor navy `#1E2A6E` + cyan `#3FBFD9`)
@@ -95,7 +96,7 @@
 - الـ `ApiClient` بيقبض على 401/`AUTH_REQUIRED` ويبثّ Stream، التطبيق يلتقطه في [lib/app/app.dart](lib/app/app.dart) ويعمل `AuthLogoutRequested` تلقائي.
 - الـ `GoRouter` بيراقب الـ `AuthBloc` ويعمل redirect: لو unauthenticated يروح `/login`، لو authenticated يروح `/home`.
 - شاشة الـ Home بتفرّع على حسب الدور: `_UserShell` للموظف، `_ManagerShell` (Tabs) للمدير.
-- الـ `LiveLocationBloc` بيستخدم `WidgetsBindingObserver` فيوقّف الـ ticker لما التطبيق يدخل background ويرجّع يشغّله لما يرجع للـ foreground — ده يطابق تصريح الخصوصية بإننا foreground-only.
+- الـ `LiveLocationBloc` بيستخدم `WidgetsBindingObserver` فيوقّف الـ ticker لما التطبيق يدخل background ويرجّع يشغّله لما يرجع للـ foreground — اللايف لوكيشن foreground-only. الاستثناء الوحيد للخلفية هو مسار يوم العمل (`WorkdayTracker`) وهو معلن في سياسة الخصوصية.
 
 ---
 
@@ -305,13 +306,17 @@ dart run flutter_native_splash:create
 
 | الصلاحية | Android | iOS | السبب |
 |---|---|---|---|
-| Precise location (foreground) | `ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION` | `NSLocationWhenInUseUsageDescription` | check-in/out + لايف لوكيشن أثناء استخدام التطبيق |
+| Precise location (while in use) | `ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION` | `NSLocationWhenInUseUsageDescription` | check-in/out + مسار الزيارة + لايف لوكيشن + مسار يوم العمل |
+| مسار يوم العمل في الخلفية | `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_LOCATION` (service type `location`) | `UIBackgroundModes=location` + `NSLocationAlwaysAndWhenInUseUsageDescription` (اختياري "Always") + `NSLocationTemporaryUsageDescriptionDictionary` | بين Start وEnd work day فقط |
+| Notifications | `POST_NOTIFICATIONS` | (push) | إشعارات الزيارات + إشعار تتبع يوم العمل على Android |
+| Camera | (intent) | `NSCameraUsageDescription` | صور إثبات الزيارة |
 | Internet | `INTERNET` + `ACCESS_NETWORK_STATE` | (تلقائي) | API + كشف الـ offline |
 
 **التطبيق مش بيطلب:**
-- ❌ Background location — اللايف لوكيشن يقف لما التطبيق يبق في background
-- ❌ Foreground service — مش محتاجه طول ما مفيش background tracking
-- ❌ Camera / Mic / Contacts / Calendar / SMS / Files
+- ❌ `ACCESS_BACKGROUND_LOCATION` — الـ foreground service بتبدأ دايمًا والتطبيق في المقدمة
+- ❌ Mic / Contacts / Calendar / SMS
+
+قبل أول "بدء يوم العمل" بيظهر إفصاح داخل التطبيق (`WorkdayDisclosureDialog`) قبل أي طلب إذن. إعلانات Play في [store/play/location-and-foreground-service-declarations.md](store/play/location-and-foreground-service-declarations.md).
 
 الـ Privacy Policy الكاملة في [docs/PRIVACY_POLICY.md](docs/PRIVACY_POLICY.md) (و نسخة Word في [docs/PRIVACY_POLICY.docx](docs/PRIVACY_POLICY.docx) جاهزة للرفع على موقع الشركة).
 

@@ -55,7 +55,7 @@ A bidirectional interface with a dark mode that is easy on the eyes.
 
 LOCATION AND PRIVACY
 
-The app uses your device's location only while you are using it. It does not track you in the background or after the app is closed. Coordinates are captured at two specific moments — check-in and check-out — and are stored in your company's system to document the visit and calculate attendance. You can decline the location permission, but visit logging will not work without it.
+The app uses your device's location to record visit check-in and check-out, the route of a visit, and while you use it. When you start your work day, it also records your route for the whole day — including travel between visits — in the background and while the screen is locked, until you end the work day or sign out. Locations are stored on the phone until they reach your company's system. You can decline the location permission, but visit logging and work-day recording will not work without it. Continued use of GPS in the background can decrease battery life.
 
 IMPORTANT
 
@@ -86,8 +86,9 @@ with a few clean visits already seeded, and keep it working until the app is app
 
 **Notes:** the live text now lives in
 [apple-review-2026-08-06.md § 4-ب](apple-review-2026-08-06.md) — it carries the server
-address and database name, without which the reviewer cannot get past the first screen.
-The draft below is kept only as background.
+address and database name, without which the reviewer cannot get past the first screen,
+and its LOCATION USE section is the work-day (background location) text below. The draft
+below is kept only as background.
 
 ```
 Field Visits is an enterprise field-service app used by employees of companies that run our backend. Sign-in credentials are issued by the employer; there is no public self-registration. The demo account above is seeded with sample customers and visits so every screen can be reached.
@@ -100,7 +101,10 @@ HOW TO REVIEW
 5. Sign in with the manager credentials to see the Dashboard, live team map, and Analytics tabs, and to approve the submitted visit.
 
 LOCATION USE
-The app requests When In Use authorization only. It does not request Always authorization, does not use background location modes, and does not track the user when the app is not in the foreground. Coordinates are read at two moments only — check-in and check-out — and are sent to the employer's server to document the visit and compute attendance. This is disclosed on screen before the permission prompt and in the App Privacy section.
+Visit check-in/out and live sharing use When In Use location while the app is open.
+The app also declares the "location" background mode for one feature: the work-day route. When the employee taps "Start work day", the app records their route (about one position every 5 seconds while moving) until they tap "End work day" or sign out — including while the app is in the background or the screen is locked, with the system location indicator shown. The route, including travel between customer visits, is uploaded to the employer's own server for the work-day and visit reports. Nothing is recorded outside an active work day.
+Before the first work day the app shows a disclosure screen explaining this and asks for agreement before any permission prompt. When In Use authorization is enough; the app then asks once whether to allow "Always", which only lets recording resume if iOS terminates the app during a work day. Declining keeps the feature working.
+To test: sign in, tap "Start work day", agree, allow location, press Home or lock the device and move, then reopen the app — Today's Route shows the recorded route. Tap "End work day" to stop recording.
 
 Please contact us at the address above if any step cannot be completed; we can reset the demo data on request.
 ```

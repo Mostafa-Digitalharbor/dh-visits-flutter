@@ -68,24 +68,52 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('VisitTrack.fromApi', () {
-    test('orders points by logged_at, not by id', () {
+    test('keeps the server order, which is fix time rather than id', () {
       // Straight from the API doc: ids 39 and 38 arrived out of order in a
-      // batch and the server filed them by fix time. A polyline fed in id order
-      // would double back on itself.
+      // batch and the server filed them by fix time. The client draws the
+      // polyline through `logs` exactly as returned.
       final track = VisitTrack.fromApi({
         'visit_id': 52,
         'location_log_count': 3,
         'tracked_distance_km': 9.311,
         'logs': [
+          {'id': 36, 'logged_at': '2026-09-12T09:10:00', 'latitude': 24.71, 'longitude': 46.67},
           {'id': 39, 'logged_at': '2026-09-12T09:30:00', 'latitude': 24.745, 'longitude': 46.705},
           {'id': 38, 'logged_at': '2026-09-12T09:40:00', 'latitude': 24.76, 'longitude': 46.72},
-          {'id': 36, 'logged_at': '2026-09-12T09:10:00', 'latitude': 24.71, 'longitude': 46.67},
         ],
       });
 
       expect(track.logs.map((l) => l.id), [36, 39, 38]);
       expect(track.trackedDistanceKm, 9.311);
       expect(track.hasPath, isTrue);
+    });
+
+    test('does not reshuffle points that share a timestamp', () {
+      // A Start and the first fix can land in the same second. The server's
+      // order between them is the route; an unstable local re-sort was free to
+      // swap them.
+      final track = VisitTrack.fromApi({
+        'visit_id': 52,
+        'logs': [
+          for (var i = 1; i <= 12; i++)
+            {'id': i, 'logged_at': '2026-09-12T09:10:00', 'latitude': 24.7 + i / 1000, 'longitude': 46.6, 'source': i == 1 ? 'start' : 'track'},
+        ],
+      });
+
+      expect(track.logs.map((l) => l.id), [for (var i = 1; i <= 12; i++) i]);
+    });
+
+    test('parses API datetimes as UTC, including Odoo `false`', () {
+      final track = VisitTrack.fromApi({
+        'visit_id': 52,
+        'logs': [
+          {'id': 1, 'logged_at': '2026-09-12T09:10:01', 'latitude': 24.71, 'longitude': 46.67, 'device_id': false, 'location': false},
+        ],
+      });
+      final log = track.logs.single;
+      expect(log.loggedAt, DateTime.utc(2026, 9, 12, 9, 10, 1));
+      expect(log.loggedAt.isUtc, isTrue);
+      expect(log.deviceId, isNull);
     });
 
     test('drops a point with no usable coordinate or timestamp', () {

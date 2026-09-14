@@ -1,6 +1,24 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../core/map_matching/route_geometry.dart';
 import 'visit.dart' show parseOdooUtc;
+
+extension VisitLocationTrace on List<VisitLocationLog> {
+  /// The points as the road matcher reads them — same coordinates, in the
+  /// same (server) order. Drawing input only; nothing is written back.
+  List<TracePoint> get trace => [
+        for (final l in this)
+          TracePoint(
+            latitude: l.latitude,
+            longitude: l.longitude,
+            time: l.loggedAt,
+            // Odoo stores an unreported accuracy as 0.
+            accuracy: (l.accuracy ?? 0) > 0 ? l.accuracy : null,
+            speed: l.speed,
+            heading: l.heading,
+          ),
+      ];
+}
 
 /// Who wrote a point onto the trail.
 ///
@@ -172,11 +190,12 @@ class VisitTrack extends Equatable {
         if (log != null) logs.add(log);
       }
     }
-    // The server documents "always oldest first", and the ordering is what
-    // makes the polyline a path rather than a scribble. Sorting locally costs
-    // nothing on a few hundred points and means a server that ever pages
-    // differently can't draw us a knot.
-    logs.sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
+    // Kept exactly in the order the server returned. The server files the
+    // trail by `logged_at` ("always oldest first") and that order *is* the
+    // route — the polyline is drawn straight through it. Re-sorting here used
+    // to be a no-op at best; at worst Dart's unstable sort reshuffled points
+    // sharing a timestamp (a Start and the first fix in the same second) and
+    // the client drew a different path from the one the server measured.
     return VisitTrack(
       visitId: (json['visit_id'] as num?)?.toInt() ?? 0,
       locationLogCount:

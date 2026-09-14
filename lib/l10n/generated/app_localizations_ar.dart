@@ -1743,4 +1743,154 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get trailFitRoute => 'ملء المسار';
+
+  @override
+  String get routeRecordedTrails => 'المسارات المسجّلة اليوم';
+
+  @override
+  String routeTrailSummary(int points, String km) {
+    return '$points نقطة · $km كم';
+  }
+
+  @override
+  String get routeTrailsPartial => 'تعذّر تحميل مسارات بعض الزيارات';
+
+  @override
+  String get workdayNotStarted => 'لم يبدأ يوم العمل بعد';
+
+  @override
+  String get workdayStart => 'بدء يوم العمل';
+
+  @override
+  String get workdayEnd => 'إنهاء يوم العمل';
+
+  @override
+  String workdayActiveSince(String time) {
+    return 'يوم العمل نشط منذ $time';
+  }
+
+  @override
+  String workdayPending(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count نقطة بانتظار الرفع',
+      one: 'نقطة واحدة بانتظار الرفع',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get workdayCaptureOff =>
+      'تتبع الموقع متوقف مؤقتًا — اسمح بالوصول إلى الموقع للاستئناف';
+
+  @override
+  String get workdayEndConfirmTitle => 'إنهاء يوم العمل؟';
+
+  @override
+  String get workdayEndConfirmMessage =>
+      'سيتوقف تتبع الموقع وسيُغلق مسار اليوم.';
+
+  @override
+  String get workdayNotificationTitle => 'تتبع يوم العمل نشط';
+
+  @override
+  String get workdayNotificationText => 'تتبع الموقع قيد التشغيل حاليًا';
+
+  @override
+  String get workdayStarted => 'بدأ يوم العمل — يتم تسجيل مسارك';
+
+  @override
+  String get workdayEnded => 'انتهى يوم العمل';
+
+  @override
+  String get workdayEndQueued =>
+      'انتهى يوم العمل — ستتم المزامنة عند عودة الاتصال';
+
+  @override
+  String get workdayUnsupported => 'تتبع يوم العمل غير متاح على هذا الخادم';
+
+  @override
+  String get workdayLocationDenied =>
+      'يلزم الوصول إلى الموقع لتسجيل يوم العمل.';
+
+  @override
+  String get workdayLocationDeniedForever =>
+      'الوصول إلى الموقع محظور لهذا التطبيق. اسمح به من الإعدادات لبدء يوم العمل.';
+
+  @override
+  String get workdayLocationServiceOff => 'شغّل خدمات الموقع لبدء يوم العمل.';
+
+  @override
+  String get workdayOpenSettings => 'فتح الإعدادات';
+
+  @override
+  String get workdayPreciseOff =>
+      'الموقع الدقيق مغلق لهذا التطبيق، فلا يمكن تسجيل مسارك بدقة. فعّل الموقع الدقيق من الإعدادات لبدء يوم العمل.';
+
+  @override
+  String get workdayDisclosureTitle => 'تتبع الموقع أثناء يوم العمل';
+
+  @override
+  String get workdayDisclosureBody =>
+      'أثناء يوم العمل النشط يجمع تطبيق الزيارات الموقع الدقيق لهذا الجهاز — حتى عندما يكون التطبيق مغلقًا أو في الخلفية وأثناء قفل الشاشة — لتسجيل مسار يوم عملك وزياراتك للعملاء لصالح جهة عملك.';
+
+  @override
+  String get workdayDisclosureStops =>
+      'يبدأ التتبع فقط عند الضغط على بدء يوم العمل، ويتوقف عند الضغط على إنهاء يوم العمل أو تسجيل الخروج.';
+
+  @override
+  String get workdayDisclosureStorage =>
+      'تُحفَظ المواقع على هذا الهاتف حتى تصل إلى خادم شركتك. ولرسم المسارات على الطرق قد تُرسَل النقاط المسجّلة إلى خدمة مطابقة الطرق التابعة لشركتك.';
+
+  @override
+  String get workdayDisclosureAndroid => 'يظل إشعار ظاهرًا طوال مدة التتبع.';
+
+  @override
+  String get workdayDisclosureIos =>
+      'سيطلب iOS إذن الوصول إلى الموقع. اختيار \"دائمًا\" يتيح استمرار التسجيل إذا أغلق iOS التطبيق أثناء يوم عملك.';
+
+  @override
+  String get workdayDisclosureAgree => 'موافق ومتابعة';
+
+  @override
+  String get workdayDisclosureDecline => 'ليس الآن';
+
+  @override
+  String get routeWorkdayTitle => 'مسار يوم العمل';
+
+  @override
+  String get routeWorkdayStart => 'بداية يوم العمل';
+
+  @override
+  String get routeWorkdayEnd => 'نهاية يوم العمل';
+
+  @override
+  String get routeWorkdayNow => 'الموقع الحالي';
+
+  @override
+  String get routeWorkdayMovement => 'التنقل بين الزيارات';
+
+  @override
+  String get routeWorkdayPoints => 'النقاط';
+
+  @override
+  String routeWorkdaySpan(String from, String to) {
+    return '$from – $to';
+  }
+
+  @override
+  String get routeWorkdayFailed => 'تعذّر تحميل مسار يوم العمل';
+
+  @override
+  String get routeLineRoads => 'الطرق';
+
+  @override
+  String get routeLineGps => 'GPS الخام';
+
+  @override
+  String get routeLineMatching => 'جارٍ المطابقة مع الطرق…';
+
+  @override
+  String get routeLineUnmatched => 'تعذّرت مطابقة الطرق — يُعرض مسار GPS الخام';
 }

@@ -54,6 +54,67 @@ class AppEnvironment {
       ? _definedDatabase
       : (_useDevSeed ? _devSeedDatabase : '');
 
+  /// The public OSRM demo server (OpenStreetMap data, like the map tiles).
+  /// Development only: its usage policy rules out production traffic, it has
+  /// no SLA, and it would receive employees' coordinates — see
+  /// docs/WORKDAY_TRACKING.md "Road matching". Never used by a release build.
+  static const String publicOsrmUrl = 'https://router.project-osrm.org';
+
+  /// Public demo routing servers a release build refuses to talk to.
+  static const Set<String> _publicDemoHosts = {
+    'router.project-osrm.org',
+    'routing.openstreetmap.de',
+  };
+
+  static const bool _mapMatchingDefined = bool.hasEnvironment('MAP_MATCHING_URL');
+  static const String _definedMapMatchingUrl =
+      String.fromEnvironment('MAP_MATCHING_URL');
+
+  /// OSRM-compatible server used to match recorded routes to roads for
+  /// display: `--dart-define=MAP_MATCHING_URL=https://osrm.example.com`.
+  /// Empty means road matching is off and routes are drawn as recorded.
+  ///
+  /// A **release** build only ever uses a URL passed at build time — the
+  /// company-controlled server — and never the public demo server, not even
+  /// when it is passed explicitly. Debug and profile builds default to the
+  /// public demo server so development works without infrastructure.
+  static String get mapMatchingUrl => resolveMapMatchingUrl(
+        defined: _mapMatchingDefined,
+        value: _definedMapMatchingUrl,
+        release: kReleaseMode,
+      );
+
+  @visibleForTesting
+  static String resolveMapMatchingUrl({
+    required bool defined,
+    required String value,
+    required bool release,
+  }) {
+    final url = value.trim();
+    if (!release) return defined ? url : publicOsrmUrl;
+    if (!defined || url.isEmpty) return '';
+    final uri = Uri.tryParse(url);
+    // HTTPS only (cleartext is blocked on both platforms anyway), and never a
+    // public demo server: employee coordinates stay on company infrastructure.
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) return '';
+    if (isPublicDemoServer(url)) return '';
+    return url;
+  }
+
+  static bool isPublicDemoServer(String url) =>
+      _publicDemoHosts.contains(Uri.tryParse(url.trim())?.host.toLowerCase());
+
+  /// Most GPS fixes the matching server accepts in one request
+  /// (`--dart-define=MAP_MATCHING_MAX_POINTS=100` for a self-hosted server
+  /// with a raised `--max-matching-size`). 0 = the matcher's default: 10 on
+  /// the public demo server, 90 elsewhere.
+  static const int mapMatchingMaxPoints =
+      int.fromEnvironment('MAP_MATCHING_MAX_POINTS');
+
+  /// OSRM profile the server was built with (`driving`, `foot`, ...).
+  static const String mapMatchingProfile =
+      String.fromEnvironment('MAP_MATCHING_PROFILE', defaultValue: 'driving');
+
   /// Build flavour name surfaced in logs / settings screen.
   static const String flavor = String.fromEnvironment(
     'APP_FLAVOR',

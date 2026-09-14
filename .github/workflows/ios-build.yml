@@ -1,0 +1,69 @@
+# Compile check for the iOS app (no signing, uploads nothing). Runs when native
+# iOS code, the location channel or dependencies change, or by hand. ci.yml
+# builds Android only, and release.yml builds iOS only on a tag -- this lane
+# catches a Swift error (e.g. in WorkdayLocation.swift) before a store build
+# spends a macOS hour discovering it.
+name: iOS build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'ios/**'
+      - 'lib/core/location/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/ios-build.yml'
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.35.3'
+
+jobs:
+  ios:
+    name: flutter build ios --no-codesign
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest installed Xcode
+        # Same selection as release.yml (sort -V; capture output, no pipe into head).
+        run: |
+          set -euo pipefail
+          latest="$(printf '%s\n' /Applications/Xcode*.app | sort -V | tail -n 1)"
+          sudo xcode-select -s "$latest/Contents/Developer"
+          xcver="$(xcodebuild -version)"
+          echo "$xcver"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Build (debug, device, unsigned)
+        run: flutter build ios --debug --no-codesign --no-tree-shake-icons
+
+      - name: Check the location keys in the built Info.plist
+        run: |
+          set -euo pipefail
+          plist="build/ios/iphoneos/Runner.app/Info.plist"
+          for key in \
+            NSLocationWhenInUseUsageDescription \
+            NSLocationAlwaysAndWhenInUseUsageDescription \
+            NSLocationTemporaryUsageDescriptionDictionary:WorkdayRoute; do
+            /usr/libexec/PlistBuddy -c "Print :$key" "$plist" >/dev/null \
+              || { echo "::error::$key missing from $plist"; exit 1; }
+          done
+          /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$plist" | grep -q '^ *location$' \
+            || { echo "::error::UIBackgroundModes lacks location"; exit 1; }
+          manifest="build/ios/iphoneos/Runner.app/PrivacyInfo.xcprivacy"
+          plutil -lint "$manifest" \
+            || { echo "::error::PrivacyInfo.xcprivacy missing or invalid in Runner.app"; exit 1; }
+          echo "Location keys, background mode and privacy manifest present."

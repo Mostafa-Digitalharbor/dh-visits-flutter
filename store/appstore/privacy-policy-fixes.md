@@ -2,12 +2,55 @@
 
 الصفحة: https://digitalharbor.com.sa/ar/visit-app
 
+> **الحالة (فُحصت 2026-09-14):** الصفحة المنشورة ما زالت النسخة القديمة — تقول
+> "The App does not collect or transmit your location when it is in the background"
+> و"No background tracking"، وتاريخ السريان ما زال نصًا مؤقتًا ("Replace with the date
+> you publish this policy"). انشر مكانها النص الكامل من
+> [docs/PRIVACY_POLICY.md](../../docs/PRIVACY_POLICY.md) (أو `PRIVACY_POLICY.docx`)
+> **قبل** رفع أي build فيه يوم العمل، وإلا يتناقض مع التطبيق وإعلانات المتجرين.
+
 الصفحة جيدة في تغطية الموقع، لكنها تناقض إعلان App Privacy المنشور في App Store Connect
 في ثلاث نقاط. المراجع لدى Apple يقارن الاثنين، والتناقض سبب رفض مباشر.
 
 ---
 
-## 1. الصور — تناقض صريح (الأهم)
+## 0. الموقع في الخلفية أثناء يوم العمل — تغيير جوهري (الأهم الآن)
+
+الصفحة تقول إن التطبيق لا يتتبع الموقع في الخلفية. هذا لم يعد صحيحًا منذ إضافة
+"يوم العمل": بين "بدء يوم العمل" و"إنهاء يوم العمل" يسجّل التطبيق المسار في الخلفية
+ومع قفل الشاشة (Android: خدمة foreground من نوع location مع إشعار ظاهر؛ iOS: وضع
+الخلفية location). احذف أي عبارة "لا يوجد تتبع في الخلفية" وأضِف ما يلي. النص
+الإنجليزي الكامل في [docs/PRIVACY_POLICY.md](../../docs/PRIVACY_POLICY.md) (البندان 2.2 و4).
+
+**عربي:**
+
+> **مسار يوم العمل**: عند الضغط على "بدء يوم العمل" يسجّل التطبيق موقع جهازك الدقيق
+> (تقريبًا كل 5 ثوانٍ أثناء الحركة) حتى الضغط على "إنهاء يوم العمل" أو تسجيل الخروج،
+> بما في ذلك والتطبيق في الخلفية أو الشاشة مقفلة. على Android يظهر إشعار "تتبع يوم
+> العمل نشط" طوال مدة التسجيل، وعلى iOS يظهر مؤشر الموقع الخاص بالنظام. يُستخدم المسار
+> — بما فيه التنقل بين الزيارات — لتقارير يوم العمل والزيارات لدى جهة عملك. عند انقطاع
+> الشبكة تُحفظ المواقع على الجهاز حتى تُرفع إلى خادم جهة عملك ثم تُحذف من الجهاز.
+> لرسم المسارات على الطرق قد تُرسَل الإحداثيات المسجّلة (دون اسمك أو معرّفك أو معرّف
+> الجهاز) إلى خدمة مطابقة طرق تديرها Digital Harbor على بنية تحتية تتحكم فيها (وليست
+> خدمة توجيه عامة)؛ ولا تُغيَّر المواقع المسجّلة. لا يُسجَّل أي مسار خارج يوم عمل نشط.
+
+**English:**
+
+> **Work-day route**: When you tap "Start work day", the App records your device's
+> precise location (about every 5 seconds while moving) until you tap "End work day" or
+> sign out, including while the App is in the background or the screen is locked. On
+> Android a "Workday tracking active" notification is shown for as long as recording
+> runs; on iOS the system location indicator is shown. The route — including travel
+> between visits — is used for your employer's work-day and visit reports. Without a
+> network, positions are kept on the device until they are uploaded to your employer's
+> server, then removed from the device. To draw routes along roads, recorded coordinates
+> (without your name, ID or device ID) may be sent to a road-matching service operated by
+> Digital Harbor on infrastructure it controls (never a public routing service); the
+> recorded positions are not changed. No route is recorded outside an active work day.
+
+---
+
+## 1. الصور — تناقض صريح
 
 **السطر الحالي يقول إن التطبيق لا يجمع الصور:**
 

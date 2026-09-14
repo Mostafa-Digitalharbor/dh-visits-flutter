@@ -9,6 +9,8 @@ import '../../../app/design/app_dimens.dart';
 import '../../../app/design/responsive.dart';
 import '../../../core/constants.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../core/map_matching/route_geometry.dart';
+import '../../../core/map_matching/route_matcher.dart';
 import '../../../core/utils/app_date.dart';
 import '../../../core/utils/communications.dart';
 import '../../../core/utils/duration_format.dart';
@@ -61,6 +63,8 @@ class _VisitTrailViewState extends State<_VisitTrailView> {
   /// 30s on a running visit) don't yank the camera back while the user is
   /// reading some other part of the route.
   bool _fitted = false;
+
+  RouteLineMode _lineMode = RouteLineMode.roads;
 
   void _fit(List<LatLng> points) {
     if (points.isEmpty) return;
@@ -140,6 +144,8 @@ class _VisitTrailViewState extends State<_VisitTrailView> {
                   track: state.track,
                   live: visit.isTrackingLive,
                   onFit: () => _fit(TrailLayers.points(state.track)),
+                  lineMode: _lineMode,
+                  onLineMode: (m) => setState(() => _lineMode = m),
                 ),
               ),
               Expanded(
@@ -159,18 +165,31 @@ class _TrailMap extends StatelessWidget {
   final VisitTrack track;
   final bool live;
   final VoidCallback onFit;
+  final RouteLineMode lineMode;
+  final ValueChanged<RouteLineMode> onLineMode;
 
   const _TrailMap({
     required this.map,
     required this.track,
     required this.live,
     required this.onFit,
+    required this.lineMode,
+    required this.onLineMode,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Matched once per change of the trail's points, not per rebuild.
+    return MatchedRouteBuilder(
+      traces: [track.logs.trace],
+      builder: (context, geometries) => _build(context, geometries.first),
+    );
+  }
+
+  Widget _build(BuildContext context, RouteGeometry geometry) {
     final isDark = context.isDark;
     final points = TrailLayers.points(track);
+    final matching = RouteLineToggle.stateOf([geometry]);
 
     return Stack(
       children: [
@@ -195,7 +214,14 @@ class _TrailMap extends StatelessWidget {
           children: [
             const AppMapTileLayer(
                 maxZoom: AppConstants.mapMaxZoom, panBuffer: 2),
-            TrailLayers.polyline(context, track, strokeWidth: 5),
+            TrailLayers.polyline(
+              context,
+              track,
+              strokeWidth: 5,
+              path: lineMode == RouteLineMode.roads ? geometry.path() : null,
+            ),
+            // The recorded fixes themselves, in both modes: where the device
+            // actually reported the employee.
             TrailLayers.vertexDots(context, track),
             TrailLayers.endpoints(context, track, live: live),
             const AppMapAttribution(alignment: Alignment.bottomLeft),
@@ -214,6 +240,17 @@ class _TrailMap extends StatelessWidget {
             semanticLabel: context.s.trailFitRoute,
           ),
         ),
+        if ((slMaybe<RouteMatcher>()?.enabled ?? false) && points.length > 1)
+          Positioned(
+            top: 12,
+            right: 12,
+            child: RouteLineToggle(
+              mode: lineMode,
+              onChanged: onLineMode,
+              pending: matching.pending,
+              unmatched: matching.unmatched,
+            ),
+          ),
       ],
     );
   }

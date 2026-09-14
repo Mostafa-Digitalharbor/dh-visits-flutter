@@ -3301,6 +3301,258 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Fit route'**
   String get trailFitRoute;
+
+  /// No description provided for @routeRecordedTrails.
+  ///
+  /// In en, this message translates to:
+  /// **'Routes recorded today'**
+  String get routeRecordedTrails;
+
+  /// No description provided for @routeTrailSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{points} points · {km} km'**
+  String routeTrailSummary(int points, String km);
+
+  /// No description provided for @routeTrailsPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Some visit routes could not be loaded'**
+  String get routeTrailsPartial;
+
+  /// No description provided for @workdayNotStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Work day not started'**
+  String get workdayNotStarted;
+
+  /// No description provided for @workdayStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start work day'**
+  String get workdayStart;
+
+  /// No description provided for @workdayEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End work day'**
+  String get workdayEnd;
+
+  /// No description provided for @workdayActiveSince.
+  ///
+  /// In en, this message translates to:
+  /// **'Work day active since {time}'**
+  String workdayActiveSince(String time);
+
+  /// No description provided for @workdayPending.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 point waiting to upload} other{{count} points waiting to upload}}'**
+  String workdayPending(int count);
+
+  /// No description provided for @workdayCaptureOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Location tracking is paused — allow location access to resume'**
+  String get workdayCaptureOff;
+
+  /// No description provided for @workdayEndConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'End your work day?'**
+  String get workdayEndConfirmTitle;
+
+  /// No description provided for @workdayEndConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Location tracking stops and today\'s route is closed.'**
+  String get workdayEndConfirmMessage;
+
+  /// No description provided for @workdayNotificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workday tracking active'**
+  String get workdayNotificationTitle;
+
+  /// No description provided for @workdayNotificationText.
+  ///
+  /// In en, this message translates to:
+  /// **'Location tracking is currently running'**
+  String get workdayNotificationText;
+
+  /// No description provided for @workdayStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Work day started — your route is being recorded'**
+  String get workdayStarted;
+
+  /// No description provided for @workdayEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'Work day ended'**
+  String get workdayEnded;
+
+  /// No description provided for @workdayEndQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Work day ended — it will sync when you\'re back online'**
+  String get workdayEndQueued;
+
+  /// No description provided for @workdayUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Work-day tracking isn\'t available on this server'**
+  String get workdayUnsupported;
+
+  /// No description provided for @workdayLocationDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Location access is required to record your work day.'**
+  String get workdayLocationDenied;
+
+  /// No description provided for @workdayLocationDeniedForever.
+  ///
+  /// In en, this message translates to:
+  /// **'Location access is blocked for this app. Allow it in Settings to start your work day.'**
+  String get workdayLocationDeniedForever;
+
+  /// No description provided for @workdayLocationServiceOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on location services to start your work day.'**
+  String get workdayLocationServiceOff;
+
+  /// No description provided for @workdayOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get workdayOpenSettings;
+
+  /// No description provided for @workdayPreciseOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Precise location is off for this app, so your route can\'t be recorded accurately. Turn on Precise Location in Settings to start your work day.'**
+  String get workdayPreciseOff;
+
+  /// No description provided for @workdayDisclosureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Work-day location tracking'**
+  String get workdayDisclosureTitle;
+
+  /// No description provided for @workdayDisclosureBody.
+  ///
+  /// In en, this message translates to:
+  /// **'While your work day is active, Visits collects this device\'s precise location — also when the app is closed or in the background and while the screen is locked — to record your work-day route and your customer visits for your employer.'**
+  String get workdayDisclosureBody;
+
+  /// No description provided for @workdayDisclosureStops.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking starts only when you tap Start work day, and stops when you tap End work day or sign out.'**
+  String get workdayDisclosureStops;
+
+  /// No description provided for @workdayDisclosureStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Locations are kept on this phone until they reach your company\'s server. To draw routes along roads, recorded points may be sent to your company\'s map-matching service.'**
+  String get workdayDisclosureStorage;
+
+  /// No description provided for @workdayDisclosureAndroid.
+  ///
+  /// In en, this message translates to:
+  /// **'A notification stays visible for as long as tracking runs.'**
+  String get workdayDisclosureAndroid;
+
+  /// No description provided for @workdayDisclosureIos.
+  ///
+  /// In en, this message translates to:
+  /// **'iOS will ask for location access. Choosing \"Always\" lets recording continue if iOS closes the app during your work day.'**
+  String get workdayDisclosureIos;
+
+  /// No description provided for @workdayDisclosureAgree.
+  ///
+  /// In en, this message translates to:
+  /// **'Agree and continue'**
+  String get workdayDisclosureAgree;
+
+  /// No description provided for @workdayDisclosureDecline.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get workdayDisclosureDecline;
+
+  /// No description provided for @routeWorkdayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Work day route'**
+  String get routeWorkdayTitle;
+
+  /// No description provided for @routeWorkdayStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Work day start'**
+  String get routeWorkdayStart;
+
+  /// No description provided for @routeWorkdayEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Work day end'**
+  String get routeWorkdayEnd;
+
+  /// No description provided for @routeWorkdayNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Current position'**
+  String get routeWorkdayNow;
+
+  /// No description provided for @routeWorkdayMovement.
+  ///
+  /// In en, this message translates to:
+  /// **'Movement between visits'**
+  String get routeWorkdayMovement;
+
+  /// No description provided for @routeWorkdayPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Points'**
+  String get routeWorkdayPoints;
+
+  /// No description provided for @routeWorkdaySpan.
+  ///
+  /// In en, this message translates to:
+  /// **'{from} – {to}'**
+  String routeWorkdaySpan(String from, String to);
+
+  /// No description provided for @routeWorkdayFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s work-day route could not be loaded'**
+  String get routeWorkdayFailed;
+
+  /// No description provided for @routeLineRoads.
+  ///
+  /// In en, this message translates to:
+  /// **'Roads'**
+  String get routeLineRoads;
+
+  /// No description provided for @routeLineGps.
+  ///
+  /// In en, this message translates to:
+  /// **'Raw GPS'**
+  String get routeLineGps;
+
+  /// No description provided for @routeLineMatching.
+  ///
+  /// In en, this message translates to:
+  /// **'Matching to roads…'**
+  String get routeLineMatching;
+
+  /// No description provided for @routeLineUnmatched.
+  ///
+  /// In en, this message translates to:
+  /// **'No road match — showing raw GPS'**
+  String get routeLineUnmatched;
 }
 
 class _AppLocalizationsDelegate

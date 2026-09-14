@@ -49,11 +49,23 @@ class ApiException implements Exception {
   /// Diagnostic payload for logs and Sentry. Never rendered to the user.
   final dynamic details;
 
+  /// The Odoo exception class from `error.data.name`
+  /// (`odoo.exceptions.UserError`, `odoo.http.SessionExpiredException`, …).
+  /// docs/API.md is explicit that this — not `error.code`, which is `0` for a
+  /// `UserError` and `100` for an expiry — is what to branch on.
+  final String? odooName;
+
   ApiException({
     required this.code,
     this.serverMessage,
     this.details,
+    this.odooName,
   });
+
+  /// The session cookie is no longer valid. The one Odoo failure a client may
+  /// retry: re-authenticate, then repeat the call once (see `ApiClient`).
+  bool get isSessionExpired =>
+      odooName == 'odoo.http.SessionExpiredException';
 
   factory ApiException.fromJson(Map<String, dynamic> json) {
     final err = json['error'] is Map ? json['error'] as Map<String, dynamic> : json;
@@ -85,6 +97,7 @@ class ApiException implements Exception {
       // The diagnostic is never lost — it just moves somewhere the UI can't
       // render it from.
       details: err['details'] ?? err['data'] ?? (showable ? null : rawMessage),
+      odooName: dataName,
     );
   }
 
@@ -95,8 +108,13 @@ class ApiException implements Exception {
   /// before its scheduled time"). Everything else — `builtins.TypeError`,
   /// `KeyError`, `psycopg2.*`, and even `MissingError` — carries a Python
   /// diagnostic.
+  ///
+  /// `AccessError` is included because docs/API.md says to show its message:
+  /// the visit module raises it with a sentence explaining which record the
+  /// user may not touch.
   static const _userAuthoredOdooErrors = {
     'odoo.exceptions.UserError',
+    'odoo.exceptions.AccessError',
     'odoo.exceptions.ValidationError',
     'odoo.exceptions.RedirectWarning',
     'odoo.exceptions.Warning',

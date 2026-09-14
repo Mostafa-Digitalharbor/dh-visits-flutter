@@ -22,6 +22,8 @@ export 'lazy_indexed_stack.dart';
 export 'leaderboard_row.dart';
 export 'map_fab.dart';
 export 'map_pin.dart';
+export 'matched_route_builder.dart';
+export 'route_line_toggle.dart';
 export 'section_header.dart';
 export 'debounced_search_field.dart';
 export 'offline_banner.dart';

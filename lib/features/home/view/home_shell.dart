@@ -27,6 +27,8 @@ import '../../visits/bloc/visit_bloc.dart';
 import '../../visits/bloc/visits_list_bloc.dart';
 import '../../visits/view/persistent_visit_bar.dart';
 import '../../visits/view/visits_list_page.dart';
+import '../../workday/data/workday_tracker.dart';
+import '../../workday/view/workday_bar.dart';
 
 /// Root shell after login. Branches on the user's role:
 ///
@@ -45,6 +47,7 @@ class _HomeShellState extends State<HomeShell> {
   StreamSubscription<int>? _syncedSub;
   StreamSubscription<DroppedAction>? _droppedSub;
   StreamSubscription<int>? _trailDroppedSub;
+  StreamSubscription<int>? _workdayDroppedSub;
 
   @override
   void initState() {
@@ -82,8 +85,25 @@ class _HomeShellState extends State<HomeShell> {
       );
     });
 
+    // Work-day points recorded and then refused for good (e.g. the day was
+    // closed from another device before they uploaded).
+    final workday = slMaybe<WorkdayTracker>();
+    _workdayDroppedSub = workday?.onPointsDropped.listen((count) {
+      if (!mounted || count <= 0) return;
+      context.showSnack(
+        context.s.trailPointsDropped(count),
+        kind: SnackKind.error,
+      );
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      // An open work day survives app restarts: resume capturing it (or adopt
+      // the one open on the server) before anything else asks for location.
+      unawaited(workday?.restore(
+        notificationTitle: context.s.workdayNotificationTitle,
+        notificationText: context.s.workdayNotificationText,
+      ));
       final user = context.read<AuthBloc>().state.user;
       final isManager = user?.canEditVisits ?? false;
       // Their permissions never loaded, so the workflow buttons won't appear.
@@ -97,12 +117,14 @@ class _HomeShellState extends State<HomeShell> {
       context
           .read<LiveLocationBloc>()
           .add(const LiveLocationStartRequested());
-      // Only try to resume an active visit for field users — admins
-      // don't go on visits, so any "active" visit in the system would
-      // belong to another user and end up misrepresented on their bar.
-      if (!isManager) {
-        context.read<VisitBloc>().add(const VisitResumeRequested());
-      }
+      // Resume the caller's own running visit for every role. `/api/visit/my`
+      // only ever returns visits where the caller is the responsible employee,
+      // so a manager never picks up a subordinate's visit here — and a manager
+      // who runs visits themselves (the `VisitActionBar` offers them Start/End
+      // on their own visits) used to lose GPS trail recording after any app
+      // restart because this was skipped for them. The active-visit bar itself
+      // is still only shown in the field-user shell.
+      context.read<VisitBloc>().add(const VisitResumeRequested());
       context.read<VisitsListBloc>().add(VisitsListLoadRequested(
             scope:
                 isManager ? VisitListScope.pending : VisitListScope.mine,
@@ -113,6 +135,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void dispose() {
     _trailDroppedSub?.cancel();
+    _workdayDroppedSub?.cancel();
     _syncedSub?.cancel();
     _droppedSub?.cancel();
     super.dispose();
@@ -228,6 +251,8 @@ class _RoleShellState extends State<_RoleShell> {
         children: [
           const OfflineBanner(),
           const LiveLocationBanner(),
+          // Field users run the work day; managers oversee it.
+          if (widget.showVisitBar) const WorkdayBar(),
           Expanded(
             child: LazyIndexedStack(
               index: _tab,

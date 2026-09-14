@@ -436,9 +436,9 @@ Required packages:
 - `riverpod` or `bloc` (state)
 - `freezed` + `json_serializable` (models)
 
-Permissions:
-- Android: `ACCESS_FINE_LOCATION`, `ACCESS_BACKGROUND_LOCATION` (if background updates needed), `INTERNET`.
-- iOS: `NSLocationWhenInUseUsageDescription`, `NSLocationAlwaysAndWhenInUseUsageDescription`.
+Permissions (as shipped — see docs/WORKDAY_TRACKING.md):
+- Android: `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_LOCATION` (work-day route), `INTERNET`. `ACCESS_BACKGROUND_LOCATION` is not used: the foreground service is started from the foreground.
+- iOS: `NSLocationWhenInUseUsageDescription`, `NSLocationAlwaysAndWhenInUseUsageDescription`, `NSLocationTemporaryUsageDescriptionDictionary`, `UIBackgroundModes` = `location`.
 
 Location service config:
 - Distance filter: 5m.
@@ -536,7 +536,7 @@ curl -b cookies.txt -X POST https://dh-abdelrahmanwael-odoo-19-test.odoo.com/api
 - **Network loss during check-in:** queue request; retry until success. Backend rejects duplicate via "already checked-in" guard, so dedupe is automatic.
 - **Network loss during location push:** drop the sample (next sample replaces it). Never queue location updates — stale GPS is worse than gap.
 - **Clock skew:** always send `timestamp` from device, server trusts it for `check_in_time` etc. If device clock is wrong, visit timeline will be wrong. Consider syncing via NTP / using `DateTime.now().toUtc()` only.
-- **Background mode:** Android 12+ background location requires foreground service. iOS requires `Always` authorization. If team won't grant, fall back to foreground-only sharing.
+- **Background mode:** live sharing stays foreground-only. The work-day route records in the background through an Android foreground service (type `location`) and iOS background location updates (works with While Using when started in the app; Always adds relaunch after termination). See docs/WORKDAY_TRACKING.md.
 - **Session expiry:** intercept 401 → redirect to login, preserve in-flight check-in payload to retry after re-auth.
 - **Customers without coords:** never appear in `/api/customers`. If user opens deep link to such customer, `GET /api/customers/<id>` returns full record but check-in will fail with `LOCATION_REQUIRED`.
 

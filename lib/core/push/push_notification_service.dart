@@ -173,7 +173,7 @@ class PushNotificationService {
       await repository.registerDevice(
         token: token,
         platform: _platform(),
-        deviceId: await _deviceId(),
+        deviceId: await deviceId(),
       );
       await prefs.setString(_lastTokenKey, token);
       appLog('[push] token registered');
@@ -184,7 +184,7 @@ class PushNotificationService {
           await repository.registerDevice(
             token: newToken,
             platform: _platform(),
-            deviceId: await _deviceId(),
+            deviceId: await deviceId(),
           );
           await prefs.setString(_lastTokenKey, newToken);
           appLog('[push] token refreshed & re-registered');
@@ -264,7 +264,7 @@ class PushNotificationService {
 
   /// A stable per-install id so the backend can de-duplicate tokens for the
   /// same device. Generated once and persisted (no external uuid dependency).
-  Future<String> _deviceId() async {
+  Future<String> deviceId() async {
     var id = prefs.getString(_deviceIdKey);
     if (id == null || id.isEmpty) {
       final rand = Random.secure();

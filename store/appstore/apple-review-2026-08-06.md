@@ -219,14 +219,25 @@ app are reachable from it.
 
 LOCATION USE
 
-The app uses location/GPS to verify that a field rep is physically present at the
-customer's site during check-in and check-out. It requests When In Use authorization
-only: it does not request Always authorization, declares no background location mode,
-and does not read the location when the app is not in the foreground. Coordinates are
-read at two moments only — the start and the end of a visit — and are sent to the
-employer's own server to document that visit. The purpose is disclosed on screen
-before the permission prompt and in the App Privacy section. No location data is used
-for tracking or advertising.
+Visit check-in/out and live sharing use When In Use location while the app is open.
+
+The app also declares the "location" background mode for one feature: the work-day
+route. When the employee taps "Start work day", the app records their route (about
+one position every 5 seconds while moving) until they tap "End work day" or sign out
+— including while the app is in the background or the screen is locked, with the
+system location indicator shown. The route, including travel between customer
+visits, is uploaded to the employer's own server for the work-day and visit reports.
+Nothing is recorded outside an active work day.
+
+Before the first work day the app shows a disclosure screen explaining this and asks
+for agreement before any permission prompt. When In Use authorization is enough; the
+app then asks once whether to allow "Always", which only lets recording resume if iOS
+terminates the app during a work day. Declining keeps the feature working. No
+location data is used for tracking or advertising.
+
+To test: sign in, tap "Start work day", agree, allow location, press Home or lock the
+device and move, then reopen the app — the "Today's Route" tab shows the recorded
+route. Tap "End work day" to stop recording.
 
 The demo server above stays online until the review is complete, and we can reset its
 sample data on request.

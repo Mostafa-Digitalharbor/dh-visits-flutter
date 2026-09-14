@@ -51,13 +51,27 @@
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
 		<!-- ============================================================ -->
-		<!-- Location permission usage string. WhenInUse only — the app    -->
-		<!-- collects location while the user is actively using it and     -->
-		<!-- intentionally stops when backgrounded. Localized strings in   -->
-		<!-- en.lproj/InfoPlist.strings and ar.lproj/InfoPlist.strings.    -->
+		<!-- Location. Visit check-in/out and live sharing read location   -->
+		<!-- while the app is in use. Between "Start Work Day" and "End     -->
+		<!-- Work Day" the work-day route is also recorded in the          -->
+		<!-- background and with the screen locked (WorkdayLocation.swift, -->
+		<!-- UIBackgroundModes "location" below). "While Using" is enough  -->
+		<!-- for that because capture always starts in the foreground;     -->
+		<!-- "Always" is asked for afterwards, explained first in the app, -->
+		<!-- and only adds relaunch after iOS terminated the app.          -->
+		<!-- geolocator_apple still requests When In Use first: it checks  -->
+		<!-- for NSLocationWhenInUseUsageDescription before Always.        -->
+		<!-- Localized in en.lproj / ar.lproj InfoPlist.strings.           -->
 		<!-- ============================================================ -->
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>We use your location to record customer visit check-in/out and to share your live position with your manager while you are using the app.</string>
+		<string>Visits uses your location to record customer visit check-in and check-out, to share your position with your manager while you use the app, and — while your work day is active — to record your work-day route, including in the background and with the screen locked. Route recording stops when you end your work day.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>While your work day is active, Visits records your work-day route in the background. Allowing location access "Always" lets recording resume if iOS closes the app during your work day. No route is recorded outside an active work day.</string>
+		<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+		<dict>
+			<key>WorkdayRoute</key>
+			<string>Precise location is needed to record your work-day route and visits on the correct streets.</string>
+		</dict>
 		<!-- Camera: proof-of-visit photos attached to a visit. -->
 		<key>NSCameraUsageDescription</key>
 		<string>We use the camera so you can attach proof-of-visit photos to a customer visit.</string>
@@ -87,9 +101,14 @@
 		     FCM can deliver visit-workflow events in the background. Also enable
 		     "Push Notifications" + "Background Modes → Remote notifications" in
 		     the Xcode target Signing & Capabilities, and upload an APNs Auth Key
-		     (.p8) to Firebase → Cloud Messaging. -->
+		     (.p8) to Firebase → Cloud Messaging.
+		     "location": work-day route capture continues in the background and
+		     with the screen locked, only between Start and End Work Day. App
+		     Review needs that explained in the review notes
+		     (store/appstore/listing-en.md). -->
 		<key>UIBackgroundModes</key>
 		<array>
+			<string>location</string>
 			<string>remote-notification</string>
 			<string>fetch</string>
 		</array>

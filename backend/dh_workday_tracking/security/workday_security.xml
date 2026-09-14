@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Who sees and writes which work days. Rules of one group are OR-ed, so
+        a manager (who implies Visit User) records their own day through the
+        "own" rules and reads their team through the "team" rules.
+
+        "Team" is the hr.employee hierarchy (parent_id): a manager reads the
+        work days of the employees below them, evaluated at query time, so a
+        change of manager takes effect immediately.
+
+        Ownership on create/write and the rules of a work day (one active day,
+        no points into a completed day, append-only points, no reopening) are
+        enforced in Python and SQL constraints, not only here.
+    -->
+    <record id="rule_dh_work_session_company" model="ir.rule">
+        <field name="name">Work day: multi-company</field>
+        <field name="model_id" ref="model_dh_work_session"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_dh_work_location_company" model="ir.rule">
+        <field name="name">Work day point: multi-company</field>
+        <field name="model_id" ref="model_dh_work_location"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    </record>
+
+    <record id="rule_dh_work_session_own" model="ir.rule">
+        <field name="name">Work day: own</field>
+        <field name="model_id" ref="model_dh_work_session"/>
+        <field name="groups" eval="[(4, ref('dh_visit_management.group_visit_user'))]"/>
+        <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_dh_work_session_team" model="ir.rule">
+        <field name="name">Work day: team hierarchy (read)</field>
+        <field name="model_id" ref="model_dh_work_session"/>
+        <field name="groups" eval="[(4, ref('dh_visit_management.group_visit_manager'))]"/>
+        <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('employee_id', 'child_of', user.employee_ids.ids)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_dh_work_session_admin" model="ir.rule">
+        <field name="name">Work day: visit administrator (read, close)</field>
+        <field name="model_id" ref="model_dh_work_session"/>
+        <field name="groups" eval="[(4, ref('dh_visit_management.group_visit_admin'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_dh_work_session_system" model="ir.rule">
+        <field name="name">Work day: system maintenance</field>
+        <field name="model_id" ref="model_dh_work_session"/>
+        <field name="groups" eval="[(4, ref('base.group_system'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
+    <record id="rule_dh_work_location_own" model="ir.rule">
+        <field name="name">Work day point: own</field>
+        <field name="model_id" ref="model_dh_work_location"/>
+        <field name="groups" eval="[(4, ref('dh_visit_management.group_visit_user'))]"/>
+        <field name="domain_force">[('session_id.employee_id.user_id', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_dh_work_location_team" model="ir.rule">
+        <field name="name">Work day point: team hierarchy (read)</field>
+        <field name="model_id" ref="model_dh_work_location"/>
+        <field name="groups" eval="[(4, ref('dh_visit_management.group_visit_manager'))]"/>
+        <field name="domain_force">['|', ('session_id.employee_id.user_id', '=', user.id), ('session_id.employee_id', 'child_of', user.employee_ids.ids)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_dh_work_location_admin" model="ir.rule">
+        <field name="name">Work day point: visit administrator (read)</field>
+        <field name="model_id" ref="model_dh_work_location"/>
+        <field name="groups" eval="[(4, ref('dh_visit_management.group_visit_admin'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_dh_work_location_system" model="ir.rule">
+        <field name="name">Work day point: system maintenance</field>
+        <field name="model_id" ref="model_dh_work_location"/>
+        <field name="groups" eval="[(4, ref('base.group_system'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+</odoo>

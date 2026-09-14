@@ -47,7 +47,12 @@ class VisitsRepository {
 
   VisitsRepository({required this.api, required this.session, this.attendance});
 
-  static final DateFormat _odooDateTime = DateFormat('yyyy-MM-dd HH:mm:ss');
+  // Locale pinned: a bare `DateFormat` follows `Intl.defaultLocale`, and under
+  // an Arabic locale intl emits Arabic-Indic digits ("٢٠٢٦-٠٩-١٢ …"), which the
+  // server refuses as "not a valid date and time". This is a wire format, not
+  // a display string.
+  static final DateFormat _odooDateTime =
+      DateFormat('yyyy-MM-dd HH:mm:ss', 'en_US');
 
   /// Formats a [DateTime] as Odoo's naive-UTC string (`yyyy-MM-dd HH:mm:ss`).
   static String formatOdooUtc(DateTime dt) =>

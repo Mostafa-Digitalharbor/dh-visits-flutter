@@ -1750,4 +1750,160 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get trailFitRoute => 'Fit route';
+
+  @override
+  String get routeRecordedTrails => 'Routes recorded today';
+
+  @override
+  String routeTrailSummary(int points, String km) {
+    return '$points points · $km km';
+  }
+
+  @override
+  String get routeTrailsPartial => 'Some visit routes could not be loaded';
+
+  @override
+  String get workdayNotStarted => 'Work day not started';
+
+  @override
+  String get workdayStart => 'Start work day';
+
+  @override
+  String get workdayEnd => 'End work day';
+
+  @override
+  String workdayActiveSince(String time) {
+    return 'Work day active since $time';
+  }
+
+  @override
+  String workdayPending(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count points waiting to upload',
+      one: '1 point waiting to upload',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get workdayCaptureOff =>
+      'Location tracking is paused — allow location access to resume';
+
+  @override
+  String get workdayEndConfirmTitle => 'End your work day?';
+
+  @override
+  String get workdayEndConfirmMessage =>
+      'Location tracking stops and today\'s route is closed.';
+
+  @override
+  String get workdayNotificationTitle => 'Workday tracking active';
+
+  @override
+  String get workdayNotificationText =>
+      'Location tracking is currently running';
+
+  @override
+  String get workdayStarted =>
+      'Work day started — your route is being recorded';
+
+  @override
+  String get workdayEnded => 'Work day ended';
+
+  @override
+  String get workdayEndQueued =>
+      'Work day ended — it will sync when you\'re back online';
+
+  @override
+  String get workdayUnsupported =>
+      'Work-day tracking isn\'t available on this server';
+
+  @override
+  String get workdayLocationDenied =>
+      'Location access is required to record your work day.';
+
+  @override
+  String get workdayLocationDeniedForever =>
+      'Location access is blocked for this app. Allow it in Settings to start your work day.';
+
+  @override
+  String get workdayLocationServiceOff =>
+      'Turn on location services to start your work day.';
+
+  @override
+  String get workdayOpenSettings => 'Open settings';
+
+  @override
+  String get workdayPreciseOff =>
+      'Precise location is off for this app, so your route can\'t be recorded accurately. Turn on Precise Location in Settings to start your work day.';
+
+  @override
+  String get workdayDisclosureTitle => 'Work-day location tracking';
+
+  @override
+  String get workdayDisclosureBody =>
+      'While your work day is active, Visits collects this device\'s precise location — also when the app is closed or in the background and while the screen is locked — to record your work-day route and your customer visits for your employer.';
+
+  @override
+  String get workdayDisclosureStops =>
+      'Tracking starts only when you tap Start work day, and stops when you tap End work day or sign out.';
+
+  @override
+  String get workdayDisclosureStorage =>
+      'Locations are kept on this phone until they reach your company\'s server. To draw routes along roads, recorded points may be sent to your company\'s map-matching service.';
+
+  @override
+  String get workdayDisclosureAndroid =>
+      'A notification stays visible for as long as tracking runs.';
+
+  @override
+  String get workdayDisclosureIos =>
+      'iOS will ask for location access. Choosing \"Always\" lets recording continue if iOS closes the app during your work day.';
+
+  @override
+  String get workdayDisclosureAgree => 'Agree and continue';
+
+  @override
+  String get workdayDisclosureDecline => 'Not now';
+
+  @override
+  String get routeWorkdayTitle => 'Work day route';
+
+  @override
+  String get routeWorkdayStart => 'Work day start';
+
+  @override
+  String get routeWorkdayEnd => 'Work day end';
+
+  @override
+  String get routeWorkdayNow => 'Current position';
+
+  @override
+  String get routeWorkdayMovement => 'Movement between visits';
+
+  @override
+  String get routeWorkdayPoints => 'Points';
+
+  @override
+  String routeWorkdaySpan(String from, String to) {
+    return '$from – $to';
+  }
+
+  @override
+  String get routeWorkdayFailed =>
+      'Today\'s work-day route could not be loaded';
+
+  @override
+  String get routeLineRoads => 'Roads';
+
+  @override
+  String get routeLineGps => 'Raw GPS';
+
+  @override
+  String get routeLineMatching => 'Matching to roads…';
+
+  @override
+  String get routeLineUnmatched => 'No road match — showing raw GPS';
 }

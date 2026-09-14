@@ -13,6 +13,7 @@ import '../core/config/server_config_cubit.dart';
 import '../core/config/server_config_repository.dart';
 import '../core/di/service_locator.dart';
 import '../core/location/location_service.dart';
+import '../core/map_matching/route_matcher.dart';
 import '../core/push/push_notification_service.dart';
 import '../core/settings/settings_cubit.dart';
 import '../core/settings/settings_repository.dart';
@@ -27,6 +28,7 @@ import '../features/nearby/data/nearby_repository.dart';
 import '../features/visits/bloc/visit_bloc.dart';
 import '../features/visits/bloc/visits_list_bloc.dart';
 import '../features/visits/data/visits_repository.dart';
+import '../features/workday/data/workday_tracker.dart';
 import '../l10n/generated/app_localizations.dart';
 import 'router.dart';
 import 'theme.dart';
@@ -58,8 +60,15 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
     super.initState();
     _authBloc = AuthBloc(
       repository: sl<AuthRepository>(),
-      // Unregister the FCM token while the session is still valid.
-      onBeforeLogout: () => _push.unregister(),
+      // Unregister the FCM token while the session is still valid, and stop
+      // work-day capture (nobody is tracked while signed out) after pushing
+      // what it recorded.
+      onBeforeLogout: () async {
+        await _push.unregister();
+        await slMaybe<WorkdayTracker>()?.suspend();
+        // Matched road geometry describes where this employee went.
+        await slMaybe<RouteMatcher>()?.clear();
+      },
     )..add(const AuthStarted());
     _settingsCubit =
         SettingsCubit(repository: sl<SettingsRepository>());

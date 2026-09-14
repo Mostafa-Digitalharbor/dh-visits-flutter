@@ -11,10 +11,27 @@ import '../../../core/constants.dart';
 import '../../../core/location/location_service.dart';
 import '../../../core/network/connectivity_status.dart';
 import '../../../core/network/pending_actions_queue.dart';
+import '../../../core/network/server_clock.dart';
 import '../../../core/utils/app_log.dart';
 import '../../../core/utils/distance.dart';
 import 'models/visit_location_log.dart';
 import 'visits_repository.dart';
+
+/// A location source outside [VisitTrailTracker] that takes over sampling
+/// while it is active — the work-day capture. The tracker then opens no GPS
+/// stream of its own and receives the running visit's fixes via
+/// [VisitTrailTracker.ingest] instead.
+abstract class TrailFeed {
+  /// True while the feed is capturing; the tracker's own stream stays closed.
+  bool get isActive;
+
+  /// Tells the feed which visit is running (null: none), so the fixes it takes
+  /// from now on are attributed to it.
+  void activeVisitChanged(int? visitId);
+
+  /// Delivers every fix captured but not yet handed over.
+  Future<void> drain();
+}
 
 /// Collects the GPS trail of the visit that is currently running and pushes it
 /// to the server in batches.
@@ -29,11 +46,13 @@ import 'visits_repository.dart';
 ///   taken in a dead zone still flush correctly after the visit ends — the
 ///   server accepts a late upload as long as the fix's `logged_at` falls inside
 ///   the start–end window.
-/// - **Foreground only.** The app declares foreground-only location use (no
-///   `ACCESS_BACKGROUND_LOCATION`, no iOS `UIBackgroundModes=location`), so the
+/// - **Its own GPS stream is foreground only.** Outside a work day the
 ///   subscription is torn down the moment the app leaves the foreground and
-///   restored on resume. Sampling from the background would fail silently and
-///   make the store privacy declaration untrue.
+///   restored on resume. During an active work day it opens no stream at all:
+///   the work-day capture ([feed]) is the single location source, and hands
+///   this tracker the fixes taken while the visit ran through [ingest] —
+///   including those taken in the background — so two GPS streams never run
+///   side by side.
 ///
 /// It is deliberately *not* a bloc: nothing renders it directly. The trail UI
 /// reads the server's copy through `VisitTrailCubit`; this class only feeds it.
@@ -50,12 +69,29 @@ class VisitTrailTracker with WidgetsBindingObserver {
   /// to and would refuse the whole batch. See [_flush].
   final PendingActionsQueue Function()? pendingActions;
 
+  /// Re-expresses each fix's device-clock timestamp on the server's clock, so
+  /// `logged_at` is comparable with the `start_datetime`/`end_datetime` the
+  /// server stamps. See [ServerClock] for the failure this prevents. Null (in
+  /// tests) sends the device time unchanged.
+  final ServerClock? serverClock;
+
+  /// Stable per-install id sent as each point's `device_id`, the same one the
+  /// FCM registration uses, so a manager can tell which handset recorded a
+  /// stretch of route.
+  final Future<String?> Function()? deviceId;
+
+  /// The work-day capture, when one is wired in. Assigned after construction:
+  /// the work-day tracker is built on top of this one.
+  TrailFeed? feed;
+
   VisitTrailTracker({
     required this.prefs,
     required this.repository,
     required this.locationService,
     required this.connectivity,
     this.pendingActions,
+    this.serverClock,
+    this.deviceId,
   }) {
     WidgetsBinding.instance.addObserver(this);
     _pendingCount.value = _readBuffer().length;
@@ -71,12 +107,22 @@ class VisitTrailTracker with WidgetsBindingObserver {
   StreamSubscription<Position>? _positions;
   Timer? _flushTimer;
   VoidCallback? _connectivityListener;
-  bool _flushing = false;
+
+  /// The flush currently running. [flushNow] waits on it instead of returning
+  /// early — see there.
+  Future<void>? _inFlight;
 
   /// The visit being tracked, or null when idle.
   int? _visitId;
   int? get activeVisitId => _visitId;
   bool get isTracking => _visitId != null;
+
+  /// Device time at which sampling began for [_visitId]. A fix stamped earlier
+  /// is a cached position the OS replayed when the stream opened — see
+  /// [_onPosition].
+  DateTime? _trackingSince;
+
+  String? _deviceIdValue;
 
   /// The last fix we *kept*, used to reject points that haven't moved far
   /// enough to be worth a vertex.
@@ -106,15 +152,22 @@ class VisitTrailTracker with WidgetsBindingObserver {
   /// tracked (a no-op), which is what makes it usable straight from the Start
   /// action *and* from the app-resume path without coordinating the two.
   Future<void> start(int visitId) async {
-    if (_visitId == visitId && _positions != null) return;
+    if (_visitId == visitId &&
+        (_positions != null || (feed?.isActive ?? false))) {
+      return;
+    }
     if (_visitId != null && _visitId != visitId) {
       // Switching visits: get whatever the old one collected off the device
-      // before its subscription goes away.
+      // before its subscription goes away. Points are buffered against the id
+      // they were taken for, so nothing of the old visit can leak into this one.
       await stop();
     }
     _visitId = visitId;
+    _trackingSince = DateTime.now();
     await prefs.setInt(_activeKey, visitId);
+    feed?.activeVisitChanged(visitId);
     _lastKept = null;
+    await _resolveDeviceId();
     await _subscribe();
     _startFlushTimer();
     // Flush straight away: a previous run may have left points buffered.
@@ -133,6 +186,7 @@ class VisitTrailTracker with WidgetsBindingObserver {
     if (runningVisitId == null) {
       if (stored != null) await prefs.remove(_activeKey);
       _visitId = null;
+      feed?.activeVisitChanged(null);
       await flushNow();
       return;
     }
@@ -147,14 +201,57 @@ class VisitTrailTracker with WidgetsBindingObserver {
     _flushTimer?.cancel();
     _flushTimer = null;
     _visitId = null;
+    _trackingSince = null;
     _lastKept = null;
     await prefs.remove(_activeKey);
+    feed?.activeVisitChanged(null);
+    // Under a work day the fixes are captured outside this class: pull in the
+    // ones not handed over yet, so End's flush carries the tail of the route.
+    if (feed?.isActive ?? false) await feed!.drain();
     if (flush) await flushNow();
+  }
+
+  /// Re-evaluates who samples after the work-day capture started or stopped:
+  /// closes this tracker's own stream when the feed took over, and reopens it
+  /// (foreground only) for a visit still running after the feed went away.
+  void feedChanged() {
+    if (feed?.isActive ?? false) {
+      _positions?.cancel();
+      _positions = null;
+      return;
+    }
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    final foreground =
+        lifecycle == null || lifecycle == AppLifecycleState.resumed;
+    if (_visitId != null && _positions == null && foreground) {
+      unawaited(_subscribe());
+      _startFlushTimer();
+    }
+  }
+
+  /// Buffers a fix the work-day capture took while [visitId] was running.
+  /// Same buffer, same flush as a fix from this tracker's own stream; a fix
+  /// already buffered (a drain replayed after a crash) is ignored.
+  Future<void> ingest(int visitId, TrailPoint point) async {
+    final key = _BufferedPoint(visitId: visitId, point: point).key;
+    if (_readBuffer().any((b) => b.key == key)) return;
+    await _buffer(visitId, point);
+  }
+
+  Future<void> _resolveDeviceId() async {
+    if (_deviceIdValue != null || deviceId == null) return;
+    try {
+      _deviceIdValue = await deviceId!();
+    } catch (e) {
+      appLog('[VisitTrailTracker] device id unavailable: $e');
+    }
   }
 
   Future<void> _subscribe() async {
     await _positions?.cancel();
     _positions = null;
+    // The work-day capture is sampling already; see [feed].
+    if (feed?.isActive ?? false) return;
     final permitted = await locationService.ensurePermission();
     if (!permitted) {
       // No permission is not an error to raise here: the visit itself could not
@@ -177,7 +274,7 @@ class VisitTrailTracker with WidgetsBindingObserver {
     _flushTimer?.cancel();
     _flushTimer = Timer.periodic(
       AppConstants.trailFlushInterval,
-      (_) => unawaited(flushNow()),
+      (_) => unawaited(flushNow(probe: true)),
     );
   }
 
@@ -203,7 +300,7 @@ class VisitTrailTracker with WidgetsBindingObserver {
         if (_visitId != null && _positions == null) {
           unawaited(_subscribe());
           _startFlushTimer();
-          unawaited(flushNow());
+          unawaited(flushNow(probe: true));
         }
         break;
     }
@@ -213,9 +310,22 @@ class VisitTrailTracker with WidgetsBindingObserver {
   // Sampling
   // ---------------------------------------------------------------------------
 
+  /// A device-clock instant expressed on the server's clock.
+  DateTime _serverTime(DateTime deviceTime) =>
+      serverClock?.toServer(deviceTime) ?? deviceTime.toUtc();
+
   void _onPosition(Position pos) {
     final visitId = _visitId;
     if (visitId == null) return;
+
+    // Android hands a new subscription its last known location first, stamped
+    // with the time it was originally taken. That fix predates this visit's
+    // start (often it *is* the fix the Start action itself used), and the
+    // server refuses anything older than `start_datetime` — so it would only
+    // ever come back as a rejected point and a "positions could not be saved"
+    // warning for the rep.
+    final since = _trackingSince;
+    if (since != null && pos.timestamp.isBefore(since)) return;
 
     // A wildly uncertain fix is worse than no fix: it puts a vertex hundreds of
     // metres off the real route and the drawn thread jumps sideways and back.
@@ -246,20 +356,23 @@ class VisitTrailTracker with WidgetsBindingObserver {
       TrailPoint(
         latitude: pos.latitude,
         longitude: pos.longitude,
-        // The device's own fix time, not `DateTime.now()`: this is the field
-        // the server orders and measures the trail by.
-        loggedAt: pos.timestamp.toUtc(),
+        // The fix's own time, not the upload time: this is the field the server
+        // orders and measures the trail by. Only the clock it is read against
+        // is corrected, never the moment itself.
+        loggedAt: _serverTime(pos.timestamp),
         accuracy: accuracy > 0 ? accuracy : null,
         altitude: pos.altitude,
         speed: pos.speed >= 0 ? pos.speed : null,
         heading: pos.heading >= 0 ? pos.heading : null,
+        deviceId: _deviceIdValue,
       ),
     ));
   }
 
   /// Records a point the user asked for explicitly (not from the stream), e.g.
   /// a "mark my position" tap. Goes through the same buffer so it is as
-  /// crash-safe and as offline-tolerant as an automatic one.
+  /// crash-safe and as offline-tolerant as an automatic one. [loggedAt] is
+  /// device time.
   Future<void> addManualPoint({
     required int visitId,
     required double latitude,
@@ -273,9 +386,10 @@ class VisitTrailTracker with WidgetsBindingObserver {
       TrailPoint(
         latitude: latitude,
         longitude: longitude,
-        loggedAt: (loggedAt ?? DateTime.now()).toUtc(),
+        loggedAt: _serverTime(loggedAt ?? DateTime.now()),
         accuracy: accuracy,
         location: location,
+        deviceId: _deviceIdValue,
       ),
     );
     await flushNow();
@@ -305,15 +419,41 @@ class VisitTrailTracker with WidgetsBindingObserver {
 
   /// Pushes everything buffered to the server, one batch per visit.
   ///
+  /// When a flush is already running this waits for it and then flushes again,
+  /// rather than returning at once. End awaits this to get the route onto the
+  /// server while the visit is still open; with an early return, a timer tick
+  /// that happened to be mid-flush made that await resolve immediately and the
+  /// tail of the route was still on the device when the visit closed.
+  ///
+  /// [probe] sends even while [ConnectivityStatus] reads offline. That flag
+  /// only turns back to online after *some* request succeeds, so if the
+  /// tracker never tried while it was down, a quiet app (nothing else calling
+  /// the server) would keep the route stuck on the device indefinitely after
+  /// the network had long returned. The periodic timer and app-resume flushes
+  /// are that probe; a failed attempt costs one fast request and keeps every
+  /// point. Point-count triggers do not probe, so a dead zone is not hammered
+  /// once per fix.
+  ///
   /// Never throws: it runs from a timer, a connectivity callback and a lifecycle
   /// callback, none of which have anywhere to put an error.
-  Future<void> flushNow() async {
-    if (_flushing) return;
-    _flushing = true;
+  Future<void> flushNow({bool probe = false}) async {
+    while (_inFlight != null) {
+      await _inFlight;
+    }
+    final run = _flushAll(probe: probe);
+    _inFlight = run;
+    try {
+      await run;
+    } finally {
+      _inFlight = null;
+    }
+  }
+
+  Future<void> _flushAll({required bool probe}) async {
     try {
       final buffer = _readBuffer();
       if (buffer.isEmpty) return;
-      if (!connectivity.isOnline) return;
+      if (!connectivity.isOnline && !probe) return;
 
       final byVisit = <int, List<_BufferedPoint>>{};
       for (final b in buffer) {
@@ -343,13 +483,16 @@ class VisitTrailTracker with WidgetsBindingObserver {
         droppedTotal += droppedHere;
       }
 
-      await _writeBuffer(survivors);
+      // Points buffered while the network calls were in flight are still only
+      // on disk: re-read and keep them, or this write would erase them.
+      final sentKeys = {for (final b in buffer) b.key};
+      final arrivedMeanwhile =
+          _readBuffer().where((b) => !sentKeys.contains(b.key));
+      await _writeBuffer([...survivors, ...arrivedMeanwhile]);
       if (droppedTotal > 0) _dropped.add(droppedTotal);
       if (landed) _revision.value++;
     } catch (e) {
       appLog('[VisitTrailTracker] flush failed: $e');
-    } finally {
-      _flushing = false;
     }
   }
 
@@ -380,6 +523,7 @@ class VisitTrailTracker with WidgetsBindingObserver {
     points.sort((a, b) => a.point.loggedAt.compareTo(b.point.loggedAt));
 
     var remaining = points;
+    final keep = <_BufferedPoint>[];
     var landed = false;
     var dropped = 0;
 
@@ -392,25 +536,42 @@ class VisitTrailTracker with WidgetsBindingObserver {
           [for (final b in batch) b.point],
         );
 
-        // `rejected[].index` is the position in the array we just sent. Those
-        // points are malformed or outside the visit's window — re-sending them
-        // would be refused identically forever, so they are dropped rather than
-        // retried, but never silently: they were real field evidence.
-        for (final r in result.rejected) {
-          appLog('[VisitTrailTracker] visit $visitId point ${r.index} '
-              'refused: ${r.error}');
+        // Partial success is the normal case, not an error: `rejected[].index`
+        // is the position in the array just sent, and every index *not* listed
+        // was created. Accepted points simply leave the buffer.
+        final refusedAt = {for (final r in result.rejected) r.index: r};
+        final serverNow = serverClock?.now() ?? DateTime.now().toUtc();
+        for (var i = 0; i < batch.length; i++) {
+          final refusal = refusedAt[i];
+          if (refusal == null) continue;
+          final b = batch[i];
+          // Every refusal is permanent except one: "cannot be dated in the
+          // future", which time itself cures. The message is translated, so it
+          // is recognised by the point rather than the text — a fix still ahead
+          // of the server's clock is kept and retried (bounded, like a refused
+          // batch). Anything else (out of range, unparseable, before the start,
+          // after the end) would be refused identically forever, so it is
+          // dropped — but never silently: it was real field evidence.
+          if (b.point.loggedAt.isAfter(serverNow) &&
+              b.attempts + 1 < AppConstants.trailMaxFlushAttempts) {
+            keep.add(b.withAttempt());
+            appLog('[VisitTrailTracker] visit $visitId point $i dated ahead of '
+                'the server; retrying later: ${refusal.error}');
+          } else {
+            dropped++;
+            appLog('[VisitTrailTracker] visit $visitId point $i '
+                '(${b.point.loggedAt.toIso8601String()}) refused: '
+                '${refusal.error}');
+          }
         }
-        // Every point in the batch was either created or rejected, so the whole
-        // batch leaves the buffer either way.
         landed = landed || result.created > 0;
-        dropped += result.rejected.length;
         remaining = rest;
       } on ApiException catch (e) {
         if (e.code == ApiErrorCode.network ||
             e.code == ApiErrorCode.timeout ||
             e.code == ApiErrorCode.server) {
           // Unreachable again mid-drain — keep what is left, retry next tick.
-          return (remaining, landed, dropped);
+          return ([...keep, ...remaining], landed, dropped);
         }
         // The whole call was refused (the visit moved on, rights changed).
         // Count the attempts rather than either retrying forever or dropping on
@@ -423,11 +584,12 @@ class VisitTrailTracker with WidgetsBindingObserver {
         ];
         dropped += remaining.length - retried.length;
         appLog('[VisitTrailTracker] visit $visitId batch refused '
-            '(${e.code}); keeping ${retried.length}, dropping $dropped');
-        return (retried, landed, dropped);
+            '(${e.code} ${e.serverMessage ?? ''}); keeping ${retried.length}, '
+            'dropping ${remaining.length - retried.length}');
+        return ([...keep, ...retried], landed, dropped);
       }
     }
-    return (remaining, landed, dropped);
+    return (keep, landed, dropped);
   }
 
   // ---------------------------------------------------------------------------
@@ -491,6 +653,12 @@ class _BufferedPoint {
     required this.point,
     this.attempts = 0,
   });
+
+  /// Identity of the fix itself (not of this attempt count), used to tell the
+  /// points a flush sent apart from ones buffered while it was running.
+  String get key =>
+      '$visitId|${point.loggedAt.microsecondsSinceEpoch}|'
+      '${point.latitude}|${point.longitude}';
 
   _BufferedPoint withAttempt() => _BufferedPoint(
         visitId: visitId,

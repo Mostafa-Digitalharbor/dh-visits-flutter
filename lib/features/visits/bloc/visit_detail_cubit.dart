@@ -335,12 +335,22 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
   }) async {
     if (_busy) return false;
     final tracker = _trail;
-    // Push what is still buffered *before* the visit closes. A late flush is
-    // supported — the server accepts a point transmitted after the end as long
-    // as its `logged_at` falls inside the start–end window — but the End also
-    // stamps `end_datetime`, so anything sampled during the request itself
-    // would land outside it and be refused for good.
-    await tracker?.flushNow();
+    // Only this visit's own recording is stopped; a tracker busy with another
+    // running visit keeps going and just gets flushed.
+    final trackingThis = tracker != null &&
+        (tracker.activeVisitId == null || tracker.activeVisitId == visitId);
+    // Stop sampling, then push what is buffered, *before* the End goes out.
+    // A late flush is supported — the server accepts a point transmitted after
+    // the end as long as its `logged_at` falls inside the start–end window —
+    // but the End stamps `end_datetime`, so a fix sampled while the request is
+    // in flight (or between its response and a later stop) lands after it and
+    // is refused for good. The End's own coordinates, acquired fresh by the
+    // caller, are the trail's final point.
+    if (trackingThis) {
+      await tracker.stop();
+    } else {
+      await tracker?.flushNow();
+    }
     final ok = await _runQueueable(
       'end',
       {
@@ -358,7 +368,13 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
           location: location,
           isMocked: isMocked),
     );
-    if (ok) await tracker?.stop();
+    // Refused (no outcome, state moved on): if the visit is in fact still
+    // running, its route must keep recording. An End that only reached the
+    // offline queue counts as success — the buffered tail stays on the device
+    // and flushes once the queued End has replayed.
+    if (!ok && trackingThis && (state.visit?.isInProgress ?? false)) {
+      unawaited(tracker.start(visitId));
+    }
     return ok;
   }
 
