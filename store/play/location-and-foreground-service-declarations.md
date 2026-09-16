@@ -163,8 +163,11 @@ declaration and the in-app disclosure.
 - [ ] Hosted policy `https://digitalharbor.com.sa/ar/visit-app` carries the
       current docs/PRIVACY_POLICY.md (last updated 16 September 2026),
       including "Background location during an active visit". **Checked
-      2026-09-14: not yet** — the page still says "No background tracking" and
-      has no real effective date.
+      2026-09-16 again: not yet** — the page still says "No background
+      tracking", still describes sharing live location "during the work day"
+      and the nearby-employees map, and its effective date is still the
+      "Replace with the date you publish this policy" placeholder. Publish
+      docs/PRIVACY_POLICY.html there before submitting to either store.
 - [ ] It names the notification, the Start Visit / End Visit limits, offline
       storage, and road matching by a company-controlled service.
 - [ ] Store listing text describes visit-only location use
