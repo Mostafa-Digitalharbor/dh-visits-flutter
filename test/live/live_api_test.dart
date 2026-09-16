@@ -47,6 +47,7 @@ import 'package:location_gps/features/customers/data/customers_repository.dart';
 import 'package:location_gps/features/employees/data/employees_repository.dart';
 import 'package:location_gps/features/visits/data/models/visit.dart';
 import 'package:location_gps/features/visits/data/models/visit_location_log.dart';
+import 'package:location_gps/features/visits/data/models/visit_participant.dart';
 import 'package:location_gps/features/visits/data/visit_tracking_consent.dart';
 import 'package:location_gps/features/visits/data/visit_trail_tracker.dart';
 import 'package:location_gps/features/visits/data/visits_repository.dart';
@@ -727,6 +728,39 @@ void main() {
       } on ApiException catch (e) {
         print('  repeated attendee decision → ${_userFacing(e)}');
       }
+      await visits.cancel(v.id);
+    });
+  }, skip: _skip);
+
+  group('attendee rejection', () {
+    test('rejecting an attendee sends the visit back per the server policy',
+        () async {
+      final v = await visits.createVisit({
+        'visit_type': 'project',
+        'project_id': projectId,
+        'scheduled_datetime': VisitsRepository.formatOdooUtc(
+            DateTime.now().add(const Duration(hours: 6))),
+        'purpose': '$_qaTag attendee reject',
+        if (user.employeeId != null) 'employee_id': user.employeeId,
+      });
+      final other = (await EmployeesRepository(api: api).list())
+          .where((e) => e.hrEmployeeId != null && e.hrEmployeeId != user.employeeId)
+          .map((e) => e.hrEmployeeId!)
+          .first;
+      await visits.addParticipants(v.id, [other]);
+      expect(await visits.submit(v.id), 'submitted');
+      final line = (await visits.readParticipants(v.id)).single;
+      await visits.rejectParticipant(line.id, '$_qaTag attendee on leave');
+      final after = await visits.getVisit(v.id);
+      final decided = (await visits.readParticipants(v.id)).single;
+      print('  attendee rejected → participant=${decided.approvalState.name} '
+          'visit=${after?.state.name} attendee track=${after?.attendeeApprovalState.name}');
+      expect(decided.approvalState, ParticipantApprovalState.rejected);
+      expect(after?.state, anyOf(VisitState.draft, VisitState.rejected),
+          reason: 'API.md §4.4: draft (default policy) or rejected');
+      final again = await _expectApiError(
+          () => visits.rejectParticipant(line.id, '$_qaTag twice'));
+      print('  rejecting twice → ${_userFacing(again)}');
       await visits.cancel(v.id);
     });
   }, skip: _skip);
