@@ -130,15 +130,15 @@ $rtl = $Platform -in @('ios','ipad')
 $shots = if ($rtl) {
   @(
     @{n='1-visits-list';  f='02_visits_list.png'; h='زياراتك اليوم في مكان واحد'; s='من التخطيط حتى الاعتماد.'}
-    @{n='2-visit-detail'; f='01_visit_detail.png';h='حضور موثّق بالموقع';          s='إحداثيات دقيقة عند كل عميل.'}
-    @{n='3-dashboard';    f='03_dashboard.png';   h='فريقك أمامك لحظة بلحظة';      s='التقدّم والحضور وخريطة الميدان.'}
+    @{n='2-visit-detail'; f='01_visit_detail.png';h='زيارة موثّقة بالموقع';        s='إحداثيات دقيقة عند كل عميل.'}
+    @{n='3-dashboard';    f='03_dashboard.png';   h='زيارات فريقك في لوحة واحدة';  s='التقدّم والاعتمادات والزيارات الجارية على الخريطة.'}
     @{n='4-analytics';    f='04_analytics.png';   h='الأداء في نظرة واحدة';        s='الالتزام بالمواعيد والتغطية والاتجاهات.'}
   )
 } else {
   @(
     @{n='1-visits-list';  f='02_visits_list.png'; h='Your field day, planned';     s='Every assigned visit, start to finish.'}
-    @{n='2-visit-detail'; f='01_visit_detail.png';h='Check in with verified GPS';  s='Tamper-resistant location at every site.'}
-    @{n='3-dashboard';    f='03_dashboard.png';   h='See your team in real time';  s='Live progress, attendance, and field map.'}
+    @{n='2-visit-detail'; f='01_visit_detail.png';h='Start visits with verified GPS'; s='Tamper-resistant location at every site.'}
+    @{n='3-dashboard';    f='03_dashboard.png';   h='Every team visit in one view';  s='Progress, reviews, and active visits on the map.'}
     @{n='4-analytics';    f='04_analytics.png';   h='Performance at a glance';     s='On-time rates, coverage, and trends.'}
   )
 }

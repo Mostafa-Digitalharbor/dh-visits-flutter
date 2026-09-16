@@ -15,6 +15,8 @@ class CreateVisitState extends Equatable {
   final Employee? employee;
   final List<Employee> participants;
 
+  /// Set as soon as the server has created the visit — before participants
+  /// are added — so a retry never creates it twice.
   final int? createdVisitId;
   final ApiException? error;
 
@@ -37,6 +39,10 @@ class CreateVisitState extends Equatable {
       scheduled != null &&
       purpose.trim().isNotEmpty;
 
+  /// The visit exists on the server; only its participants may still be
+  /// missing (see [createdVisitId]).
+  bool get isCreated => createdVisitId != null;
+
   /// Customer name to display, taken from the chosen project/opportunity.
   String? get customerName => linked?.partnerName;
 
@@ -53,31 +59,30 @@ class CreateVisitState extends Equatable {
     List<Employee>? participants,
     int? createdVisitId,
     ApiException? error,
-  }) =>
-      CreateVisitState(
-        status: status ?? this.status,
-        visitType: visitType ?? this.visitType,
-        linked: clearLinked ? null : (linked ?? this.linked),
-        scheduled: scheduled ?? this.scheduled,
-        purpose: purpose ?? this.purpose,
-        location: location ?? this.location,
-        employee: clearEmployee ? null : (employee ?? this.employee),
-        participants: participants ?? this.participants,
-        createdVisitId: createdVisitId ?? this.createdVisitId,
-        error: error,
-      );
+  }) => CreateVisitState(
+    status: status ?? this.status,
+    visitType: visitType ?? this.visitType,
+    linked: clearLinked ? null : (linked ?? this.linked),
+    scheduled: scheduled ?? this.scheduled,
+    purpose: purpose ?? this.purpose,
+    location: location ?? this.location,
+    employee: clearEmployee ? null : (employee ?? this.employee),
+    participants: participants ?? this.participants,
+    createdVisitId: createdVisitId ?? this.createdVisitId,
+    error: error,
+  );
 
   @override
   List<Object?> get props => [
-        status,
-        visitType,
-        linked?.id,
-        scheduled,
-        purpose,
-        location,
-        employee?.hrEmployeeId,
-        participants.map((e) => e.hrEmployeeId).toList(),
-        createdVisitId,
-        error,
-      ];
+    status,
+    visitType,
+    linked?.id,
+    scheduled,
+    purpose,
+    location,
+    employee?.hrEmployeeId,
+    participants.map((e) => e.hrEmployeeId).toList(),
+    createdVisitId,
+    error,
+  ];
 }

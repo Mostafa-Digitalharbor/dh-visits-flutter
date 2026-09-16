@@ -1,9 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_dh_work_session_user,dh.work.session.user,model_dh_work_session,dh_visit_management.group_visit_user,1,1,1,0
-access_dh_work_session_manager,dh.work.session.manager,model_dh_work_session,dh_visit_management.group_visit_manager,1,1,1,0
-access_dh_work_session_admin,dh.work.session.admin,model_dh_work_session,dh_visit_management.group_visit_admin,1,1,1,0
-access_dh_work_session_system,dh.work.session.system,model_dh_work_session,base.group_system,1,1,1,1
-access_dh_work_location_user,dh.work.location.user,model_dh_work_location,dh_visit_management.group_visit_user,1,0,1,0
-access_dh_work_location_manager,dh.work.location.manager,model_dh_work_location,dh_visit_management.group_visit_manager,1,0,1,0
-access_dh_work_location_admin,dh.work.location.admin,model_dh_work_location,dh_visit_management.group_visit_admin,1,0,1,0
-access_dh_work_location_system,dh.work.location.system,model_dh_work_location,base.group_system,1,0,1,1

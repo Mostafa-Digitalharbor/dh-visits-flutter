@@ -1,5 +1,9 @@
 import 'config/app_environment.dart';
 
+export 'constants/app_locales.dart';
+export 'constants/storage_keys.dart';
+export 'constants/ui_keys.dart';
+
 class AppConstants {
   AppConstants._();
 
@@ -10,37 +14,39 @@ class AppConstants {
   /// Odoo database name. Sourced from `--dart-define=ODOO_DATABASE=...`.
   static String get database => AppEnvironment.database;
 
-  static const Duration locationPingInterval = Duration(seconds: 30);
-  static const Duration nearbyRefreshInterval = Duration(seconds: 10);
-
-  /// Minimum movement before we re-send live location.
-  static const double locationMinDistanceMeters = 5.0;
-
-  /// Even if not moving, send at least this often to stay "online" server-side.
-  static const Duration locationHeartbeatInterval = Duration(minutes: 2);
-
   // ---- Visit GPS trail ----
-  // The thread drawn on the map between a visit's Start and End. Tuned for a
-  // rep moving by car through a city: dense enough that the path follows the
-  // road, sparse enough that an hour of driving is a few hundred points rather
-  // than a few thousand.
+  // The path recorded between a visit's Start and End — and only then. The
+  // native capture (VisitLocationService / VisitLocation.swift) applies the
+  // sampling rules; the foreground-stream fallback applies the same ones.
+  // Dense enough that a drawn trail follows the road and its turns, sparse
+  // enough that standing still records nothing.
 
-  /// Minimum movement between two kept fixes. Also the position stream's
-  /// `distanceFilter`, so most samples are discarded by the OS before they ever
-  /// reach the app.
-  static const double trailMinDistanceMeters = 20.0;
+  /// Minimum movement between two recorded fixes. Below it a fix is standing
+  /// still (or GPS jitter), not movement. Also the OS `distanceFilter`.
+  static const double trailMinDistanceMeters = 10.0;
 
-  /// Minimum time between two kept fixes, applied together with the distance
-  /// rule so crawling traffic doesn't pack the path with near-identical points.
-  static const Duration trailMinInterval = Duration(seconds: 20);
+  /// Minimum time between two recorded fixes, unless the second already covers
+  /// [trailBurstDistanceMeters]. Just under the native 5 s request interval, so
+  /// delivery jitter never skips a sample.
+  static const Duration trailMinInterval = Duration(seconds: 4);
+
+  /// A fix inside [trailMinInterval] is still kept when it is this far away.
+  /// Mirrors `BURST_DISTANCE_M` in VisitLocationService.
+  static const double trailBurstDistanceMeters = 15.0;
 
   /// A fix less certain than this is discarded rather than drawn: it would put
-  /// a vertex hundreds of metres off the route and inflate the server's
-  /// `tracked_distance_km` along with it.
-  static const double trailMaxAccuracyMeters = 100.0;
+  /// a vertex off the real street and inflate the server's
+  /// `tracked_distance_km` along with it. (The native capture relaxes this to
+  /// 100 m after 30 s without a usable fix, so an urban canyon leaves a coarse
+  /// point instead of a gap.)
+  static const double trailMaxAccuracyMeters = 50.0;
+
+  /// How often fixes recorded by the native capture are moved into the upload
+  /// buffer while the app process is alive (foreground or background).
+  static const Duration trailDrainInterval = Duration(seconds: 15);
 
   /// How often the buffered fixes are pushed to the server.
-  static const Duration trailFlushInterval = Duration(minutes: 2);
+  static const Duration trailFlushInterval = Duration(minutes: 1);
 
   /// Buffer size that triggers an immediate flush without waiting for the timer.
   static const int trailFlushBatchSize = 20;
@@ -49,58 +55,29 @@ class AppConstants {
   /// across several requests instead of one that times out.
   static const int trailMaxBatchSize = 100;
 
-  /// Hard ceiling on the on-device buffer (~10h of driving at the sampling
-  /// rates above). Past this the oldest fixes are dropped: the recent path is
-  /// the part still worth uploading.
-  static const int trailMaxBufferedPoints = 2000;
+  /// Most fixes moved from the native journal in one drain.
+  static const int trailMaxDrain = 500;
+
+  /// Hard ceiling on the on-device buffer (several hours of continuous
+  /// movement offline at the sampling rate above). Past this the oldest fixes
+  /// are dropped: the recent path is the part still worth uploading.
+  static const int trailMaxBufferedPoints = 4000;
 
   /// How many times a batch the server *refuses* is retried before its points
-  /// are abandoned. Covers the window where a Start is still replaying from the
-  /// offline queue, without retrying a genuinely impossible point forever.
+  /// are abandoned, so a genuinely impossible point is not retried forever.
   static const int trailMaxFlushAttempts = 5;
+
+  /// Visits whose local end time is remembered (to drop any fix recorded after
+  /// it). Older entries are forgotten first.
+  static const int trailMaxEndedVisits = 20;
+
+  /// Shortest gap between two server checks that a visit being recorded is
+  /// still in progress (on app resume, after a refused batch).
+  static const Duration trailVerifyInterval = Duration(seconds: 30);
 
   /// How often an open trail screen re-reads a visit that is still running.
   static const Duration trailLiveRefreshInterval = Duration(seconds: 30);
 
-  // ---- Work-day route ----
-  // The employee's movement for the whole of a work day, visits included. One
-  // location source feeds both it and a running visit's trail. Batch sizes are
-  // the visit trail's above; sampling is denser, because the drawn route is
-  // matched to roads and needs the turns to be in the data.
-
-  /// Server models holding the work day and its points. See WorkdayRepository.
-  static const String workSessionModel = 'x_dh_work_session';
-  static const String workLocationModel = 'x_dh_work_location';
-
-  /// Minimum movement between two recorded work-day fixes. Below it a fix is
-  /// standing still (or GPS jitter), not movement.
-  static const double workdayMinDistanceMeters = 5.0;
-
-  /// Minimum time between two recorded fixes. Just under the native service's
-  /// 5 s request interval, so delivery jitter never skips a sample: while
-  /// moving, about one fix every 5 s is recorded.
-  static const Duration workdayMinInterval = Duration(seconds: 4);
-
-  /// A fix within [workdayMinInterval] of the last is still kept when it is at
-  /// least this far away. Mirrors `BURST_DISTANCE_M` in WorkdayLocationService.
-  static const double workdayBurstDistanceMeters = 15.0;
-
-  /// Fixes less certain than this are skipped: at road-matching scale a 50 m
-  /// error already puts a fix on the wrong street.
-  static const double workdayMaxAccuracyMeters = 50.0;
-
-  /// How often fixes captured by the native service are moved into the upload
-  /// queue while the app process is alive (foreground or background).
-  static const Duration workdayDrainInterval = Duration(seconds: 15);
-
-  /// How often the work-day queue is pushed to the server.
-  static const Duration workdayFlushInterval = Duration(minutes: 1);
-
-  /// Hard ceiling on the on-device work-day queue: about 11 hours of
-  /// continuous movement offline at the sampling rate above.
-  static const int workdayMaxBufferedPoints = 8000;
-
-  static const double defaultRadiusMeters = 10.0;
   static const double defaultMapZoom = 19.0;
 
   // ---- Map tiles (OpenStreetMap) ----
@@ -108,7 +85,10 @@ class AppConstants {
   // identically everywhere. Change the provider in one place here.
   static const String mapTileUrl =
       'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-  static const String mapUserAgent = 'com.digitalharbor.location_gps';
+
+  /// Must be the app's real package id (`applicationId` / bundle id): the
+  /// OSM tile policy requires an identifying user agent, and OSRM sees it too.
+  static const String mapUserAgent = 'net.digitalharbor.visits';
 
   /// Target of the on-map credit badge ([AppMapAttribution]). OSM's ODbL
   /// licence requires the credit to be visible and to link back here.
@@ -160,19 +140,23 @@ class AppConstants {
   static const Duration apiConnectTimeout = Duration(seconds: 15);
   static const Duration apiReceiveTimeout = Duration(seconds: 30);
 
+  /// Longest a request body may take to go out. Without it a stalled upload
+  /// hangs until the OS gives up on the socket, minutes later.
+  static const Duration apiSendTimeout = Duration(seconds: 30);
+
+  /// Send and receive limit for file uploads (`Endpoints.uploads`): a photo
+  /// on a weak link, then stored server-side, needs far longer than JSON.
+  static const Duration apiUploadTimeout = Duration(minutes: 3);
+
   /// How long an idle socket is kept alive (Dart's default is 15s), so moving
   /// between screens reuses the connection instead of re-negotiating TLS.
   ///
   /// The socket *count* is deliberately left unbounded — see [ApiClient].
   static const Duration apiIdleTimeout = Duration(seconds: 30);
 
-  /// How recent a presence ping must be for an employee to count as "online"
-  /// on the nearby radar.
-  static const Duration nearbyOnlineWindow = Duration(minutes: 5);
-
-  /// GPS-search radius slider bounds (meters) on the nearby map.
-  static const double nearbyRadiusMinMeters = 5.0;
-  static const double nearbyRadiusMaxMeters = 200.0;
+  /// Longest a pull-to-refresh spinner waits for its reload before letting go.
+  /// The reload keeps running; only the gesture stops blocking.
+  static const Duration refreshTimeout = Duration(seconds: 30);
 
   // ---- Visit scheduling ----
   /// How far ahead / back a visit may be scheduled in the date picker.
@@ -194,8 +178,6 @@ class AppConstants {
 
   // ---- Standard Odoo models the app talks to via generic JSON-RPC ----
   static const String partnerModel = 'res.partner';
-  static const String calendarEventModel = 'calendar.event';
-  static const String calendarEventTypeModel = 'calendar.event.type';
   static const String usersModel = 'res.users';
 
   /// Visits live in the `dh_visit_management` Odoo module. The visit record is
@@ -233,10 +215,29 @@ class AppConstants {
       'group_visit_project_manager';
   static const String groupVisitAdminXmlName = 'group_visit_admin';
 
-  // Attendance: the salesperson's check-in / check-out is also mirrored to
-  // Odoo's standard `hr.attendance` (with GPS in the native `in_*` / `out_*`
-  // fields) so it shows up in the Attendances module. Each app user is matched
-  // to an `hr.employee` via its `user_id`.
-  static const String hrAttendanceModel = 'hr.attendance';
+  /// Employees (the participant picker, the signed-in user's employee).
   static const String hrEmployeeModel = 'hr.employee';
+
+  /// Chatter messages (a record's history and notes).
+  static const String mailMessageModel = 'mail.message';
+
+  // ---- Offline visit actions (PendingActionsQueue) ----
+
+  /// How often queued Start / End actions are retried while the app runs, on
+  /// top of the retry that fires when connectivity comes back.
+  static const Duration pendingActionFlushInterval = Duration(seconds: 60);
+
+  /// Failed replays (other than plain connectivity failures) after which a
+  /// queued action is given up and the user told. Keeps one broken action from
+  /// holding the rest of the queue forever.
+  static const int pendingActionMaxAttempts = 8;
+
+  /// Age after which a queued action that still can't be replayed is given up.
+  /// Two weeks covers any realistic stretch without coverage.
+  static const Duration pendingActionMaxAge = Duration(days: 14);
+
+  /// Rows fetched for a searchable directory (customers, the employee picker).
+  /// Both lists are searched server-side, so a page is a starting view, not
+  /// the whole directory — the search field reaches everything else.
+  static const int directoryPageLimit = 50;
 }

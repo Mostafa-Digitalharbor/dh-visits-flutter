@@ -1,3 +1,5 @@
+import '../../../../core/api/odoo_parse.dart';
+
 /// A pending to-do assigned to the current user on a visit — the in-app
 /// notification feed. Backed by Odoo's standard `mail.activity` (the same
 /// records that drive the manager's Activities clock and bell). The
@@ -39,22 +41,23 @@ class VisitActivity {
     this.urgency = ActivityUrgency.unknown,
   });
 
+  /// Throws [FormatException] for a row without an id or a visit to open —
+  /// an activity the user could tap but never reach — so `parseRows` skips it.
   factory VisitActivity.fromJson(Map<String, dynamic> json) {
-    String? m2oName(dynamic v) =>
-        (v is List && v.length >= 2) ? v[1]?.toString() : null;
-    final deadlineRaw = json['date_deadline'];
+    final typeName = odooMany2one(json['activity_type_id']).name;
     return VisitActivity(
-      id: (json['id'] as num).toInt(),
-      summary: (json['summary'] == false || json['summary'] == null)
-          ? (m2oName(json['activity_type_id']) ?? '')
-          : json['summary'].toString(),
-      typeName: m2oName(json['activity_type_id']),
-      visitId: (json['res_id'] as num?)?.toInt() ?? 0,
-      visitRef: (json['res_name'] == false) ? null : json['res_name']?.toString(),
-      deadline: (deadlineRaw == null || deadlineRaw == false)
-          ? null
-          : DateTime.tryParse(deadlineRaw.toString()),
-      urgency: activityUrgencyFromWire(json['state']?.toString()),
+      id:
+          odooInt(json['id']) ??
+          (throw const FormatException('activity row without an id')),
+      summary: odooString(json['summary']) ?? typeName ?? '',
+      typeName: typeName,
+      visitId:
+          odooInt(json['res_id']) ??
+          (throw const FormatException('activity without a visit')),
+      visitRef: odooString(json['res_name']),
+      // A date field (`YYYY-MM-DD`), so a plain local-date parse is right.
+      deadline: DateTime.tryParse(odooString(json['date_deadline']) ?? ''),
+      urgency: activityUrgencyFromWire(odooString(json['state'])),
     );
   }
 }

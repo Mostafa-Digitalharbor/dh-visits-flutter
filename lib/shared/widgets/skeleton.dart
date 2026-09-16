@@ -31,12 +31,21 @@ class AppShimmer extends StatelessWidget {
   }
 }
 
+/// The fill a skeleton shape is drawn with. Its colour never shows — the
+/// shimmer's shader replaces it; only its opacity matters.
+const Color _shimmerMask = AppColors.onMap;
+
 /// A single skeleton placeholder box with rounded corners.
 class SkeletonBox extends StatelessWidget {
   final double? width;
   final double height;
   final double radius;
-  const SkeletonBox({super.key, this.width, this.height = 16, this.radius = 8});
+  const SkeletonBox({
+    super.key,
+    this.width,
+    this.height = Insets.x4,
+    this.radius = Radii.xs,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +53,7 @@ class SkeletonBox extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: Colors.white, // Shimmer paints over this
+        color: _shimmerMask,
         borderRadius: BorderRadius.circular(radius),
       ),
     );
@@ -53,7 +62,7 @@ class SkeletonBox extends StatelessWidget {
 
 class SkeletonCircle extends StatelessWidget {
   final double size;
-  const SkeletonCircle({super.key, this.size = 40});
+  const SkeletonCircle({super.key, this.size = CompSz.chip});
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +70,7 @@ class SkeletonCircle extends StatelessWidget {
       width: size,
       height: size,
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: _shimmerMask,
         shape: BoxShape.circle,
       ),
     );
@@ -73,31 +82,48 @@ class SkeletonCircle extends StatelessWidget {
 class SkeletonListTile extends StatelessWidget {
   const SkeletonListTile({super.key});
 
+  static const double _rowPadding = Insets.x3;
+  static const double _titleLine = 14;
+  static const double _subtitleLine = 12;
+  static const double _titleShare = 0.55;
+  static const double _subtitleShare = 0.8;
+
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        const Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: Insets.x4,
+            vertical: _rowPadding,
+          ),
           child: Row(
-            children: const [
-              SkeletonCircle(size: 44),
+            children: [
+              SkeletonCircle(size: CompSz.avatar),
               SizedBox(width: Insets.x3h),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SkeletonBox(width: 160, height: 14),
+                    // Shares, not fixed widths: a 220dp bar overflowed the row
+                    // on a 320dp screen once the avatar and gutters were in.
+                    FractionallySizedBox(
+                      widthFactor: _titleShare,
+                      child: SkeletonBox(height: _titleLine),
+                    ),
                     SizedBox(height: Insets.x2),
-                    SkeletonBox(width: 220, height: 12),
+                    FractionallySizedBox(
+                      widthFactor: _subtitleShare,
+                      child: SkeletonBox(height: _subtitleLine),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
         ),
-        const Divider(height: 1),
+        const Divider(height: CompSz.hairline),
       ],
     );
   }
@@ -108,9 +134,11 @@ class SkeletonList extends StatelessWidget {
   final int itemCount;
   const SkeletonList({super.key, this.itemCount = 8});
 
-  /// 44dp avatar + 12dp padding top and bottom + a 1dp divider. Fixed, so the
-  /// sliver can place rows arithmetically.
-  static const double rowHeight = 69;
+  /// Avatar + padding above and below + the divider. Fixed, so the sliver can
+  /// place rows arithmetically.
+  static const double rowHeight = CompSz.avatar +
+      SkeletonListTile._rowPadding * 2 +
+      CompSz.hairline;
 
   @override
   Widget build(BuildContext context) {
@@ -138,24 +166,38 @@ class SkeletonList extends StatelessWidget {
 /// surface loading.
 class SkeletonCard extends StatelessWidget {
   final double height;
-  const SkeletonCard({super.key, this.height = 120});
+  const SkeletonCard({super.key, this.height = _defaultHeight});
+
+  static const double _defaultHeight = 120;
+  static const double _titleLine = 16;
+  static const double _bodyLine = 12;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       height: height,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(Insets.cardPad),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(Radii.sm),
+        color: _shimmerMask,
+        // The radius of the cards it stands in for.
+        borderRadius: BorderRadius.circular(Radii.lg),
       ),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: const [
-          SkeletonBox(width: 180, height: 16),
-          SkeletonBox(width: 240, height: 12),
-          SkeletonBox(width: 120, height: 12),
+        children: [
+          FractionallySizedBox(
+            widthFactor: 0.6,
+            child: SkeletonBox(height: _titleLine),
+          ),
+          FractionallySizedBox(
+            widthFactor: 0.9,
+            child: SkeletonBox(height: _bodyLine),
+          ),
+          FractionallySizedBox(
+            widthFactor: 0.4,
+            child: SkeletonBox(height: _bodyLine),
+          ),
         ],
       ),
     );

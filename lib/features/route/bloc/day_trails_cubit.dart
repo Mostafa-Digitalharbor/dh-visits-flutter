@@ -6,6 +6,7 @@ import '../../../core/utils/app_log.dart';
 import '../../visits/data/models/visit.dart';
 import '../../visits/data/models/visit_location_log.dart';
 import '../../visits/data/visits_repository.dart';
+import '../../visits/domain/visit_metrics.dart' show isSameDay;
 
 /// One visit's server trail, kept together with the visit it belongs to.
 ///
@@ -55,15 +56,13 @@ class DayTrailsCubit extends Cubit<DayTrailsState> {
   /// Visits that were actually started on the local calendar day of [day],
   /// ordered by start time — the order the employee did them in.
   static List<Visit> startedOn(Iterable<Visit> visits, DateTime day) {
-    bool sameDay(DateTime d) {
-      final l = d.toLocal();
-      return l.year == day.year && l.month == day.month && l.day == day.day;
-    }
-
-    return visits
-        .where((v) => v.startDatetime != null && sameDay(v.startDatetime!))
-        .toList()
-      ..sort((a, b) => a.startDatetime!.compareTo(b.startDatetime!));
+    final started = [
+      for (final v in visits)
+        if (v.startDatetime case final start?
+            when isSameDay(start.toLocal(), day))
+          (visit: v, start: start),
+    ]..sort((a, b) => a.start.compareTo(b.start));
+    return [for (final e in started) e.visit];
   }
 
   Future<void> load(List<Visit> visits, {bool force = false}) async {
@@ -76,7 +75,13 @@ class DayTrailsCubit extends Cubit<DayTrailsState> {
       return;
     }
     if (!isClosed) {
-      emit(DayTrailsState(loading: true, trails: state.trails));
+      // Keeps the previous figures on screen while the reload runs, the
+      // failure count included — dropping it made the error line flicker.
+      emit(DayTrailsState(
+        loading: true,
+        trails: state.trails,
+        failed: state.failed,
+      ));
     }
 
     final results = await Future.wait(visits.map((v) async {

@@ -1,9 +1,15 @@
 # Google Play — location and foreground service declarations
 
-Answers for the Play Console, derived from what the app actually does
-(AndroidManifest.xml, `WorkdayLocationService.kt`, docs/WORKDAY_TRACKING.md).
-Re-check this file whenever a permission, the service type or the disclosure
-text changes.
+Answers for the Play Console, derived from what the app does
+(AndroidManifest.xml, `visittracking/VisitLocationService.kt`,
+[docs/VISIT_TRACKING.md](../../docs/VISIT_TRACKING.md)). Re-check this file
+whenever a permission, the service type or the disclosure text changes.
+
+> **2026-09-16:** the work-day route (Start/End Work Day), live location
+> sharing, the manager "nearby employees" radar and the hr.attendance mirror
+> were removed from the app. Location is now collected **only for customer
+> visits**. Earlier answers that mention a work day are obsolete — do not
+> reuse them.
 
 ---
 
@@ -11,15 +17,16 @@ text changes.
 
 | Manifest entry | Why |
 |---|---|
-| `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` | Visit start/end, visit routes, live sharing while in use, work-day route |
-| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION` | `WorkdayLocationService`, `foregroundServiceType="location"` (required from Android 14 / targetSdk 34) |
-| `POST_NOTIFICATIONS` | Push notifications; makes the ongoing "Workday tracking active" notification visible on Android 13+ |
+| `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` | Start Visit / End Visit positions and the GPS trail of a visit in progress (while-in-use grant only) |
+| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION` | `VisitLocationService`, `foregroundServiceType="location"` (the type permission is required from Android 14 / targetSdk 34) |
+| `POST_NOTIFICATIONS` | Push notifications; makes the ongoing "Visit tracking active" notification visible on Android 13+ |
 
-**Not declared:** `ACCESS_BACKGROUND_LOCATION`. The service is only ever
-started while the app is in the foreground (the Start tap, or the app being
-reopened during an open work day), which the while-in-use grant covers. Do not
-add it: it would require the separate background-location declaration and
-review, for access the app does not need.
+**Not declared:** `ACCESS_BACKGROUND_LOCATION`. The service is only started
+while the app is in the foreground — right after the server confirms Start
+Visit, or when the app is reopened during a visit that is still in progress —
+which the while-in-use grant covers. Do not add it: it would require the
+separate background-location declaration and review, for access the app does
+not need.
 
 ---
 
@@ -33,39 +40,44 @@ Play asks this of every app targeting Android 14+ that declares a
 **Use case / task description** (paste):
 
 ```
-Field employees start a work day in the app ("Start work day"). While the work
-day is active, the app records the employee's route with a foreground service
-of type location: about one GPS position every 5 seconds while moving, stored
-on the device and uploaded to the employer's own server. The route covers the
-whole working day, including travel between customer visits, and is used for
-the employer's work-day and visit reports. The service runs only between the
-user's "Start work day" and "End work day" actions (or sign-out), shows an
-ongoing notification "Workday tracking active - Location tracking is currently
-running" for its whole duration, and stops immediately when the user ends the
-work day.
+Records the GPS trail of a customer visit the employee started, while the
+visit is in progress; stops when the visit ends.
+
+Field employees open an approved customer visit and tap "Start Visit". Once
+the employer's server confirms that the visit has started, the app starts a
+foreground service of type location that records the route of that visit
+(about one GPS position every few seconds while moving, nothing while
+standing still). Positions are stored on the device and uploaded to the
+employer's own server for the visit report. The service shows an ongoing
+"Visit tracking active" notification for its whole duration and stops
+immediately when the employee taps "End Visit" or signs out. No location is
+recorded before Start Visit, between visits or after End Visit.
 ```
 
-**Is the task started by the user?** Yes — explicit "Start work day" button.
+**Is the task started by the user?** Yes — the explicit "Start Visit" button
+on a visit.
 
 **Impact if the task is deferred or interrupted** (paste):
 
 ```
-The work-day route would have gaps: the positions of the employee's travel
-while the phone is in a pocket or the screen is locked would never be
-recorded, so the day's route and the time spent between visits could not be
-reported. Recording cannot be deferred because positions are only meaningful
-at the moment they are taken.
+The visit's route would have gaps: positions taken while the phone is in a
+pocket or the screen is locked during the visit would never be recorded, so
+the route and distance of the visit could not be reported. Recording cannot
+be deferred because positions are only meaningful at the moment they are
+taken.
 ```
 
-**Video link:** required. Record (screen capture, unlisted YouTube or Drive
-link) on a real device:
-1. Sign in → the work-day bar shows "Work day not started".
-2. Tap **Start work day** → the in-app disclosure appears → **Agree and
-   continue** → the location permission prompt → allow while using.
-3. The "Workday tracking active" notification appears.
-4. Press Home, lock the screen, move (or drive a short route), unlock.
-5. Open the app → Today's Route shows the movement recorded meanwhile.
-6. Tap **End work day** → confirm → the notification disappears.
+**Video link:** required (demo video still to be recorded). Record a screen
+capture on a real device and share it as an unlisted YouTube or Drive link:
+1. Sign in → open an **approved** visit.
+2. Tap **Start Visit** → the in-app disclosure appears (first time) → accept →
+   the location permission prompt → allow **while using the app**.
+3. The visit moves to *In progress* and the "Visit tracking active"
+   notification appears.
+4. Press Home, lock the screen, move (walk or drive a short route), unlock.
+5. Open the app → the visit's trail shows the movement recorded meanwhile.
+6. Tap **End Visit** → the notification disappears; show that nothing is
+   recorded afterwards (no notification, no new points on the trail).
 
 ---
 
@@ -74,8 +86,9 @@ link) on a real device:
 **Not required.** That declaration applies to apps that request
 `ACCESS_BACKGROUND_LOCATION`, which this app does not. If Play still flags
 background access (it inspects behaviour, not only the manifest), answer with
-the task description above and the video, and point out the foreground service
-with its ongoing notification.
+the task description and video above, and point out that background
+collection happens only through the location foreground service, with its
+ongoing notification, while a visit the user started is in progress.
 
 ---
 
@@ -83,32 +96,31 @@ with its ongoing notification.
 
 Play requires an in-app disclosure, shown before the runtime permission
 prompt, when location is used in a way users might not expect — continuing in
-the background qualifies. Implemented in
-`lib/features/workday/view/workday_disclosure_dialog.dart`, shown before the
-first Start work day (and again if the text version changes), and also before
-recording resumes for a work day restored on an install that has not shown it
-yet (a day started on another device, or a reinstall mid-day), with an
-explicit **Agree and continue** / **Not now**. Text (English; Arabic in
-`app_ar.arb`):
+the background qualifies. The app shows it before the first **Start Visit**
+(and again if the disclosure text version changes). It must state what is
+collected, that collection continues in the background and with the screen
+locked while the visit is in progress, that it stops at End Visit or sign-out,
+and where the data goes. Suggested text (English; the shipped wording, and
+its Arabic version in `app_ar.arb`, must say the same — verify against the
+build before submitting):
 
-> **Work-day location tracking**
+> **Visit location tracking**
 >
-> While your work day is active, Visits collects this device's precise
-> location — also when the app is closed or in the background and while the
-> screen is locked — to record your work-day route and your customer visits
-> for your employer.
+> While a customer visit you started is in progress, Visits collects this
+> device's precise location — also when the app is in the background or the
+> screen is locked — to record the route of that visit for your employer.
 >
-> Tracking starts only when you tap Start work day, and stops when you tap End
-> work day or sign out.
+> Tracking starts only when you start a visit and stops when you tap End Visit
+> or sign out. No location is collected between visits.
 >
 > Locations are kept on this phone until they reach your company's server. To
-> draw routes along roads, recorded points may be sent to your company's
-> map-matching service.
+> draw a visit's route along roads, its recorded points may be sent to your
+> company's map-matching service.
 >
 > A notification stays visible for as long as tracking runs.
 
-Nothing is collected and no permission is requested if the user taps **Not
-now**.
+The disclosure needs an explicit accept action; if the user declines, no
+location is tracked.
 
 ---
 
@@ -123,29 +135,39 @@ now**.
 | Photos and videos → Photos | Yes | No | No | Optional | App functionality |
 | Files and docs | Yes | No | No | Optional | App functionality |
 | App info and performance → Crash logs, Diagnostics | Yes | No | No | Required | App functionality |
-| Device or other IDs | Yes (push token) | No | No | Required | App functionality |
+| Device or other IDs | Yes (push token, random per-install device id) | No | No | Required | App functionality |
 
 "Shared: No" — the employer's backend, the company-controlled road-matching
 server, Sentry and Firebase act on behalf of the developer/employer (service
-providers), which Play does not count as sharing.
+providers), which Play does not count as sharing. OpenStreetMap tile servers
+receive only map-tile requests for the visible map area, never the user's
+position.
+
+**Location, in plain terms:** collected only for customer visits — one
+position at Start Visit, one at End Visit, and the GPS trail while the visit
+is in progress. The trail keeps being collected in the background **only
+during an active visit**, through the location foreground service, with the
+while-in-use permission. Nothing is collected outside a visit.
 
 - Data encrypted in transit: **Yes**.
 - Users can request deletion: **Yes** (through their employer's administrator).
 
-The Data safety form has no "background" question; background collection is
-covered by the privacy policy, the foreground service declaration and the
-in-app disclosure.
+The Data safety form has no "background" question; background collection
+during a visit is covered by the privacy policy, the foreground service
+declaration and the in-app disclosure.
 
 ---
 
 ## 6. Privacy policy consistency checklist
 
-- [ ] Hosted policy `https://digitalharbor.com.sa/ar/visit-app` has the
-      "Background location during an active work day" section of
-      docs/PRIVACY_POLICY.md. **Checked 2026-09-14: not yet** — the page still
-      says "No background tracking" and has no real effective date.
-- [ ] It names the notification, the Start/End work day limits, offline
+- [ ] Hosted policy `https://digitalharbor.com.sa/ar/visit-app` carries the
+      current docs/PRIVACY_POLICY.md (last updated 16 September 2026),
+      including "Background location during an active visit". **Checked
+      2026-09-14: not yet** — the page still says "No background tracking" and
+      has no real effective date.
+- [ ] It names the notification, the Start Visit / End Visit limits, offline
       storage, and road matching by a company-controlled service.
-- [ ] Store listing text no longer says "no background tracking"
-      (store/play/listing-ar.md).
-- [ ] The disclosure text above matches the build being submitted.
+- [ ] Store listing text describes visit-only location use
+      (store/play/listing-ar.md) — no work day, live sharing or attendance.
+- [ ] The disclosure text in the build matches § 4.
+- [ ] The demo video (§ 2) was recorded on the build being submitted.

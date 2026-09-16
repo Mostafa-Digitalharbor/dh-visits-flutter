@@ -8,6 +8,10 @@
 /// posting logic; this file owns nothing but the text.
 library;
 
+import 'dart:convert';
+
+import '../../../core/location/location_describe.dart';
+
 /// Which end of the visit a verdict belongs to.
 enum SpoofPhase { start, end }
 
@@ -47,8 +51,16 @@ class MockLocationNote {
   /// carried none.
   static String formatCoords(double? latitude, double? longitude) =>
       (latitude != null && longitude != null)
-          ? '${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}'
-          : 'unavailable / غير متاح';
+      ? LocationDescriber.formatCoordinates(latitude, longitude)
+      : 'unavailable / غير متاح';
+
+  /// Escapes device-supplied text for the HTML body.
+  ///
+  /// `mail.message.body` written after the post is stored *unescaped* (that
+  /// is the whole point of the upgrade — see the class doc), so the
+  /// reverse-geocoded label, which comes from the device, would otherwise be
+  /// injected into the chatter a manager opens as live markup.
+  static const _html = HtmlEscape();
 
   factory MockLocationNote.build({
     required SpoofPhase phase,
@@ -59,13 +71,16 @@ class MockLocationNote {
     final at = phase == SpoofPhase.start ? 'check-in' : 'check-out';
     final atAr = phase == SpoofPhase.start ? 'بدء الزيارة' : 'إنهاء الزيارة';
     final coords = formatCoords(latitude, longitude);
+    final safeCoords = _html.convert(coords);
+    final safeLocation = location == null ? null : _html.convert(location);
     final where = location != null
         ? ' • Reported location / الموقع المُبلَّغ: $location'
         : '';
 
     // Reads correctly as one flowing line, because this is what survives if the
     // markup upgrade never lands.
-    final plain = '⚠ Mock location detected at $at — تم رصد موقع وهمي عند $atAr'
+    final plain =
+        '⚠ Mock location detected at $at — تم رصد موقع وهمي عند $atAr'
         ' • The device reported these coordinates came from a fake-GPS app, not'
         ' the GPS sensor; this visit needs manual review.'
         ' • أبلغ الجهاز أن هذه الإحداثيات مصدرها تطبيق موقع وهمي وليست من مستشعر'
@@ -73,15 +88,16 @@ class MockLocationNote {
         ' • Coordinates / الإحداثيات: $coords$where'
         ' • [$kMockLocationMarker]';
 
-    final html = '<p><strong>⚠ Mock location detected at $at '
+    final html =
+        '<p><strong>⚠ Mock location detected at $at '
         '— تم رصد موقع وهمي عند $atAr</strong></p>'
         '<p>The device reported that these coordinates came from a mock '
         'location provider (a fake-GPS app), not the GPS sensor. '
         'This visit needs manual review.<br/>'
         'أبلغ الجهاز أن هذه الإحداثيات مصدرها تطبيق موقع وهمي وليست من '
         'مستشعر GPS. هذه الزيارة تحتاج مراجعة يدوية.</p>'
-        '<ul><li>Coordinates / الإحداثيات: <code>$coords</code></li>'
-        '${location != null ? '<li>Reported location / الموقع المُبلَّغ: $location</li>' : ''}'
+        '<ul><li>Coordinates / الإحداثيات: <code>$safeCoords</code></li>'
+        '${safeLocation != null ? '<li>Reported location / الموقع المُبلَّغ: $safeLocation</li>' : ''}'
         '</ul><p><code>$kMockLocationMarker</code></p>';
 
     return MockLocationNote(plain: plain, html: html);

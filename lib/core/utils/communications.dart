@@ -29,7 +29,8 @@ class Communications {
     if (!normalized.startsWith(RegExp(r'https?://'))) {
       normalized = 'https://$normalized';
     }
-    return _launch(Uri.parse(normalized));
+    final uri = Uri.tryParse(normalized);
+    return uri == null ? false : _launch(uri);
   }
 
   /// Open the user's preferred maps app at the given coordinates. The
@@ -60,7 +61,7 @@ class Communications {
         mode: LaunchMode.externalApplication,
       );
     } catch (e) {
-      appLog('[debug] Communications.launch failed: $e');
+      appLog('[Communications] launch failed: $e');
       return false;
     }
   }

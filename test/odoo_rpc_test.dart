@@ -7,6 +7,7 @@
 // positional callers, the exact shape is asserted here rather than assumed.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:location_gps/core/api/api_client.dart';
+import 'package:location_gps/core/api/api_exceptions.dart';
 import 'package:location_gps/core/api/endpoints.dart';
 import 'package:location_gps/core/api/odoo_rpc.dart';
 
@@ -20,7 +21,11 @@ class _CapturingClient implements ApiClient {
   _CapturingClient({this.response});
 
   @override
-  Future<dynamic> jsonRpc(String path, {Map<String, dynamic>? params}) async {
+  Future<dynamic> jsonRpc(
+    String path, {
+    Map<String, dynamic>? params,
+    bool reportUnauthorized = true,
+  }) async {
     this.path = path;
     this.params = params;
     return response;
@@ -87,6 +92,18 @@ void main() {
       final client = _CapturingClient(response: false);
       expect(await (client as ApiClient).searchRead('res.partner'), isEmpty);
     });
+
+    test('rejects a reply that is not a list instead of reading it as empty',
+        () async {
+      // An object or text here is a contract break. Reading it as "no rows"
+      // told the user there was nothing to show when the app couldn't read it.
+      final client = _CapturingClient(response: {'records': []});
+      await expectLater(
+        (client as ApiClient).searchRead('res.partner'),
+        throwsA(isA<ApiException>()
+            .having((e) => e.code, 'code', ApiErrorCode.invalidResponse)),
+      );
+    });
   });
 
   group('readRecords', () {
@@ -118,9 +135,17 @@ void main() {
       expect(client.params!['method'], 'search_count');
     });
 
-    test('returns 0 for a non-numeric answer', () async {
+    test("returns 0 for Odoo's empty answer", () async {
       final client = _CapturingClient(response: false);
       expect(await (client as ApiClient).searchCount('dh.visit'), 0);
+    });
+
+    test('rejects a non-numeric answer', () async {
+      final client = _CapturingClient(response: 'seven');
+      await expectLater(
+        (client as ApiClient).searchCount('dh.visit'),
+        throwsA(isA<ApiException>()),
+      );
     });
   });
 
@@ -148,6 +173,15 @@ void main() {
       expect(
         await (bad as ApiClient).writeRecord('dh.visit', [1], {'state': 'x'}),
         isFalse,
+      );
+    });
+
+    test('create without an id is an error, not a silent null', () async {
+      final client = _CapturingClient(response: null);
+      await expectLater(
+        (client as ApiClient).createRecord('dh.visit', {'name': 'V-1'}),
+        throwsA(isA<ApiException>()
+            .having((e) => e.code, 'code', ApiErrorCode.invalidResponse)),
       );
     });
   });

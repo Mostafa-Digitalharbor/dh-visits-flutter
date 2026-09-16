@@ -690,14 +690,14 @@ jobs:
           set -euo pipefail
           plist="$RUNNER_TEMP/Runner.xcarchive/Products/Applications/Runner.app/Info.plist"
           missing=0
-          # Work-day tracking records the route in the background: the Always
+          # An active visit's trail is recorded in the background: the Always
           # and temporary-accuracy strings and the `location` background mode
-          # have to ship together with WorkdayLocation.swift, or App Review
+          # have to ship together with VisitLocation.swift, or App Review
           # (and allowsBackgroundLocationUpdates) fails.
           for key in \
             NSLocationWhenInUseUsageDescription \
             NSLocationAlwaysAndWhenInUseUsageDescription \
-            NSLocationTemporaryUsageDescriptionDictionary:WorkdayRoute \
+            NSLocationTemporaryUsageDescriptionDictionary:VisitRoute \
             NSCameraUsageDescription \
             NSPhotoLibraryUsageDescription; do
             value="$(/usr/libexec/PlistBuddy -c "Print :$key" "$plist" 2>/dev/null || true)"
@@ -709,7 +709,7 @@ jobs:
             fi
           done
           if ! /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$plist" 2>/dev/null | grep -q '^ *location$'; then
-            echo "::error::UIBackgroundModes lacks 'location'; work-day tracking would stop in the background."
+            echo "::error::UIBackgroundModes lacks 'location'; an active visit's trail would stop recording in the background."
             missing=1
           fi
           [ "$missing" -eq 0 ] || exit 1

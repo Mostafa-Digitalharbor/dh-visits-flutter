@@ -1,23 +1,23 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../core/api/odoo_parse.dart';
 import '../../../../core/map_matching/route_geometry.dart';
-import 'visit.dart' show parseOdooUtc;
 
 extension VisitLocationTrace on List<VisitLocationLog> {
   /// The points as the road matcher reads them — same coordinates, in the
   /// same (server) order. Drawing input only; nothing is written back.
   List<TracePoint> get trace => [
-        for (final l in this)
-          TracePoint(
-            latitude: l.latitude,
-            longitude: l.longitude,
-            time: l.loggedAt,
-            // Odoo stores an unreported accuracy as 0.
-            accuracy: (l.accuracy ?? 0) > 0 ? l.accuracy : null,
-            speed: l.speed,
-            heading: l.heading,
-          ),
-      ];
+    for (final l in this)
+      TracePoint(
+        latitude: l.latitude,
+        longitude: l.longitude,
+        time: l.loggedAt,
+        // Odoo stores an unreported accuracy as 0.
+        accuracy: (l.accuracy ?? 0) > 0 ? l.accuracy : null,
+        speed: l.speed,
+        heading: l.heading,
+      ),
+  ];
 }
 
 /// Who wrote a point onto the trail.
@@ -43,17 +43,9 @@ TrailSource trailSourceFromWire(String? raw) {
   }
 }
 
-/// Odoo serialises an unset float as `0.0` and an unset string as `false`.
-/// Accuracy/altitude/speed/heading are all legitimately zero, so unlike
-/// coordinates they are NOT treated as absent when zero — a stationary fix
-/// really does have `speed: 0`.
-double? _num(dynamic raw) => raw is num ? raw.toDouble() : null;
-
-String? _str(dynamic raw) {
-  if (raw == null || raw == false) return null;
-  final s = raw.toString().trim();
-  return (s.isEmpty || s == 'false') ? null : s;
-}
+// Accuracy/altitude/speed/heading are read with `odooDouble`, not
+// `odooCoord`: unlike coordinates they are legitimately zero — a stationary fix
+// really does have `speed: 0`.
 
 /// One GPS fix on a visit's trail (`dh.visit.location.log`).
 ///
@@ -113,24 +105,24 @@ class VisitLocationLog extends Equatable {
   /// usable coordinate or timestamp — a half-formed point must not become a
   /// (0, 0) vertex that drags the drawn path into the Gulf of Guinea.
   static VisitLocationLog? tryFromApi(Map<String, dynamic> json) {
-    final lat = _num(json['latitude']);
-    final lng = _num(json['longitude']);
+    final lat = odooDouble(json['latitude']);
+    final lng = odooDouble(json['longitude']);
     final at = parseOdooUtc(json['logged_at']);
     if (lat == null || lng == null || at == null) return null;
-    if (lat.abs() > 90 || lng.abs() > 180) return null;
+    if (!isValidLatLng(lat, lng)) return null;
     return VisitLocationLog(
-      id: (json['id'] as num?)?.toInt() ?? 0,
-      visitId: (json['visit_id'] as num?)?.toInt(),
+      id: odooInt(json['id']) ?? 0,
+      visitId: odooInt(json['visit_id']),
       loggedAt: at,
       latitude: lat,
       longitude: lng,
-      accuracy: _num(json['accuracy']),
-      altitude: _num(json['altitude']),
-      speed: _num(json['speed']),
-      heading: _num(json['heading']),
-      location: _str(json['location']),
-      deviceId: _str(json['device_id']),
-      source: trailSourceFromWire(json['source']?.toString()),
+      accuracy: odooDouble(json['accuracy']),
+      altitude: odooDouble(json['altitude']),
+      speed: odooDouble(json['speed']),
+      heading: odooDouble(json['heading']),
+      location: odooString(json['location']),
+      deviceId: odooString(json['device_id']),
+      source: trailSourceFromWire(odooString(json['source'])),
     );
   }
 
@@ -182,14 +174,7 @@ class VisitTrack extends Equatable {
   }
 
   factory VisitTrack.fromApi(Map<String, dynamic> json) {
-    final raw = json['logs'];
-    final logs = <VisitLocationLog>[];
-    if (raw is List) {
-      for (final m in raw.whereType<Map>()) {
-        final log = VisitLocationLog.tryFromApi(Map<String, dynamic>.from(m));
-        if (log != null) logs.add(log);
-      }
-    }
+    final logs = _parseLogs(json['logs']);
     // Kept exactly in the order the server returned. The server files the
     // trail by `logged_at` ("always oldest first") and that order *is* the
     // route — the polyline is drawn straight through it. Re-sorting here used
@@ -197,17 +182,20 @@ class VisitTrack extends Equatable {
     // sharing a timestamp (a Start and the first fix in the same second) and
     // the client drew a different path from the one the server measured.
     return VisitTrack(
-      visitId: (json['visit_id'] as num?)?.toInt() ?? 0,
-      locationLogCount:
-          (json['location_log_count'] as num?)?.toInt() ?? logs.length,
-      trackedDistanceKm:
-          (json['tracked_distance_km'] as num?)?.toDouble() ?? 0.0,
+      visitId: odooInt(json['visit_id']) ?? 0,
+      locationLogCount: odooInt(json['location_log_count']) ?? logs.length,
+      trackedDistanceKm: odooDouble(json['tracked_distance_km']) ?? 0.0,
       logs: logs,
     );
   }
 
   @override
-  List<Object?> get props => [visitId, locationLogCount, trackedDistanceKm, logs];
+  List<Object?> get props => [
+    visitId,
+    locationLogCount,
+    trackedDistanceKm,
+    logs,
+  ];
 }
 
 /// A fix captured on the device and not yet accepted by the server.
@@ -242,7 +230,8 @@ class TrailPoint extends Equatable {
   /// `logged_at` is always sent even though the server would default it to
   /// "now": the whole point of the buffer is that a fix taken in a dead zone
   /// keeps its real time when it is flushed an hour later.
-  Map<String, dynamic> toApi({required String Function(DateTime) formatUtc}) => {
+  Map<String, dynamic> toApi({required String Function(DateTime) formatUtc}) =>
+      {
         'latitude': latitude,
         'longitude': longitude,
         'logged_at': formatUtc(loggedAt),
@@ -255,32 +244,32 @@ class TrailPoint extends Equatable {
       };
 
   Map<String, dynamic> toJson() => {
-        'lat': latitude,
-        'lng': longitude,
-        'at': loggedAt.toUtc().toIso8601String(),
-        if (accuracy != null) 'acc': accuracy,
-        if (altitude != null) 'alt': altitude,
-        if (speed != null) 'spd': speed,
-        if (heading != null) 'hdg': heading,
-        if (location != null) 'loc': location,
-        if (deviceId != null) 'dev': deviceId,
-      };
+    'lat': latitude,
+    'lng': longitude,
+    'at': loggedAt.toUtc().toIso8601String(),
+    if (accuracy != null) 'acc': accuracy,
+    if (altitude != null) 'alt': altitude,
+    if (speed != null) 'spd': speed,
+    if (heading != null) 'hdg': heading,
+    if (location != null) 'loc': location,
+    if (deviceId != null) 'dev': deviceId,
+  };
 
   static TrailPoint? tryFromJson(Map<String, dynamic> j) {
-    final lat = _num(j['lat']);
-    final lng = _num(j['lng']);
-    final at = DateTime.tryParse(j['at']?.toString() ?? '');
+    final lat = odooDouble(j['lat']);
+    final lng = odooDouble(j['lng']);
+    final at = DateTime.tryParse(odooString(j['at']) ?? '');
     if (lat == null || lng == null || at == null) return null;
     return TrailPoint(
       latitude: lat,
       longitude: lng,
       loggedAt: at.toUtc(),
-      accuracy: _num(j['acc']),
-      altitude: _num(j['alt']),
-      speed: _num(j['spd']),
-      heading: _num(j['hdg']),
-      location: _str(j['loc']),
-      deviceId: _str(j['dev']),
+      accuracy: odooDouble(j['acc']),
+      altitude: odooDouble(j['alt']),
+      speed: odooDouble(j['spd']),
+      heading: odooDouble(j['hdg']),
+      location: odooString(j['loc']),
+      deviceId: odooString(j['dev']),
     );
   }
 
@@ -318,33 +307,29 @@ class TrailFlushResult {
   });
 
   factory TrailFlushResult.fromApi(Map<String, dynamic> json) {
-    final logs = <VisitLocationLog>[];
-    final raw = json['logs'];
-    if (raw is List) {
-      for (final m in raw.whereType<Map>()) {
-        final log = VisitLocationLog.tryFromApi(Map<String, dynamic>.from(m));
-        if (log != null) logs.add(log);
-      }
-    }
-    final rejected = <RejectedPoint>[];
-    final rawRejected = json['rejected'];
-    if (rawRejected is List) {
-      for (final m in rawRejected.whereType<Map>()) {
-        final idx = (m['index'] as num?)?.toInt();
-        if (idx == null) continue;
-        rejected.add(RejectedPoint(
-          index: idx,
-          error: _str(m['error']) ?? '',
-        ));
-      }
-    }
+    final logs = _parseLogs(json['logs']);
+    final rejected = [
+      for (final raw in odooList(json['rejected']))
+        if (odooMap(raw) case final m? when odooInt(m['index']) != null)
+          RejectedPoint(
+            index: odooInt(m['index'])!,
+            error: odooString(m['error']) ?? '',
+          ),
+    ];
     return TrailFlushResult(
-      created: (json['created'] as num?)?.toInt() ?? logs.length,
+      created: odooInt(json['created']) ?? logs.length,
       logs: logs,
       rejected: rejected,
-      locationLogCount: (json['location_log_count'] as num?)?.toInt() ?? 0,
-      trackedDistanceKm:
-          (json['tracked_distance_km'] as num?)?.toDouble() ?? 0.0,
+      locationLogCount: odooInt(json['location_log_count']) ?? 0,
+      trackedDistanceKm: odooDouble(json['tracked_distance_km']) ?? 0.0,
     );
   }
 }
+
+/// The usable points of a `logs` array, in the order the server sent them. A
+/// half-formed point is dropped on its own (see [VisitLocationLog.tryFromApi]).
+List<VisitLocationLog> _parseLogs(dynamic raw) => [
+  for (final item in odooList(raw))
+    if (odooMap(item) case final m?)
+      if (VisitLocationLog.tryFromApi(m) case final log?) log,
+];

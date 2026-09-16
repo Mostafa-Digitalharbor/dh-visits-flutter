@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../../../app/design/responsive.dart';
-
 import '../../../app/design/app_dimens.dart';
+import '../../../app/design/responsive.dart';
 import '../../../core/utils/communications.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 
-/// A titled group: a small header (icon + label) above a card of [rows].
-/// widget (e.g. an "open in maps" button) and value color (e.g. a warning).
+/// One labelled value inside a [VisitSection] card: a tinted icon, a small
+/// label above the value, and an optional trailing widget (e.g. an "open in
+/// maps" button) or value colour (e.g. a warning).
 class VisitDetailRow extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -20,7 +20,9 @@ class VisitDetailRow extends StatelessWidget {
   /// When set, the whole row becomes tappable (e.g. the customer row opening
   /// the customer profile) and a chevron affordance is shown.
   final VoidCallback? onTap;
-  const VisitDetailRow({super.key, 
+
+  const VisitDetailRow({
+    super.key,
     required this.icon,
     required this.label,
     required this.value,
@@ -35,21 +37,28 @@ class VisitDetailRow extends StatelessWidget {
     final cs = context.colors;
     final tint = iconColor ?? cs.primary;
     final row = Padding(
-      padding: const EdgeInsets.symmetric(vertical: 11),
+      padding: EdgeInsets.symmetric(vertical: context.r(Insets.x2h)),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          IconBadge(icon: icon, color: tint),
+          IconBadge(
+            icon: icon,
+            color: tint,
+            size: context.r(CompSz.badge),
+            iconSize: context.r(IconSz.label),
+          ),
           context.gapW(Insets.x3),
+          // The value wraps rather than truncates: purpose, outcome and
+          // addresses are the content the manager opened the screen to read.
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: context.text.labelSmall?.copyWith(
                     color: cs.onSurfaceVariant,
-                    letterSpacing: 0.2,
                   ),
                 ),
                 context.gapH(Insets.hair),
@@ -58,7 +67,6 @@ class VisitDetailRow extends StatelessWidget {
                   style: context.text.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: valueColor,
-                    height: 1.25,
                   ),
                 ),
               ],
@@ -69,7 +77,7 @@ class VisitDetailRow extends StatelessWidget {
             context.gapW(Insets.x1),
             Icon(
               context.isRtl ? Icons.chevron_left : Icons.chevron_right,
-              size: 20,
+              size: context.r(IconSz.sm),
               color: cs.onSurfaceVariant,
             ),
           ],
@@ -85,12 +93,17 @@ class VisitDetailRow extends StatelessWidget {
   }
 }
 
-/// A compact "open in Maps" pill button for a coordinate.
+/// A compact "open in Maps" button for a coordinate.
+///
+/// The tinted badge is small, but the tap target around it is the full
+/// [IconSz.hit] square — a field rep taps this one-handed.
 class VisitMapsPill extends StatelessWidget {
   final double latitude;
   final double longitude;
   final String? label;
-  const VisitMapsPill({super.key, 
+
+  const VisitMapsPill({
+    super.key,
     required this.latitude,
     required this.longitude,
     this.label,
@@ -98,23 +111,26 @@ class VisitMapsPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = context.colors;
+    final hit = context.r(IconSz.hit);
     return Tooltip(
       message: context.s.wfOpenInMaps,
       child: InkWell(
-        borderRadius: BorderRadius.circular(Radii.tile),
+        customBorder: const CircleBorder(),
         onTap: () => context.openExternal(
-            () => Communications.openInMaps(latitude, longitude, label: label)),
-        child: IconBadge(
-          icon: Icons.map_outlined,
-          color: cs.tertiary,
-          size: null,
-          padding: const EdgeInsets.all(8),
-          iconSize: 18,
-          tintAlpha: 0.14,
+          () => Communications.openInMaps(latitude, longitude, label: label),
+        ),
+        child: SizedBox.square(
+          dimension: hit,
+          child: Center(
+            child: IconBadge(
+              icon: Icons.map_outlined,
+              color: context.colors.tertiary,
+              size: context.r(CompSz.badge),
+              iconSize: context.r(IconSz.label),
+            ),
+          ),
         ),
       ),
     );
   }
 }
-

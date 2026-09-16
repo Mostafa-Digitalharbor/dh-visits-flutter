@@ -39,6 +39,15 @@ class VisitsListStateFilterChanged extends VisitsListEvent {
   List<Object?> get props => [state];
 }
 
+/// Opens the list on a dashboard preset (see [VisitsListFocus]); no refetch.
+/// Clears the state filter so the preset alone decides what shows.
+class VisitsListFocusChanged extends VisitsListEvent {
+  final VisitsListFocus focus;
+  const VisitsListFocusChanged(this.focus);
+  @override
+  List<Object?> get props => [focus];
+}
+
 /// Drop every user-scoped value back to the initial state. Dispatched on
 /// logout: this bloc lives for the whole app, so without it the next user
 /// inherits the previous one's items *and* filters — a stale `searchQuery`

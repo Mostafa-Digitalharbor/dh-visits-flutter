@@ -1,5 +1,8 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../core/api/odoo_parse.dart';
+import '../../../../core/storage/session_storage.dart';
+
 /// The user's role inside the `dh_visit_management` module, derived from their
 /// Odoo security-group membership (highest wins). Drives which visit screens,
 /// list tabs and action buttons the app exposes.
@@ -51,20 +54,10 @@ class VisitGroupMemberships {
   }
 }
 
-VisitRole _visitRoleFromName(dynamic raw) {
-  switch (raw?.toString()) {
-    case 'admin':
-      return VisitRole.admin;
-    case 'projectManager':
-      return VisitRole.projectManager;
-    case 'manager':
-      return VisitRole.manager;
-    case 'user':
-      return VisitRole.user;
-    default:
-      return VisitRole.none;
-  }
-}
+/// Reads back what [AuthUser.toJson] stored (`VisitRole.name`). Anything
+/// unknown — an older build's payload — degrades to [VisitRole.none].
+VisitRole _visitRoleFromName(dynamic raw) =>
+    VisitRole.values.asNameMap()[odooString(raw)] ?? VisitRole.none;
 
 class AuthUser extends Equatable {
   final int uid;
@@ -146,31 +139,47 @@ class AuthUser extends Equatable {
   /// Human-friendly name. Falls back to login if employee name unknown.
   String get displayName => employeeName ?? username;
 
+  /// Parses Odoo's `session_info` payload or a stored session.
+  ///
+  /// Tolerant by design: Odoo sends `false` for an unset field and a
+  /// `[id, name]` pair for a many2one, and a bare `as num` cast on either used
+  /// to fail a sign-in the server had already accepted. Only a missing uid is
+  /// fatal — there is no user without one.
   factory AuthUser.fromJson(Map<String, dynamic> json) {
-    final isAdmin = json['is_admin'] == true;
-    final isSystem = json['is_system'] == true;
+    final uid = odooInt(json[SessionUserFields.uid]);
+    if (uid == null) {
+      throw const FormatException('Session payload carries no uid');
+    }
+    final isAdmin = odooBool(json['is_admin']);
+    final isSystem = odooBool(json['is_system']);
     return AuthUser(
-      uid: (json['uid'] as num).toInt(),
-      username: (json['username'] ?? '').toString(),
-      employeeName: (json['employee_name'] ?? json['name'])?.toString(),
-      employeeId: (json['employee_id'] as num?)?.toInt(),
-      companyId: (json['company_id'] as num?)?.toInt(),
+      uid: uid,
+      username: odooString(json[SessionUserFields.username]) ?? '',
+      employeeName: odooString(json[SessionUserFields.employeeName]) ??
+          odooString(json['name']),
+      employeeId: odooMany2one(json[SessionUserFields.employeeId]).id,
+      companyId: odooMany2one(json['company_id']).id,
       isAdmin: isAdmin,
       isSystem: isSystem,
       // Vanilla Odoo has no custom manager group. Treat admin/system users
       // as managers. If a server *does* expose `is_manager`, honour it too.
-      isManager: json['is_manager'] == true || isAdmin || isSystem,
-      tz: _parseTz(json['tz']),
+      isManager: odooBool(json['is_manager']) || isAdmin || isSystem,
+      tz: odooString(json['tz']),
       visitRole: _visitRoleFromName(json['visit_role']),
-      profileIncomplete: json['profile_incomplete'] == true,
+      profileIncomplete: odooBool(json['profile_incomplete']),
     );
   }
 
+  /// Whether the app has anything to offer this account: a visit role, or the
+  /// Odoo administrator (who sees everything). Meaningless while
+  /// [profileIncomplete] — the role is then a fallback, not an answer.
+  bool get hasVisitAccess => visitRole != VisitRole.none || isAdmin;
+
   Map<String, dynamic> toJson() => {
-        'uid': uid,
-        'username': username,
-        'employee_name': employeeName,
-        'employee_id': employeeId,
+        SessionUserFields.uid: uid,
+        SessionUserFields.username: username,
+        SessionUserFields.employeeName: employeeName,
+        SessionUserFields.employeeId: employeeId,
         'company_id': companyId,
         'is_admin': isAdmin,
         'is_system': isSystem,
@@ -202,13 +211,6 @@ class AuthUser extends Equatable {
         visitRole: visitRole ?? this.visitRole,
         profileIncomplete: profileIncomplete ?? this.profileIncomplete,
       );
-
-  static String? _parseTz(dynamic raw) {
-    if (raw == null || raw == false) return null;
-    final s = raw.toString().trim();
-    if (s.isEmpty || s == 'false') return null;
-    return s;
-  }
 
   @override
   List<Object?> get props => [

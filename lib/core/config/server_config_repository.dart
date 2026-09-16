@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_environment.dart';
 import 'server_config.dart';
+import '../constants/storage_keys.dart';
 
 /// Persists the user-selected backend coordinates in [SharedPreferences].
 ///
@@ -9,8 +10,8 @@ import 'server_config.dart';
 /// dev/CI builds that pass `API_BASE_URL` keep working without touching the
 /// setup screen, while release builds start blank and force the setup flow.
 class ServerConfigRepository {
-  static const _kBaseUrl = 'server_base_url';
-  static const _kDatabase = 'server_database';
+  static const _kBaseUrl = StorageKeys.serverBaseUrl;
+  static const _kDatabase = StorageKeys.serverDatabase;
 
   final SharedPreferences prefs;
   ServerConfigRepository({required this.prefs});

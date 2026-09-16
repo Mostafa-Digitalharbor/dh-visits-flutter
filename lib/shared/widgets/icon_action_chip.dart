@@ -18,8 +18,8 @@ class IconActionChip extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  /// Long-press label, and what a screen reader announces. Omitted only where
-  /// the icon is unambiguous on its own (the back arrow).
+  /// Long-press label, and what a screen reader announces. A glyph-only button
+  /// needs one; the back chip uses the platform's own "Back".
   final String? tooltip;
 
   const IconActionChip({
@@ -31,25 +31,40 @@ class IconActionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final button = InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(Radii.sm),
-      child: Container(
-        // Scaled by device width, not text scale: the chip holds a glyph, and
-        // a glyph does not get taller when the user enlarges system fonts.
-        // It does need to shrink on a 320dp bar that has to fit three of them
-        // beside a two-line title.
-        width: context.r(CompSz.chip),
-        height: context.r(CompSz.chip),
-        alignment: Alignment.center,
-        decoration: AppDecor.panel(context, radius: Radii.sm),
-        child: Icon(
-          icon,
-          size: context.r(IconSz.chip),
-          color: context.colors.onSurfaceVariant,
+    // The panel is drawn with [Ink], not a decorated Container: the ripple
+    // paints on the nearest Material, which an opaque Container would cover —
+    // the tap had no visible feedback at all.
+    //
+    // Scaled by device width, not text scale: the chip holds a glyph, and a
+    // glyph does not get taller when the user enlarges system fonts. It does
+    // need to shrink on a 320dp bar that has to fit three of them beside a
+    // two-line title — while the *touch* area keeps the 48dp minimum.
+    final side = context.r(CompSz.chip);
+    final button = Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(Radii.sm),
+        child: Ink(
+          width: side,
+          height: side,
+          decoration: AppDecor.panel(context, radius: Radii.sm),
+          child: Icon(
+            icon,
+            size: context.r(IconSz.chip),
+            color: context.colors.onSurfaceVariant,
+          ),
         ),
       ),
     );
-    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
+    final target = ConstrainedBox(
+      constraints: const BoxConstraints(
+        minWidth: IconSz.hit,
+        minHeight: IconSz.hit,
+      ),
+      child: Center(child: button),
+    );
+    final label = tooltip;
+    return label == null ? target : Tooltip(message: label, child: target);
   }
 }

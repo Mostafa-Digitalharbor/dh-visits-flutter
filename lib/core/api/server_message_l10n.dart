@@ -1,4 +1,5 @@
 import '../../l10n/generated/app_localizations.dart';
+import '../constants/app_locales.dart';
 
 /// Turns the backend's own English sentences into the app's language.
 ///
@@ -31,10 +32,29 @@ class ServerMessageL10n {
     caseSensitive: false,
   );
 
-  /// `Missing required value for the field 'Purpose' (purpose)` — the label in
-  /// quotes is the translated field name, which is the half worth showing.
-  static final _missingField =
-      RegExp(r"missing required value for the field '([^']+)'", caseSensitive: false);
+  /// `Missing required value for the field 'Purpose' (purpose)` — group 1 is
+  /// the field's label in the server's language, group 2 its technical name.
+  static final _missingField = RegExp(
+    r"missing required value for the field '([^']+)'(?:\s*\(([a-z0-9_]+)\))?",
+    caseSensitive: false,
+  );
+
+  /// The localized label of a `dh.visit` field, by technical name. The
+  /// server's own label is English-only (see the class doc), so it is shown
+  /// only when nothing here matches *and* it is already in the UI's language.
+  static String? _fieldLabel(AppLocalizations s, String? technicalName) =>
+      switch (technicalName) {
+        'purpose' => s.wfFieldPurpose,
+        'scheduled_datetime' => s.wfFieldSchedule,
+        'project_id' => s.wfFieldProject,
+        'opportunity_id' => s.wfFieldOpportunity,
+        'visit_type' => s.wfFieldType,
+        'location' => s.wfFieldLocation,
+        'outcome' => s.wfFieldOutcome,
+        'employee_id' => s.wfFieldResponsible,
+        'partner_id' => s.wfFieldCustomer,
+        _ => null,
+      };
 
   /// The localized equivalent of [message], or `null` if it is not a rule this
   /// app knows about.
@@ -43,11 +63,23 @@ class ServerMessageL10n {
     if (text.isEmpty) return null;
 
     final missing = _missingField.firstMatch(message);
-    if (missing != null) return s.errMissingRequiredField(missing.group(1)!);
+    if (missing != null) {
+      final label = _fieldLabel(s, missing.group(2)) ??
+          (readableIn(s, missing.group(1)!) ? missing.group(1) : null);
+      return label == null
+          ? s.errMissingRequiredFieldGeneric
+          : s.errMissingRequiredField(label);
+    }
 
     // Ordered: the approver rule mentions "approve" too, so it has to be tested
     // before the state-of-the-visit rules that share the word.
-    if (text.contains('not authorized to approve')) return s.errNotVisitApprover;
+    if (text.contains('not authorized to approve') ||
+        text.contains('not allowed to approve')) {
+      return s.errNotVisitApprover;
+    }
+    if (text.contains('attendee approval has already been decided')) {
+      return s.errAttendeeAlreadyDecided;
+    }
     if (text.contains('only an approved visit can be started')) {
       return s.errOnlyApprovedCanStart;
     }
@@ -55,9 +87,29 @@ class ServerMessageL10n {
       return s.errOnlyInProgressCanEnd;
     }
     if (text.contains('can be submitted')) return s.errOnlyDraftCanSubmit;
+    // Checked before the generic "cannot be approved": the attendee gate's
+    // sentence ("cannot be approved yet: all attendees must be approved
+    // first") contains it too, and is not about the visit's state.
+    if (text.contains('all attendees must be approved')) {
+      return s.errAttendeesPending;
+    }
     if (text.contains('cannot be approved')) return s.errCannotApproveInState;
     if (text.contains('cannot be rejected')) return s.errCannotRejectInState;
+    if (text.contains('finished visit cannot be rescheduled')) {
+      return s.errCannotRescheduleFinished;
+    }
     if (text.contains('outcome is required')) return s.errOutcomeRequired;
+    if (text.contains('project is required')) return s.errProjectRequired;
+    if (text.contains('opportunity is required')) {
+      return s.errOpportunityRequired;
+    }
+    // GPS-trail rules: a fix for a visit that isn't running.
+    if (text.contains('has not been started, so no position')) {
+      return s.errTrailVisitNotStarted;
+    }
+    if (text.contains('a later position cannot be added')) {
+      return s.errTrailVisitEnded;
+    }
     // Odoo's referential-integrity message, which names the internal model and
     // calls the record "the troublemaker". Never fit to show, translated or not.
     if (text.contains('another model is using the record')) {
@@ -65,4 +117,16 @@ class ServerMessageL10n {
     }
     return null;
   }
+
+  /// Any Arabic letter. The two languages this app ships use disjoint
+  /// scripts, so script presence tells which one a server sentence is in.
+  static final _arabicScript = RegExp(r'[؀-ۿ]');
+
+  /// Whether [text] is written in Arabic script.
+  static bool isArabicText(String text) => _arabicScript.hasMatch(text);
+
+  /// Whether [text] reads naturally in the language [s] renders — the test
+  /// for passing an untranslated server sentence through as-is.
+  static bool readableIn(AppLocalizations s, String text) =>
+      isArabicText(text) == AppLocales.isArabicTag(s.localeName);
 }

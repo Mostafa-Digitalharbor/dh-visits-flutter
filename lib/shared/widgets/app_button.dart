@@ -41,20 +41,25 @@ class AppButton extends StatelessWidget {
     this.fullWidth = true,
   }) : variant = AppButtonVariant.destructive;
 
+  /// A long translation wraps to a second line before it is cut.
+  static const int _labelLines = 2;
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final effectiveOnPressed = loading ? null : onPressed;
 
+    final spinnerColor = switch (variant) {
+      AppButtonVariant.primary => colors.onPrimary,
+      AppButtonVariant.secondary => colors.primary,
+      AppButtonVariant.destructive => colors.onError,
+    };
     final child = loading
-        ? SizedBox(
-            height: 18,
-            width: 18,
+        ? SizedBox.square(
+            dimension: context.r(CompSz.buttonSpinner),
             child: CircularProgressIndicator(
-              strokeWidth: 2.2,
-              color: variant == AppButtonVariant.secondary
-                  ? colors.primary
-                  : colors.onPrimary,
+              strokeWidth: CompSz.buttonSpinnerStroke,
+              color: spinnerColor,
             ),
           )
         : Row(
@@ -62,12 +67,14 @@ class AppButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 18),
+                Icon(icon, size: context.r(IconSz.label)),
                 context.gapW(Insets.x2),
               ],
               Flexible(
                 child: Text(
                   label,
+                  maxLines: _labelLines,
+                  textAlign: TextAlign.center,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

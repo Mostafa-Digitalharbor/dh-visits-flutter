@@ -37,3 +37,13 @@ class AuthLogoutRequested extends AuthEvent {
 class AuthServerChanged extends AuthEvent {
   const AuthServerChanged();
 }
+
+/// A screen has shown [AuthState.error] / [AuthState.rejection] to the user.
+///
+/// The notice lives in the state because it is usually raised *before* the
+/// screen that shows it exists (a 401 while on another tab, a session that
+/// failed to restore under the splash). Clearing it once shown stops the next
+/// screen — setup, then login — from repeating it.
+class AuthNoticeShown extends AuthEvent {
+  const AuthNoticeShown();
+}

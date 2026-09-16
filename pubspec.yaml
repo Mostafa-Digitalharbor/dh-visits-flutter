@@ -20,6 +20,9 @@ dependencies:
   flutter_bloc: ^8.1.6
   bloc: ^8.1.4
   equatable: ^2.0.5
+  # droppable()/restartable() event transformers: a double-tapped action or an
+  # out-of-order search response must not run twice or overwrite newer data.
+  bloc_concurrency: ^0.2.5
 
   # Networking
   dio: ^5.7.0
@@ -74,6 +77,8 @@ dependencies:
   firebase_core: ^4.11.0
   firebase_messaging: ^16.4.1
   flutter_local_notifications: ^18.0.1
+  # SHA-256 of the platform install id sent as `device_id` (never the raw id).
+  crypto: ^3.0.6
 
 dev_dependencies:
   flutter_test:

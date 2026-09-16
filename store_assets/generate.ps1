@@ -55,7 +55,7 @@ $titleFont = New-Object System.Drawing.Font('Segoe UI', 78, [System.Drawing.Font
 $subFont   = New-Object System.Drawing.Font('Segoe UI', 27, [System.Drawing.FontStyle]::Regular)
 $tx = $circX + $circD + 70
 $gf.DrawString('Visits', $titleFont, $white, $tx, 168)
-$gf.DrawString('Field visits & live team tracking', $subFont, $soft, ($tx + 6), 296)
+$gf.DrawString('Customer visits, verified on site', $subFont, $soft, ($tx + 6), 296)
 $gf.Dispose()
 $fg.Save((Join-Path $out 'feature_graphic_1024x500.png'), [System.Drawing.Imaging.ImageFormat]::Png)
 $fg.Dispose()

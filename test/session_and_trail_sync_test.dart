@@ -118,29 +118,35 @@ class _NoLocation implements LocationService {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-VisitTrailTracker _tracker(SharedPreferences prefs, _Repo repo,
+VisitTrailTracker _tracker(SharedPreferences prefs, VisitsRepository repo,
         {ConnectivityStatus? connectivity}) =>
     VisitTrailTracker(
       prefs: prefs,
       repository: repo,
       locationService: _NoLocation(),
       connectivity: connectivity ?? ConnectivityStatus(),
+      notificationLabels: () => (title: 'title', text: 'text'),
     );
 
-/// Buffers [count] points for [visitId] without sending them, the way a dead
-/// zone does, and returns the prefs holding them.
+/// Leaves points for [visitId] in the on-device buffer, as a dead zone during
+/// that visit does, and returns the prefs holding them. Appends to what is
+/// already buffered.
 Future<SharedPreferences> _bufferedOffline(int visitId, List<DateTime> times) async {
   final prefs = await SharedPreferences.getInstance();
-  final offline = ConnectivityStatus()..markOffline();
-  final t = _tracker(prefs, _Repo(), connectivity: offline);
+  final raw = prefs.getString(StorageKeys.trailBuffer);
+  final buffer = raw == null ? <Object?>[] : jsonDecode(raw) as List<Object?>;
   for (var i = 0; i < times.length; i++) {
-    await t.addManualPoint(
-        visitId: visitId,
+    buffer.add({
+      'v': visitId,
+      'n': 0,
+      'p': TrailPoint(
         latitude: 24.70 + i / 100,
         longitude: 46.60,
-        loggedAt: times[i]);
+        loggedAt: times[i].toUtc(),
+      ).toJson(),
+    });
   }
-  t.dispose();
+  await prefs.setString(StorageKeys.trailBuffer, jsonEncode(buffer));
   return prefs;
 }
 
@@ -205,6 +211,51 @@ void main() {
       expect(loggedOut, 1);
     });
 
+    test('a refused renewal is not repeated on every later call', () async {
+      // Each attempt with dead credentials is a failed login on the server;
+      // a handful in a row lock the account for everyone.
+      final adapter = _ScriptedAdapter((path, nth) => _expired());
+      final api = _client(adapter);
+      var renewals = 0;
+      api.reauthenticate = () async {
+        renewals++;
+        return false;
+      };
+
+      for (var i = 0; i < 3; i++) {
+        await expectLater(api.jsonRpc('/api/visit/my'), throwsA(isA<ApiException>()));
+      }
+      expect(renewals, 1);
+
+      // A real sign-in makes renewal possible again.
+      api.sessionEstablished();
+      await expectLater(api.jsonRpc('/api/visit/my'), throwsA(isA<ApiException>()));
+      expect(renewals, 2);
+    });
+
+    test('a renewal that cannot reach the server keeps the session', () async {
+      // Signing the rep out over a network blip would also stop the trail of
+      // the visit in progress.
+      final adapter = _ScriptedAdapter((path, nth) => _expired());
+      final api = _client(adapter);
+      var renewals = 0;
+      api.reauthenticate = () async {
+        renewals++;
+        throw ApiException(code: ApiErrorCode.network);
+      };
+      var loggedOut = 0;
+      api.onUnauthorized.listen((_) => loggedOut++);
+
+      await expectLater(
+        api.jsonRpc('/api/visit/log_locations'),
+        throwsA(isA<ApiException>().having((e) => e.code, 'code', ApiErrorCode.network)),
+      );
+      await expectLater(api.jsonRpc('/api/visit/my'), throwsA(isA<ApiException>()));
+      await Future<void>.delayed(Duration.zero);
+      expect(loggedOut, 0);
+      expect(renewals, 2, reason: 'tried again on the next call');
+    });
+
     test('concurrent expiries share a single re-login', () async {
       final adapter = _ScriptedAdapter(
           (path, nth) => nth == 1 ? _expired() : _ok({'ok': true}));
@@ -253,8 +304,10 @@ void main() {
       expect(e.code, ApiErrorCode.permissionDenied);
       expect(e.serverMessage, 'You may not add positions to this visit.');
       expect(e.serverMessage, isNot(contains('Traceback')),
-          reason: 'debug stays in details (for Sentry), never in the message '
-              'the UI renders');
+          reason: 'debug is never in the message the UI renders');
+      expect(e.toString(), isNot(contains('Traceback')),
+          reason: 'nor in what a crash report serializes');
+      expect(e.odooName, 'odoo.exceptions.AccessError');
     });
   });
 
@@ -385,12 +438,7 @@ void main() {
       prefs = await _bufferedOffline(53, [now, now.add(const Duration(seconds: 30))]);
       final sentFor = <int, int>{};
       final repo = _RecordingRepo(sentFor);
-      final tracker = VisitTrailTracker(
-        prefs: prefs,
-        repository: repo,
-        locationService: _NoLocation(),
-        connectivity: ConnectivityStatus(),
-      );
+      final tracker = _tracker(prefs, repo);
 
       await tracker.flushNow();
 

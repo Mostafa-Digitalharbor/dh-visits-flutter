@@ -43,29 +43,33 @@ class NotificationsCubit extends Cubit<NotificationsState> {
   NotificationsCubit({required this.repository})
       : super(const NotificationsState());
 
+  /// Bumped per load, so a slow answer that lands after a newer one (a pull to
+  /// refresh racing the reload that follows a visit) cannot overwrite it.
+  int _generation = 0;
+
   Future<void> load() async {
+    final generation = ++_generation;
     emit(state.copyWith(status: NotificationsStatus.loading, error: null));
+    ApiException? failure;
+    List<VisitActivity>? activities;
     try {
-      final activities = await repository.myActivities();
-      // isClosed: this cubit is page-scoped, so popping the page while the
-      // read is in flight disposes it before this runs — and emitting on a
-      // closed cubit throws.
-      if (isClosed) return;
-      emit(state.copyWith(
-        status: NotificationsStatus.success,
-        activities: activities,
-      ));
+      activities = await repository.myActivities();
     } on ApiException catch (e) {
-      if (isClosed) return;
-      emit(state.copyWith(status: NotificationsStatus.failure, error: e));
+      failure = e;
     } catch (e) {
       // Without this, an unexpected failure (a parse error, say) escaped
       // uncaught and left the page on its spinner forever.
-      if (isClosed) return;
-      emit(state.copyWith(
-        status: NotificationsStatus.failure,
-        error: ApiException.unexpected(e),
-      ));
+      failure = ApiException.unexpected(e);
     }
+    // isClosed: this cubit is page-scoped, so popping the page while the read
+    // is in flight disposes it before this runs — and emitting on a closed
+    // cubit throws.
+    if (isClosed || generation != _generation) return;
+    emit(failure == null
+        ? state.copyWith(
+            status: NotificationsStatus.success,
+            activities: activities,
+          )
+        : state.copyWith(status: NotificationsStatus.failure, error: failure));
   }
 }

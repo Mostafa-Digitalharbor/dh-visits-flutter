@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
-import '../../../app/design/app_decor.dart';
 import '../../../app/theme.dart';
+import '../../../core/utils/app_number.dart';
+import '../../../core/utils/duration_format.dart';
+import '../../../shared/extensions/bloc_extensions.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
+import '../../dashboard/view/visits_list_feedback.dart';
 import '../../visits/bloc/visits_list_bloc.dart';
 import '../../visits/domain/visit_metrics.dart';
-import '../../../core/utils/duration_format.dart';
+import 'metric_tile.dart';
 
 /// Manager analytics (design screen 03). All metrics are derived from the
 /// existing `VisitsListBloc` items — visits volume, on-time rate, field km
@@ -17,113 +20,63 @@ import '../../../core/utils/duration_format.dart';
 class AnalyticsPage extends StatelessWidget {
   const AnalyticsPage({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<VisitsListBloc, VisitsListState>(
-      builder: (context, state) {
-        // This tab's bloc fetches when the tab is first opened, so the very
-        // first frame has no data. Rendering the metric tiles then would show
-        // a confident "0% on-time · 0 km" for as long as the request takes.
-        if (state.items.isEmpty &&
-            (state.status == VisitsListStatus.loading ||
-                state.status == VisitsListStatus.initial)) {
-          return const _AnalyticsSkeleton();
-        }
-        // Without this, a failed fetch renders every metric as 0% / 0 km with
-        // confident-looking week-over-week deltas — fabricated analytics the
-        // manager has no reason to distrust.
-        if (state.status == VisitsListStatus.failure && state.items.isEmpty) {
-          return ErrorView(
-            message: state.error?.localize(context) ?? context.s.errUnknown,
-            onRetry: () => context
-                .read<VisitsListBloc>()
-                .add(const VisitsListLoadRequested()),
-          );
-        }
-        // One sweep builds this week's and last week's figures, the weekly
-        // series and the employee table together — see [AnalyticsSummary].
-        // Every tile below used to run its own pass over the full list on each
-        // rebuild.
-        final summary = AnalyticsSummary.from(state.items);
-        final cur = summary.current;
-        final prev = summary.previous;
-
-        // Pull-to-refresh, matching the Dashboard. Without it this page had no
-        // way to refetch at all — its bloc is built once and kept alive by the
-        // shell's IndexedStack, so stale figures could only be cleared by
-        // restarting the app.
-        return AppRefreshIndicator(
-          onRefresh: () async {
-            final bloc = context.read<VisitsListBloc>();
-            bloc.add(const VisitsListLoadRequested(scope: VisitListScope.team));
-            await bloc.stream
-                .firstWhere((s) => s.status != VisitsListStatus.loading);
-          },
-          child: ListView(
-          padding: _pagePadding(context),
-          children: [
-            Row(children: [
-              Expanded(
-                child: _MetricTile(
-                  icon: Symbols.verified,
-                  tone: context.x.success,
-                  value: '${cur.onTimePct}%',
-                  label: context.s.analyticsOnTime,
-                  delta: cur.onTimePct - prev.onTimePct,
-                  deltaUnit: context.s.unitPercent,
-                ),
-              ),
-              context.gapW(Insets.x3),
-              Expanded(
-                child: _MetricTile(
-                  icon: Symbols.event_available,
-                  tone: context.colors.primary,
-                  value: '${cur.count}',
-                  label: context.s.analyticsVisitsThisWeek,
-                  delta: _pctDelta(cur.count, prev.count),
-                  deltaUnit: context.s.unitPercent,
-                ),
-              ),
-            ]),
-            context.gapH(Insets.x3),
-            Row(children: [
-              Expanded(
-                child: _MetricTile(
-                  icon: Symbols.route,
-                  tone: context.x.warning,
-                  value: '${cur.km}',
-                  label: context.s.analyticsKm,
-                  delta: _pctDelta(cur.km, prev.km),
-                  deltaUnit: context.s.unitPercent,
-                ),
-              ),
-              context.gapW(Insets.x3),
-              Expanded(
-                child: _MetricTile(
-                  icon: Symbols.timelapse,
-                  tone: context.colors.tertiary,
-                  value: Duration(minutes: cur.avgMinutes).clock,
-                  label: context.s.analyticsAvgDuration,
-                  delta: cur.avgMinutes - prev.avgMinutes,
-                  deltaUnit: context.s.unitMinShort,
-                  invertDelta: true,
-                ),
-              ),
-            ]),
-            context.gapH(Insets.x4),
-            _WeeklyChart(summary: summary),
-            context.gapH(Insets.x4h),
-            SectionHeader(icon: Symbols.leaderboard, label: context.s.analyticsByEmployee),
-            context.gapH(Insets.x2h),
-            _ByEmployee(rows: summary.byEmployee),
-          ],
-          ),
-        );
-      },
-    );
+  /// Pull-to-refresh, matching the Dashboard. Its bloc is built once and kept
+  /// alive by the shell's stack, so without this stale figures could only be
+  /// cleared by switching tabs. The spinner lasts as long as the reload.
+  static Future<void> _refresh(BuildContext context) {
+    final bloc = context.read<VisitsListBloc>()
+      ..add(const VisitsListLoadRequested(scope: VisitListScope.team));
+    return bloc.untilSettled((s) => s.status == VisitsListStatus.loading);
   }
 
-  static int _pctDelta(num cur, num prev) => AnalyticsSummary.pctDelta(cur, prev);
+  @override
+  Widget build(BuildContext context) {
+    return VisitsRefreshFailureListener(
+      child: BlocBuilder<VisitsListBloc, VisitsListState>(
+        builder: (context, state) {
+          // This tab's bloc fetches when the tab is first opened, so the very
+          // first frame has no data. Rendering the metric tiles then would
+          // show a confident "0% on-time · 0 km" for as long as the request
+          // takes.
+          if (state.items.isEmpty &&
+              (state.status == VisitsListStatus.loading ||
+                  state.status == VisitsListStatus.initial)) {
+            return const _AnalyticsSkeleton();
+          }
+          // Without this, a failed fetch renders every metric as 0% / 0 km
+          // with confident-looking week-over-week deltas — fabricated
+          // analytics the manager has no reason to distrust.
+          if (state.status == VisitsListStatus.failure && state.items.isEmpty) {
+            return ErrorView(
+              message: state.error?.localize(context) ?? context.s.errUnknown,
+              onRetry: () => _refresh(context),
+            );
+          }
+          // One sweep builds this week's and last week's figures, the weekly
+          // series and the employee table together — see [AnalyticsSummary].
+          final summary = AnalyticsSummary.from(state.items);
+          return AppRefreshIndicator(
+            onRefresh: () => _refresh(context),
+            child: ListView(
+              padding: _pagePadding(context),
+              children: [
+                _MetricGrid(summary: summary),
+                context.gapH(Insets.x4),
+                _WeeklyChart(summary: summary),
+                context.gapH(Insets.x4h),
+                SectionHeader(
+                  icon: Symbols.leaderboard,
+                  label: context.s.analyticsByEmployee,
+                ),
+                context.gapH(Insets.x2h),
+                _ByEmployee(rows: summary.byEmployee),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
 /// Shared by the page and its skeleton so the two cannot drift — the whole
@@ -135,6 +88,80 @@ EdgeInsets _pagePadding(BuildContext context) => EdgeInsets.fromLTRB(
       context.r(Insets.screen),
       context.rh(Insets.x6 + Insets.x1),
     );
+
+/// The four headline tiles, two per row.
+class _MetricGrid extends StatelessWidget {
+  final AnalyticsSummary summary;
+  const _MetricGrid({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final cur = summary.current;
+    final prev = summary.previous;
+    String percentChange(num change) =>
+        s.unitPercentValue(AppNumber.signed(change));
+    final countChange = AnalyticsSummary.pctDelta(cur.count, prev.count);
+    final kmChange = AnalyticsSummary.pctDelta(cur.km, prev.km);
+    final onTimeChange = cur.onTimePct - prev.onTimePct;
+    final durationChange = cur.avgMinutes - prev.avgMinutes;
+
+    return Column(
+      children: [
+        MetricTileRow(
+          start: MetricTile(
+            icon: Symbols.verified,
+            tone: context.x.success,
+            value: AppNumber.percent(s, cur.onTimePct),
+            label: s.analyticsOnTime,
+            countUp: true,
+            delta: MetricDelta(
+              change: onTimeChange,
+              text: percentChange(onTimeChange),
+            ),
+          ),
+          end: MetricTile(
+            icon: Symbols.event_available,
+            tone: context.colors.primary,
+            value: AppNumber.whole(cur.count),
+            label: s.analyticsVisitsThisWeek,
+            countUp: true,
+            delta: MetricDelta(
+              change: countChange,
+              text: percentChange(countChange),
+            ),
+          ),
+        ),
+        context.gapH(Insets.x3),
+        MetricTileRow(
+          start: MetricTile(
+            icon: Symbols.route,
+            tone: context.x.warning,
+            value: AppNumber.whole(cur.km),
+            label: s.analyticsKm,
+            countUp: true,
+            delta: MetricDelta(
+              change: kmChange,
+              text: percentChange(kmChange),
+            ),
+          ),
+          end: MetricTile(
+            icon: Symbols.timelapse,
+            tone: context.colors.tertiary,
+            value: Duration(minutes: cur.avgMinutes).clock,
+            label: s.analyticsAvgDuration,
+            delta: MetricDelta(
+              change: durationChange,
+              text: s.unitMinutes(AppNumber.signed(durationChange)),
+              // A shorter average visit is the good news.
+              higherIsBetter: false,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 // Placeholder heights for [_AnalyticsSkeleton], named so the relationship to
 // the components they stand in for is stated rather than implied by a literal.
@@ -155,9 +182,8 @@ class _AnalyticsSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Heights are the real components' measured heights, scaled the same way
-    // they are, so the skeleton occupies exactly the box the content will.
-    final tile = context.r(_tileHeight);
+    // Heights follow the text scale the way the real tiles grow with it.
+    final tile = context.fixedH(_tileHeight);
     final gap = context.gapW(Insets.x3);
     final tileRow = Row(children: [
       Expanded(child: SkeletonCard(height: tile)),
@@ -172,98 +198,9 @@ class _AnalyticsSkeleton extends StatelessWidget {
           context.gapH(Insets.x3),
           tileRow,
           context.gapH(Insets.x4),
-          SkeletonCard(height: context.r(_chartCardHeight)),
+          SkeletonCard(height: context.fixedH(_chartCardHeight)),
           context.gapH(Insets.x4h),
-          SkeletonCard(height: context.r(_leaderboardHeight)),
-        ],
-      ),
-    );
-  }
-}
-
-class _MetricTile extends StatelessWidget {
-  final IconData icon;
-  final Color tone;
-  final String value;
-  final String label;
-  final int delta;
-  final String deltaUnit;
-  final bool invertDelta;
-  const _MetricTile({
-    required this.icon,
-    required this.tone,
-    required this.value,
-    required this.label,
-    required this.delta,
-    required this.deltaUnit,
-    this.invertDelta = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = context.colors;
-    final x = context.x;
-    final good = invertDelta ? delta <= 0 : delta >= 0;
-    final deltaColor = good ? x.success : cs.error;
-    final up = delta >= 0;
-    return Container(
-      padding: context.padAll(Insets.x3h),
-      decoration: AppDecor.panel(context),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              IconBadge(
-                icon: icon,
-                color: tone,
-                size: context.r(CompSz.badgeLg),
-                iconSize: context.r(IconSz.sm),
-                radius: Radii.sm,
-                tintAlpha: Alphas.tintStrong,
-                fill: 1,
-              ),
-              const Spacer(),
-              // On a 320dp screen these tiles are ~140dp wide, and a
-              // three-digit delta ("+100%") next to the 38dp icon badge does
-              // not fit: the Spacer collapses to zero and the row overflows.
-              //
-              // `FittedBox`, not an ellipsis. Ellipsising is safe but useless
-              // here — "+…" tells the manager nothing, and a delta that cannot
-              // be read may as well not be drawn. Scaling the whole chip down
-              // keeps the number legible on the phones that need it while
-              // leaving it at full size everywhere else.
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(up ? Symbols.trending_up : Symbols.trending_down,
-                          size: IconSz.pill, color: deltaColor),
-                      context.gapW(Insets.hair),
-                      Text('${up ? '+' : ''}$delta$deltaUnit',
-                          maxLines: 1,
-                          style: TextStyle(
-                              fontSize: FontSz.sm,
-                              fontWeight: FontWeight.w700,
-                              color: deltaColor)),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          context.gapH(Insets.x3),
-          CountUpText(value,
-              style: AppType.number(FontSz.metric, cs.onSurface)
-                  .copyWith(height: 1)),
-          context.gapH(Insets.x1),
-          Text(label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: FontSz.sm, fontWeight: FontWeight.w500, color: x.textTertiary)),
+          SkeletonCard(height: context.fixedH(_leaderboardHeight)),
         ],
       ),
     );
@@ -278,11 +215,11 @@ class _WeeklyChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = context.colors;
     final x = context.x;
+    final s = context.s;
     final days = summary.weeklyDays;
     final counts = summary.weeklyCounts;
     final maxCount = summary.weeklyMax;
-    // Indexed by DateTime.weekday % 7 (Sun = 0 … Sat = 6), localised via l10n.
-    final s = context.s;
+    // Indexed by DateTime.weekday % daysPerWeek (Sun = 0 … Sat = 6).
     final names = [
       s.weekdayShortSun,
       s.weekdayShortMon,
@@ -300,10 +237,11 @@ class _WeeklyChart extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(context.s.analyticsWeeklyTitle,
+                child: Text(s.analyticsWeeklyTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppType.titleSm.copyWith(fontWeight: FontWeight.w700, color: cs.onSurface)),
+                    style: AppType.titleSm.copyWith(
+                        fontWeight: FontWeight.w700, color: cs.onSurface)),
               ),
               context.gapW(Insets.x2),
               // Flexible even though it already ellipsizes: a Row measures its
@@ -311,7 +249,7 @@ class _WeeklyChart extends StatelessWidget {
               // narrow card this subtitle claimed more than was left and the
               // Expanded title above it could not give any more back.
               Flexible(
-                child: Text(context.s.analyticsWeeklyCompare,
+                child: Text(s.analyticsWeeklyCompare,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: FontSz.sm, color: x.textTertiary)),
@@ -329,13 +267,14 @@ class _WeeklyChart extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                for (var i = 0; i < 7; i++)
+                for (var i = 0; i < counts.length && i < days.length; i++)
                   Expanded(
                     child: _Bar(
                       count: counts[i],
                       maxCount: maxCount,
-                      label: names[days[i].weekday % 7],
-                      isToday: i == 6,
+                      label: names[days[i].weekday % DateTime.daysPerWeek],
+                      // The series is oldest first; the last day is today.
+                      isToday: i == days.length - 1,
                     ),
                   ),
               ],
@@ -363,28 +302,27 @@ class _Bar extends StatelessWidget {
     final cs = context.colors;
     final x = context.x;
     final frac = maxCount == 0 ? 0.0 : count / maxCount;
+    final tone = isToday ? cs.primary : x.textTertiary;
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        Text('$count',
+        Text(AppNumber.whole(count),
             maxLines: 1,
             style: TextStyle(
-                fontSize: FontSz.sm, fontWeight: FontWeight.w800, color: isToday ? cs.primary : x.textTertiary)),
+                fontSize: FontSz.sm, fontWeight: FontWeight.w800, color: tone)),
         context.gapH(Insets.x1h),
-        // The bar takes whatever the two labels leave rather than a hardcoded
-        // 8 + 80·v. Those fixed numbers plus the labels' own line heights added
-        // up to just over the chart's 148dp box — a one-pixel overflow at the
-        // default font scale, and a real clip at 1.25×. Now the column can
-        // never exceed its parent whatever the font metrics do.
+        // The bar takes whatever the two labels leave rather than a fixed
+        // height, so the column can never exceed its parent whatever the font
+        // metrics do.
         Expanded(
           child: TweenAnimationBuilder<double>(
             tween: Tween(begin: 0, end: frac),
             duration: AppDurations.barGrow,
-            curve: Curves.easeOutCubic,
+            curve: AppCurves.decelerate,
             builder: (_, v, __) => FractionallySizedBox(
               alignment: Alignment.bottomCenter,
               // The floor keeps an empty day visible as a stub rather than
-              // vanishing, which is what the old `8 +` term was for.
+              // vanishing.
               heightFactor:
                   (_barFloor + (1 - _barFloor) * v).clamp(0.0, 1.0),
               child: Container(
@@ -401,10 +339,11 @@ class _Bar extends StatelessWidget {
         context.gapH(Insets.x2),
         Text(label,
             maxLines: 1,
+            overflow: TextOverflow.clip,
             style: TextStyle(
                 fontSize: FontSz.tiny,
                 fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-                color: isToday ? cs.primary : x.textTertiary)),
+                color: tone)),
       ],
     );
   }
@@ -417,12 +356,7 @@ class _ByEmployee extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shown = rows;
-
-    if (shown.isEmpty) {
-      // Was a hand-rolled copy of this row whose Text had no Expanded, so the
-      // Arabic "no data" sentence overflowed the card. [InlineEmptyRow] exists
-      // precisely because four other screens made the same mistake.
+    if (rows.isEmpty) {
       return AppCard(
         child: InlineEmptyRow(
           icon: Symbols.inbox,
@@ -434,12 +368,8 @@ class _ByEmployee extends StatelessWidget {
     return AppCard(
       child: Column(
         children: [
-          for (var i = 0; i < shown.length; i++)
-            _EmpRow(
-                rank: i + 1,
-                name: shown[i].name,
-                pct: shown[i].onTimePct,
-                visits: shown[i].visits),
+          for (var i = 0; i < rows.length; i++)
+            _EmpRow(rank: i + 1, row: rows[i]),
         ],
       ),
     );
@@ -447,28 +377,35 @@ class _ByEmployee extends StatelessWidget {
 }
 
 /// At or above this on-time percentage an employee's bar turns green; below it,
-/// amber. Matches the threshold the Dashboard's leaderboard uses.
+/// amber.
 const int _onTimeGoodPct = 90;
+
+/// The top of the on-time scale, for the bar fraction.
+const int _fullPct = 100;
 
 class _EmpRow extends StatelessWidget {
   final int rank;
-  final String name;
-  final int pct;
-  final int visits;
-  const _EmpRow({required this.rank, required this.name, required this.pct, required this.visits});
+  final EmployeeOnTime row;
+  const _EmpRow({required this.rank, required this.row});
 
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
     final x = context.x;
-    final tone = pct >= _onTimeGoodPct ? x.success : x.warning;
+    final tone = row.onTimePct >= _onTimeGoodPct ? x.success : x.warning;
     return LeaderboardRow(
-      leading: RankMedalAvatar(name: name, rank: rank),
-      name: name,
+      leading: RankMedalAvatar(name: row.name, rank: rank),
+      name: row.name,
       // The rate and the sample size together: 100% off two visits is not the
       // same result as 100% off forty, and the manager needs both to read the
-      // board correctly.
-      figure: '$pct${context.s.unitPercent} · $visits',
-      value: pct / 100,
+      // board correctly. The count stays a bare number: the figure cannot
+      // shrink in this row, and "12 visits" beside a long Arabic name
+      // overflows a 320dp phone.
+      figure: context.joinFacts([
+        AppNumber.percent(s, row.onTimePct),
+        AppNumber.whole(row.visits),
+      ]),
+      value: row.onTimePct / _fullPct,
       color: tone,
       placement: LeaderFigurePlacement.inline,
     );

@@ -85,6 +85,16 @@ class _StubListBloc extends VisitsListBloc {
   }
 }
 
+/// The review queue builds its own pending-scoped bloc and asks it to load.
+/// This one keeps its seeded items and ignores the request — the fake
+/// repository has nothing to answer with.
+class _SeededReviewBloc extends _StubListBloc {
+  _SeededReviewBloc(super.items);
+
+  @override
+  void add(VisitsListEvent event) {}
+}
+
 class _FakeServerConfigRepo implements ServerConfigRepository {
   @override
   ServerConfig read() => const ServerConfig(
@@ -400,7 +410,8 @@ void main() {
         });
 
         testWidgets('Review fits — $tag', (tester) async {
-          _expectNoLayoutErrors(await _layoutErrors(tester, const ReviewPage(),
+          _expectNoLayoutErrors(await _layoutErrors(tester,
+              ReviewPage(createBloc: () => _SeededReviewBloc(items)),
               size: vp.size,
               locale: locale,
               textScale: scale,

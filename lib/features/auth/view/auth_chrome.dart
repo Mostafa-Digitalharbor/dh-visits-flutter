@@ -4,20 +4,96 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../app/theme.dart';
+import '../../../core/constants.dart';
 import '../../../core/settings/settings_cubit.dart';
 import '../../../shared/extensions/context_extensions.dart';
 
-/// Shared visual chrome for the authentication-flow screens (login + server
-/// setup): the full-bleed brand hero, the overlapping credential sheet, the
-/// placeholder-style field, the primary CTA and the secure footer. Both screens
-/// compose these so they stay pixel-identical — only the sheet's fields differ.
+// Shared visual chrome for the authentication-flow screens (login + server
+// setup): the full-bleed brand hero, the overlapping credential sheet, the
+// placeholder-style field, the primary CTA and the secure footer. Both screens
+// compose these so they stay pixel-identical — only the sheet's fields differ.
+
+/// Component sizes of the auth chrome. Design-space dp: each is scaled at its
+/// call site (`context.r` for glyph boxes, `context.fixedH` for boxes that hold
+/// text).
+abstract final class _AuthSz {
+  /// The white tile holding the logo mark.
+  static const logoTile = 84.0;
+  static const logoRadius = 24.0;
+  static const logoShadowBlur = 24.0;
+  static const logoShadowOffset = Offset(0, 10);
+
+  /// The glass chips in the hero's top row.
+  static const chip = 34.0;
+
+  /// The decorative glows behind the hero content, and how far they hang off
+  /// its edges.
+  static const glowLarge = 200.0;
+  static const glowSmall = 170.0;
+  static const glowLargeInset = -40.0;
+  static const glowSmallBottom = -10.0;
+  static const glowSmallStart = -50.0;
+
+  /// How far the credential sheet rides up over the hero.
+  static const sheetOverlap = 44.0;
+
+  /// The sheet stops growing here, so fields keep a sane width on tablets.
+  static const sheetMaxWidth = 460.0;
+
+  /// The drag handle drawn at the top of the sheet.
+  static const handleWidth = 40.0;
+  static const handleHeight = 4.0;
+
+  /// The primary CTA — taller than a standard button; it is the one action on
+  /// these screens.
+  static const ctaHeight = 56.0;
+  static const ctaSpinnerStroke = 2.4;
+
+  static const wordmarkTracking = -0.5;
+  static const headingTracking = -0.3;
+}
+
+/// The brand veil over the hero photo — navy900 → navy700 → teal500, each
+/// slightly translucent so the map shows through.
+const _veilAlphas = (deep: 0.92, mid: 0.88, light: 0.82);
+
+/// The cyan glow in the hero's top corner — strong enough to read through the
+/// veil, unlike the faint white one opposite ([Alphas.wash]).
+const _accentGlowAlpha = 0.45;
+
+// ─── Frame ───────────────────────────────────────────────────────────────────
+
+/// The scrolling frame both auth screens share: at least one viewport tall, so
+/// the sheet's colour reaches the bottom on tall screens, and scrollable, so
+/// the form stays reachable above the keyboard on a 320×568 phone.
+class AuthScrollBody extends StatelessWidget {
+  final List<Widget> children;
+  const AuthScrollBody({super.key, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: children,
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 // ─── Hero ────────────────────────────────────────────────────────────────────
 
 class AuthHero extends StatelessWidget {
   /// When non-null, a back chip is pinned to the visual start of the hero's
-  /// top row. Login passes this to step back to the server-setup screen; setup
-  /// itself is the entry point of the flow and leaves it null.
+  /// top row. Login passes this to step back to the server-setup screen; the
+  /// setup screen passes it only when it was pushed (from Profile), since as
+  /// the entry point of the flow there is nothing behind it.
   final VoidCallback? onBack;
 
   const AuthHero({super.key, this.onBack});
@@ -25,66 +101,86 @@ class AuthHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final topPad = MediaQuery.paddingOf(context).top;
+    // With the keyboard up, or a phone on its side, the logo and tagline would
+    // push the very field being typed into off screen. The wordmark alone
+    // keeps the brand.
+    final compact = context.keyboardInset > 0 || context.isLandscape;
     return Stack(
       children: [
         Positioned.fill(
           child: Image.asset(AppAssets.mapCairo, fit: BoxFit.cover),
         ),
-        // Brand gradient veil — 155deg navy900@92 → brand@88 → cyan600@82.
         Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: const Alignment(-1, -0.7),
-                end: const Alignment(1, 1),
+                end: Alignment.bottomRight,
                 colors: [
-                  AppColors.navy900.withValues(alpha: 0.92),
-                  AppColors.navy700.withValues(alpha: 0.88),
-                  AppColors.teal500.withValues(alpha: 0.82),
+                  AppColors.navy900.withValues(alpha: _veilAlphas.deep),
+                  AppColors.navy700.withValues(alpha: _veilAlphas.mid),
+                  AppColors.teal500.withValues(alpha: _veilAlphas.light),
                 ],
                 stops: const [0, 0.55, 1],
               ),
             ),
           ),
         ),
-        Positioned(
-          top: -40,
-          right: -40,
-          child: _Glow(size: 200, color: AppColors.cyan500.withValues(alpha: 0.45)),
+        PositionedDirectional(
+          top: _AuthSz.glowLargeInset,
+          end: _AuthSz.glowLargeInset,
+          child: _Glow(
+            size: context.r(_AuthSz.glowLarge),
+            color: AppColors.cyan500.withValues(alpha: _accentGlowAlpha),
+          ),
         ),
-        Positioned(
-          bottom: -10,
-          left: -50,
-          child: _Glow(size: 170, color: Colors.white.withValues(alpha: 0.18)),
+        PositionedDirectional(
+          bottom: _AuthSz.glowSmallBottom,
+          start: _AuthSz.glowSmallStart,
+          child: _Glow(
+            size: context.r(_AuthSz.glowSmall),
+            color: AppColors.onMap.withValues(alpha: Alphas.wash),
+          ),
         ),
         Padding(
-          padding: EdgeInsets.fromLTRB(22, topPad + 14, 22, 70),
+          padding: EdgeInsetsDirectional.fromSTEB(
+            context.r(Insets.x5),
+            topPad + context.rh(Insets.x3h),
+            context.r(Insets.x5),
+            _AuthSz.sheetOverlap + context.rh(compact ? Insets.x3 : Insets.x6),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               _HeroChips(onBack: onBack),
-              context.gapH(Insets.x6),
-              const _LogoTile(),
-              context.gapH(Insets.x3h),
+              if (!compact) ...[
+                context.gapH(Insets.x6),
+                const _LogoTile(),
+              ],
+              context.gapH(compact ? Insets.x1 : Insets.x3h),
               Text(
                 context.s.loginTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: FontSz.wordmark,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                  color: Colors.white,
+                  letterSpacing: _AuthSz.wordmarkTracking,
+                  color: AppColors.onMap,
                 ),
               ),
-              context.gapH(Insets.x1h),
-              Text(
-                context.s.appTagline,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: FontSz.base,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white.withValues(alpha: 0.82),
+              if (!compact) ...[
+                context.gapH(Insets.x1h),
+                Text(
+                  context.s.appTagline,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: FontSz.base,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.onMap.withValues(alpha: Alphas.scrim),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -116,17 +212,22 @@ class _LogoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = context.r(_AuthSz.logoTile);
     return Container(
-      width: 84,
-      height: 84,
-      padding: const EdgeInsets.all(16),
+      width: size,
+      height: size,
+      padding: context.padAll(Insets.x4),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        color: AppColors.onMap,
+        borderRadius: BorderRadius.circular(_AuthSz.logoRadius),
         boxShadow: const [
-          BoxShadow(color: AppColors.shadowMedium, blurRadius: 24, offset: Offset(0, 10)),
+          BoxShadow(
+            color: AppColors.shadowMedium,
+            blurRadius: _AuthSz.logoShadowBlur,
+            offset: _AuthSz.logoShadowOffset,
+          ),
         ],
-        border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1),
+        border: Border.all(color: AppColors.onMap.withValues(alpha: Alphas.soft)),
       ),
       child: Image.asset(AppAssets.logoMark, fit: BoxFit.contain),
     );
@@ -147,10 +248,11 @@ class _HeroChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = context.isDark;
+    final glyph = context.r(IconSz.label);
     return BlocBuilder<SettingsCubit, SettingsState>(
       builder: (context, state) {
-        final isArabic = state.locale.languageCode == 'ar';
-        // Pinned to the visual left: theme toggle leftmost, then language.
+        final isArabic = AppLocales.isArabic(state.locale);
+        // Back chip at the start edge, the language and theme chips at the end.
         return Row(
           children: [
             if (onBack != null)
@@ -161,13 +263,13 @@ class _HeroChips extends StatelessWidget {
                 // `arrow_back` carries `matchTextDirection`, so Flutter already
                 // mirrors it for Arabic — it points left in English and right
                 // in Arabic without any help here.
-                child: const Icon(Symbols.arrow_back,
-                    size: 18, color: Colors.white),
+                child: Icon(Symbols.arrow_back, size: glyph, color: AppColors.onMap),
               ),
             const Spacer(),
             _GlassChip(
-              onTap: () =>
-                  context.read<SettingsCubit>().setLocale(Locale(isArabic ? 'en' : 'ar')),
+              onTap: () => context.read<SettingsCubit>().setLocale(
+                    isArabic ? AppLocales.english : AppLocales.arabic,
+                  ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -181,11 +283,15 @@ class _HeroChips extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: FontSz.sm,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      color: AppColors.onMap,
                     ),
                   ),
                   context.gapW(Insets.x1h),
-                  const Icon(Symbols.translate, size: 16, color: Colors.white),
+                  Icon(
+                    Symbols.translate,
+                    size: context.r(IconSz.xs),
+                    color: AppColors.onMap,
+                  ),
                 ],
               ),
             ),
@@ -197,8 +303,8 @@ class _HeroChips extends StatelessWidget {
               circular: true,
               child: Icon(
                 isDark ? Symbols.light_mode : Symbols.dark_mode,
-                size: 18,
-                color: Colors.white,
+                size: glyph,
+                color: AppColors.onMap,
               ),
             ),
           ],
@@ -227,20 +333,21 @@ class _GlassChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(Radii.pill);
+    final size = context.fixedH(_AuthSz.chip);
     final chip = Material(
-      color: Colors.white.withValues(alpha: 0.12),
+      color: AppColors.onMap.withValues(alpha: Alphas.tint),
       borderRadius: radius,
       child: InkWell(
         onTap: onTap,
         borderRadius: radius,
         child: Container(
-          height: 34,
-          width: circular ? 34 : null,
-          padding: circular ? null : const EdgeInsets.symmetric(horizontal: 12),
+          height: size,
+          width: circular ? size : null,
+          padding: circular ? null : context.padSym(h: Insets.x3),
           alignment: Alignment.center,
           decoration: BoxDecoration(
             borderRadius: radius,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.22), width: 1),
+            border: Border.all(color: AppColors.onMap.withValues(alpha: Alphas.halo)),
           ),
           child: child,
         ),
@@ -261,9 +368,14 @@ class AuthSheet extends StatelessWidget {
     final cs = context.colors;
     final x = context.x;
     return Transform.translate(
-      offset: const Offset(0, -44),
+      offset: const Offset(0, -_AuthSz.sheetOverlap),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(22, 10, 22, 22),
+        padding: EdgeInsetsDirectional.fromSTEB(
+          context.r(Insets.x5),
+          context.rh(Insets.x2h),
+          context.r(Insets.x5),
+          context.rh(Insets.x5),
+        ),
         decoration: BoxDecoration(
           color: cs.surfaceContainerLowest,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(Radii.xl)),
@@ -271,16 +383,16 @@ class AuthSheet extends StatelessWidget {
         ),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
+            constraints: const BoxConstraints(maxWidth: _AuthSz.sheetMaxWidth),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Center(
                   child: Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
+                    width: _AuthSz.handleWidth,
+                    height: _AuthSz.handleHeight,
+                    margin: EdgeInsets.only(bottom: context.rh(Insets.x4)),
                     decoration: BoxDecoration(
                       color: x.outlineVariant,
                       borderRadius: BorderRadius.circular(Radii.pill),
@@ -314,7 +426,7 @@ class AuthSheetTitle extends StatelessWidget {
           style: TextStyle(
             fontSize: FontSz.authHeading,
             fontWeight: FontWeight.w800,
-            letterSpacing: -0.3,
+            letterSpacing: _AuthSz.headingTracking,
             color: cs.onSurface,
           ),
         ),
@@ -343,7 +455,9 @@ class AuthField extends StatefulWidget {
   final TextInputAction textInputAction;
   final String? Function(String?)? validator;
   final void Function(String)? onSubmitted;
+  final ValueChanged<String>? onChanged;
   final List<TextInputFormatter>? inputFormatters;
+  final Iterable<String>? autofillHints;
 
   const AuthField({
     super.key,
@@ -355,7 +469,9 @@ class AuthField extends StatefulWidget {
     this.textInputAction = TextInputAction.next,
     this.validator,
     this.onSubmitted,
+    this.onChanged,
     this.inputFormatters,
+    this.autofillHints,
   });
 
   @override
@@ -368,29 +484,37 @@ class _AuthFieldState extends State<AuthField> {
   @override
   Widget build(BuildContext context) {
     final x = context.x;
+    final glyph = context.r(IconSz.sm);
     return TextFormField(
       controller: widget.controller,
       obscureText: _obscure,
       validator: widget.validator,
       onFieldSubmitted: widget.onSubmitted,
+      onChanged: widget.onChanged,
       keyboardType: widget.keyboardType,
       textInputAction: widget.textInputAction,
       inputFormatters: widget.inputFormatters,
+      autofillHints: widget.autofillHints,
+      autocorrect: !widget.isPassword,
+      enableSuggestions: !widget.isPassword,
       style: const TextStyle(fontSize: FontSz.lg, fontWeight: FontWeight.w600),
       decoration: InputDecoration(
         hintText: widget.hint,
-        prefixIcon: Icon(widget.icon, size: 20, color: x.textTertiary),
+        // The hint disappears once the field has text; the error text is the
+        // only other label, so let it wrap rather than cut its advice short.
+        errorMaxLines: 3,
+        prefixIcon: Icon(widget.icon, size: glyph, color: x.textTertiary),
         suffixIcon: widget.isPassword
             ? IconButton(
                 onPressed: () => setState(() => _obscure = !_obscure),
                 icon: Icon(
                   _obscure ? Symbols.visibility : Symbols.visibility_off,
-                  size: 20,
+                  size: glyph,
                   color: x.textTertiary,
                 ),
               )
             : null,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+        contentPadding: context.padSym(h: Insets.x3h, v: Insets.x3h),
       ),
     );
   }
@@ -398,6 +522,8 @@ class _AuthFieldState extends State<AuthField> {
 
 // ─── Primary CTA ─────────────────────────────────────────────────────────────
 
+/// The hero CTA of the auth sheet. Not [AppButton]: it is taller and carries
+/// the brand glow, which is this screen's design and nowhere else's.
 class AuthPrimaryButton extends StatelessWidget {
   final bool loading;
   final VoidCallback onPressed;
@@ -415,40 +541,51 @@ class AuthPrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = context.colors;
     final x = context.x;
+    final radius = BorderRadius.circular(Radii.lg);
+    final spinner = context.r(IconSz.sm);
     return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(Radii.lg),
-        boxShadow: x.glowBrand,
-      ),
+      decoration: BoxDecoration(borderRadius: radius, boxShadow: x.glowBrand),
       child: Material(
         color: cs.primary,
-        borderRadius: BorderRadius.circular(Radii.lg),
+        borderRadius: radius,
         child: InkWell(
           onTap: loading ? null : onPressed,
-          borderRadius: BorderRadius.circular(Radii.lg),
+          borderRadius: radius,
           child: SizedBox(
-            height: 56,
+            height: context.fixedH(_AuthSz.ctaHeight),
             child: Center(
               child: loading
-                  ? SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2.4, color: cs.onPrimary),
+                  ? SizedBox.square(
+                      dimension: spinner,
+                      child: CircularProgressIndicator(
+                        strokeWidth: _AuthSz.ctaSpinnerStroke,
+                        color: cs.onPrimary,
+                      ),
                     )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(icon, size: 22, fill: 1, color: cs.onPrimary),
-                        context.gapW(Insets.x2),
-                        Text(
-                          label,
-                          style: TextStyle(
-                            fontSize: FontSz.lg,
-                            fontWeight: FontWeight.w800,
-                            color: cs.onPrimary,
+                  : Padding(
+                      padding: context.padSym(h: Insets.x4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(icon,
+                              size: context.r(IconSz.tile),
+                              fill: 1,
+                              color: cs.onPrimary),
+                          context.gapW(Insets.x2),
+                          Flexible(
+                            child: Text(
+                              label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: FontSz.lg,
+                                fontWeight: FontWeight.w800,
+                                color: cs.onPrimary,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
             ),
           ),
@@ -471,7 +608,7 @@ class AuthSecureFooter extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, size: 14, color: x.textDisabled),
+        Icon(icon, size: context.r(IconSz.inline), color: x.textDisabled),
         context.gapW(Insets.x1h),
         Flexible(
           child: Text(

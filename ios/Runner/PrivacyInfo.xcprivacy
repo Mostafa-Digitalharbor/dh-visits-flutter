@@ -9,8 +9,8 @@
   collects. Keep it in sync with store/appstore/app-privacy.md.
 
   Required-reason APIs used by the app's own code:
-  - UserDefaults (ios/Runner/WorkdayLocation.swift keeps the open work day's
-    capture state in the app's own defaults): CA92.1.
+  - UserDefaults (ios/Runner/VisitLocation.swift keeps the in-progress
+    visit's capture state in the app's own defaults): CA92.1.
 -->
 <plist version="1.0">
 <dict>

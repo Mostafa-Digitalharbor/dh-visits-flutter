@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../app/routes.dart';
+import '../../../app/theme.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/utils/app_date.dart';
 import '../../../shared/extensions/context_extensions.dart';
-import '../../../shared/widgets/empty_view.dart';
-import '../../../shared/widgets/error_view.dart';
+import '../../../shared/widgets/widgets.dart';
 import '../../visits/data/models/visit_activity.dart';
 import '../../visits/data/visits_repository.dart';
 import '../bloc/notifications_cubit.dart';
-import '../../../shared/widgets/app_refresh_indicator.dart';
 
 class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
@@ -33,43 +33,35 @@ class _NotificationsView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(context.s.wfNotificationsTitle)),
-      body: BlocBuilder<NotificationsCubit, NotificationsState>(
-        builder: (context, state) {
-          if (state.status == NotificationsStatus.failure) {
-            return ErrorView(
-              message: state.error?.localize(context) ?? context.s.errUnknown,
-              onRetry: () => context.read<NotificationsCubit>().load(),
-            );
-          }
-          if (state.status == NotificationsStatus.loading &&
-              state.activities.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (state.activities.isEmpty) {
-            return AppRefreshIndicator(
-              onRefresh: () => context.read<NotificationsCubit>().load(),
-              child: ListView(
-                children: [
-                  SizedBox(height: MediaQuery.sizeOf(context).height * 0.25),
-                  EmptyView(
-                    icon: Icons.notifications_none_rounded,
-                    message: context.s.wfNotificationsEmpty,
-                  ),
-                ],
-              ),
-            );
-          }
-          return AppRefreshIndicator(
-            onRefresh: () => context.read<NotificationsCubit>().load(),
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: state.activities.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, i) =>
-                  _ActivityTile(activity: state.activities[i]),
-            ),
+      body: BlocConsumer<NotificationsCubit, NotificationsState>(
+        // A refresh that fails over a feed already on screen keeps the feed;
+        // this says so instead of letting the stale rows pass as current.
+        listenWhen: (previous, next) =>
+            next.status == NotificationsStatus.failure &&
+            previous.status != NotificationsStatus.failure &&
+            next.activities.isNotEmpty,
+        listener: (context, state) {
+          final s = context.s;
+          context.showSnack(
+            s.commonRefreshFailedStale(
+                state.error?.localize(context) ?? s.errUnknown),
+            kind: SnackKind.error,
           );
         },
+        builder: (context, state) => AsyncListView<VisitActivity>(
+          items: state.activities,
+          isLoading: state.status == NotificationsStatus.loading ||
+              state.status == NotificationsStatus.initial,
+          hasError: state.status == NotificationsStatus.failure,
+          errorMessage: state.error?.localize(context),
+          error: state.error,
+          onRefresh: context.read<NotificationsCubit>().load,
+          emptyIcon: Symbols.notifications_none,
+          emptyMessage: context.s.wfNotificationsEmpty,
+          separatorHeight: 0,
+          padding: const EdgeInsetsDirectional.symmetric(vertical: Insets.x2),
+          itemBuilder: (_, activity, __) => _ActivityTile(activity: activity),
+        ),
       ),
     );
   }
@@ -81,37 +73,41 @@ class _ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
     final (icon, tone) = switch (activity.urgency) {
-      ActivityUrgency.overdue => (Icons.error_outline, context.colors.error),
-      ActivityUrgency.today => (Icons.today, Colors.orange.shade700),
-      _ => (Icons.notifications_active_outlined, context.colors.primary),
+      ActivityUrgency.overdue => (Symbols.error, context.colors.error),
+      ActivityUrgency.today => (Symbols.today, context.x.warning),
+      _ => (Symbols.notifications_active, context.colors.primary),
     };
     final deadline = activity.deadline;
-    final due = deadline != null
-        ? context.s.wfNotificationsDue(AppDate.dayMonth(context, deadline))
-        : null;
+    final subtitle = context.joinFacts([
+      activity.visitRef,
+      if (deadline != null) s.wfNotificationsDue(AppDate.dayMonth(context, deadline)),
+    ]);
+    final title = activity.summary.isNotEmpty
+        ? activity.summary
+        : s.visitFallbackTitle(activity.visitId);
 
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: tone.withValues(alpha: 0.14),
-        child: Icon(icon, color: tone),
+      leading: IconBadge(
+        icon: icon,
+        color: tone,
+        radius: Radii.pill,
+        size: context.r(CompSz.chip),
       ),
-      title: Text(activity.summary,
-          maxLines: 2, overflow: TextOverflow.ellipsis),
-      subtitle: Text([
-        if (activity.visitRef != null) activity.visitRef!,
-        if (due != null) due,
-      ].join(' · ')),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: activity.visitId == 0
+      title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
+      subtitle: subtitle.isEmpty
           ? null
-          : () async {
-              await context.push(AppRoutes.visitDetail(activity.visitId));
-              if (context.mounted) {
-                // Refresh: the activity is likely cleared after acting.
-                context.read<NotificationsCubit>().load();
-              }
-            },
+          : Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+      // `chevron_right` mirrors itself in Arabic (`matchTextDirection`).
+      trailing: const Icon(Symbols.chevron_right),
+      onTap: () async {
+        await context.push(AppRoutes.visitDetail(activity.visitId));
+        if (context.mounted) {
+          // Refresh: the activity is likely cleared after acting.
+          context.read<NotificationsCubit>().load();
+        }
+      },
     );
   }
 }

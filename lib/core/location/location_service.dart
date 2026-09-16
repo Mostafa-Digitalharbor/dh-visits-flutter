@@ -6,10 +6,22 @@ import 'location_outcome.dart';
 enum LocationAccess { granted, denied, deniedForever, serviceDisabled }
 
 class LocationService {
+  /// Longest a one-off fix may take before the caller is told it's
+  /// unavailable (indoors, a basement) rather than left waiting.
+  static const Duration fixTimeout = Duration(seconds: 10);
+
+  /// The `NSLocationTemporaryUsageDescriptionDictionary` key in Info.plist
+  /// that explains why an active visit's trail needs precise location.
+  static const String _preciseLocationPurposeKey = 'VisitRoute';
+
+  /// Movement (whole meters) below which [watch] reports nothing unless the
+  /// caller asks for another threshold.
+  static const int defaultDistanceFilterMeters = 5;
+
   /// Permission + fix in one call, as a [LocationOutcome].
   ///
   /// Prefer this over [ensurePermission] + [getCurrent] at call sites that act
-  /// on the result: [getCurrent] throws on timeout (10s), and an uncaught
+  /// on the result: [getCurrent] throws on timeout ([fixTimeout]), and an uncaught
   /// throw inside an async `onPressed` makes the button appear to do nothing.
   /// Here that becomes an explicit [LocationUnavailable] the caller must
   /// handle.
@@ -49,6 +61,16 @@ class LocationService {
     return true;
   }
 
+  /// Whether location can be read right now — service on and access granted —
+  /// without ever showing a prompt. For code that may run in the background,
+  /// where a permission dialog cannot be shown.
+  Future<bool> hasPermission() async {
+    if (!await Geolocator.isLocationServiceEnabled()) return false;
+    final permission = await Geolocator.checkPermission();
+    return permission == LocationPermission.always ||
+        permission == LocationPermission.whileInUse;
+  }
+
   /// Like [ensurePermission], but says *why* location is unusable, so a
   /// screen can offer the right fix: ask again, or send the user to Settings
   /// when Android will no longer show the prompt.
@@ -71,6 +93,8 @@ class LocationService {
 
   Future<bool> openAppSettings() => Geolocator.openAppSettings();
 
+  Future<bool> openLocationSettings() => Geolocator.openLocationSettings();
+
   /// False when the user granted only approximate location ("Precise
   /// Location" off on iOS, "Approximate" on Android 12+). Unknown counts as
   /// precise, so a platform without the notion never blocks anything.
@@ -84,12 +108,14 @@ class LocationService {
   }
 
   /// iOS: asks for precise location for this app session, explained by the
-  /// `WorkdayRoute` purpose string in Info.plist. Android has no such prompt
+  /// `VisitRoute` purpose string in Info.plist. Android has no such prompt
   /// (the user changes it in Settings), so this does nothing there.
   Future<void> requestPreciseLocation() async {
     if (defaultTargetPlatform != TargetPlatform.iOS) return;
     try {
-      await Geolocator.requestTemporaryFullAccuracy(purposeKey: 'WorkdayRoute');
+      await Geolocator.requestTemporaryFullAccuracy(
+        purposeKey: _preciseLocationPurposeKey,
+      );
     } catch (_) {
       // Unsupported or refused: the caller re-checks isPreciseLocation.
     }
@@ -101,14 +127,14 @@ class LocationService {
     return Geolocator.getCurrentPosition(
       locationSettings: LocationSettings(
         accuracy: accuracy,
-        timeLimit: const Duration(seconds: 10),
+        timeLimit: fixTimeout,
       ),
     );
   }
 
   Stream<Position> watch({
     LocationAccuracy accuracy = LocationAccuracy.high,
-    int distanceFilter = 5,
+    int distanceFilter = defaultDistanceFilterMeters,
   }) {
     return Geolocator.getPositionStream(
       locationSettings: LocationSettings(

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_exceptions.dart';
-import '../../core/api/server_message_l10n.dart';
+import '../../core/api/api_error_messages.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../app/design/app_dimens.dart';
 import '../../app/design/responsive.dart';
+import '../../app/theme.dart' show AppX;
 
 /// Visual kind for snackbars — drives the leading icon and accent color
 /// on `context.showSnack`. Defaults to `info` for plain messages and
@@ -18,6 +19,15 @@ extension AppContext on BuildContext {
   TextTheme get text => Theme.of(this).textTheme;
   bool get isRtl => Directionality.of(this) == TextDirection.rtl;
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
+
+  /// Joins the non-empty [parts] with the localized list separator —
+  /// "VIS/0012 · Project Alpha". Null and blank parts are skipped, so a line
+  /// never starts or ends with a dangling separator.
+  String joinFacts(Iterable<String?> parts) => parts
+      .whereType<String>()
+      .map((p) => p.trim())
+      .where((p) => p.isNotEmpty)
+      .join(s.commonListSeparator);
 
   /// Runs an external-launch action (dial / mail / maps) and, if it fails
   /// (no handler app, or the launch threw), shows a clear localized message
@@ -34,131 +44,86 @@ extension AppContext on BuildContext {
     }
   }
 
+  /// Shows [message] as the app's floating snackbar.
+  ///
+  /// An info or success message replaces whatever is showing — it is only
+  /// news. An error waits its turn instead: several offline actions refused in
+  /// one sync each deserve to be read, and replacing one with the next hid all
+  /// but the last. Errors also stay longer and can be dismissed by hand.
   void showSnack(String message, {SnackKind kind = SnackKind.info}) {
     final scheme = colors;
+    final x = Theme.of(this).extension<AppX>();
+    final isError = kind == SnackKind.error;
     final (icon, bg, fg) = switch (kind) {
+      // The container pair, not white on green: white on the brand green
+      // falls below the contrast a 14sp label needs.
       SnackKind.success => (
-        Icons.check_circle_rounded,
-        Colors.green.shade600,
-        Colors.white,
-      ),
-      SnackKind.error => (
-        Icons.error_outline_rounded,
-        scheme.error,
-        scheme.onError,
-      ),
-      SnackKind.info => (
-        Icons.info_outline_rounded,
-        scheme.inverseSurface,
-        scheme.onInverseSurface,
-      ),
-    };
-    ScaffoldMessenger.of(this)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        backgroundColor: bg,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(
-            Insets.x4, Insets.x3, Insets.x4, Insets.x4),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(Radii.btn),
+          Icons.check_circle_rounded,
+          x?.successContainer ?? scheme.primaryContainer,
+          x?.onSuccessContainer ?? scheme.onPrimaryContainer,
         ),
-        elevation: 4,
-        duration: AppDurations.snack,
-        content: Row(
-          children: [
-            Icon(icon, color: fg, size: IconSz.sm),
-            // Unqualified: inside an extension on BuildContext the receiver
-            // *is* the context, and the sibling Responsive extension hangs off
-            // the same type.
-            gapW(Insets.x2h),
-            Expanded(
-              child: Text(
-                message,
-                style: text.bodyMedium?.copyWith(
-                  color: fg,
-                  fontWeight: FontWeight.w600,
-                ),
+      SnackKind.error => (
+          Icons.error_outline_rounded,
+          scheme.error,
+          scheme.onError,
+        ),
+      SnackKind.info => (
+          Icons.info_outline_rounded,
+          scheme.inverseSurface,
+          scheme.onInverseSurface,
+        ),
+    };
+    final messenger = ScaffoldMessenger.of(this);
+    if (!isError) messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(
+      backgroundColor: bg,
+      behavior: SnackBarBehavior.floating,
+      margin: EdgeInsetsDirectional.fromSTEB(
+        r(Insets.x4),
+        r(Insets.x3),
+        r(Insets.x4),
+        r(Insets.x4),
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Radii.btn),
+      ),
+      elevation: _snackElevation,
+      duration: isError ? AppDurations.snackError : AppDurations.snack,
+      showCloseIcon: isError,
+      closeIconColor: fg,
+      content: Row(
+        children: [
+          Icon(icon, color: fg, size: IconSz.sm),
+          // Unqualified: inside an extension on BuildContext the receiver
+          // *is* the context, and the sibling Responsive extension hangs off
+          // the same type.
+          gapW(Insets.x2h),
+          Expanded(
+            child: Text(
+              message,
+              maxLines: _snackMaxLines,
+              overflow: TextOverflow.ellipsis,
+              style: text.bodyMedium?.copyWith(
+                color: fg,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ],
-        ),
-      ));
+          ),
+        ],
+      ),
+    ));
   }
 }
 
-/// Any Arabic letter. Used to tell which language a server sentence is in —
-/// the two languages this app ships use disjoint scripts, so script presence
-/// answers it exactly, without a language-detection library.
-final _arabicScript = RegExp(r'[؀-ۿ]');
+/// Lift of the floating snackbar above the page.
+const double _snackElevation = 4;
+
+/// Enough for the longest localized error sentence at the largest text scale;
+/// anything longer is a server message that must not cover the screen.
+const int _snackMaxLines = 5;
 
 extension ApiExceptionL10n on ApiException {
-  /// The server's own message, but only when the user can actually read it.
-  ///
-  /// [ApiException.serverMessage] already excludes Python diagnostics, so what
-  /// reaches here is a sentence a human wrote — in English, because the backend
-  /// has no other language installed. Three outcomes, in order:
-  ///
-  /// 1. It is a rule [ServerMessageL10n] knows → return the localized version,
-  ///    which keeps the specifics ("only an approved visit can be started").
-  /// 2. It is unrecognised but already in the UI's language → pass it through;
-  ///    a new backend message is still better than a generic one.
-  /// 3. It is unrecognised and in the *other* language → drop it, and let the
-  ///    caller fall back to its localized default. An English sentence dropped
-  ///    into an Arabic screen is the case this whole path exists to prevent.
-  String? _serverText(BuildContext context) {
-    final raw = serverMessage?.trim();
-    if (raw == null || raw.isEmpty) return null;
-
-    final translated = ServerMessageL10n.translate(context.s, raw);
-    if (translated != null) return translated;
-
-    final wantsArabic = Localizations.localeOf(context).languageCode == 'ar';
-    return _arabicScript.hasMatch(raw) == wantsArabic ? raw : null;
-  }
-
-  String localize(BuildContext context) {
-    final s = context.s;
-    switch (code) {
-      case ApiErrorCode.invalidCredentials:
-        return s.errInvalidCredentials;
-      case ApiErrorCode.unauthorized:
-        return s.errAuthRequired;
-      case ApiErrorCode.permissionDenied:
-        // An Odoo `AccessError` names what was refused ("you may not add
-        // positions to this visit"); docs/API.md says to show it.
-        return _serverText(context) ?? s.errPermissionDenied;
-      case ApiErrorCode.timeout:
-        return s.errNetworkTimeout;
-      case ApiErrorCode.network:
-        return s.errNetworkUnreachable;
-      case ApiErrorCode.validation:
-        return _serverText(context) ?? s.errValidation;
-      case ApiErrorCode.notFound:
-        return _serverText(context) ?? s.errNotFound;
-      case ApiErrorCode.locationRequired:
-        return s.errLocationRequired;
-      case ApiErrorCode.server:
-        return _serverText(context) ?? s.errServerError;
-      case ApiErrorCode.locationPermission:
-        return s.errLocationPermission;
-      case ApiErrorCode.customerLoadFailed:
-        return s.errCustomerLoadFailed;
-      case ApiErrorCode.notSupported:
-        return s.errFeatureNotAvailable;
-      case ApiErrorCode.sessionRestoreFailed:
-        return s.errSessionRestoreFailed;
-      case ApiErrorCode.conflict:
-        return _serverText(context) ?? s.errConflict;
-      case ApiErrorCode.insecureConnection:
-        return s.errInsecureConnection;
-      case ApiErrorCode.unknown:
-        // errUnknown, not errNetworkUnknown: this arm catches parse errors,
-        // null casts and unclassified failures as well as network ones, and
-        // "a network error occurred" sends the user off to check their WiFi
-        // over what is usually a bug. `network` / `timeout` already carry the
-        // genuinely connectivity-related cases.
-        return _serverText(context) ?? s.errUnknown;
-    }
-  }
+  /// The sentence the user reads for this failure, in the UI's language.
+  /// See [ApiErrorMessages.messageFor] for the mapping itself.
+  String localize(BuildContext context) => messageFor(context.s);
 }

@@ -11,13 +11,17 @@ import 'app_date.dart';
 class RelativeTime {
   RelativeTime._();
 
+  static const int _daysPerWeek = 7;
+
+  /// A time slightly in the future (the server's clock ahead of the device's)
+  /// reads as "now" rather than a negative count.
   static String format(BuildContext context, DateTime when) {
     final diff = DateTime.now().difference(when);
     final s = context.s;
     if (diff.inMinutes < 1) return s.relativeNow;
     if (diff.inMinutes < 60) return s.relativeMinutesAgo(diff.inMinutes);
     if (diff.inHours < 24) return s.relativeHoursAgo(diff.inHours);
-    if (diff.inDays < 7) return s.relativeDaysAgo(diff.inDays);
+    if (diff.inDays < _daysPerWeek) return s.relativeDaysAgo(diff.inDays);
     return AppDate.isoDate(when);
   }
 }

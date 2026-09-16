@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-
-import '../../../app/design/app_dimens.dart';
-import '../../../app/design/responsive.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/design/app_dimens.dart';
+import '../../../app/design/responsive.dart';
 import '../../../app/routes.dart';
-import '../../../core/constants.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/utils/app_date.dart';
 import '../../../shared/extensions/context_extensions.dart';
@@ -19,6 +17,7 @@ import '../bloc/create_visit_bloc.dart';
 import '../bloc/visits_list_bloc.dart';
 import '../data/models/visit.dart';
 import '../data/visits_repository.dart';
+import 'visit_schedule_picker.dart';
 
 class CreateVisitPage extends StatelessWidget {
   final Employee? preselectedEmployee;
@@ -42,6 +41,43 @@ class CreateVisitPage extends StatelessWidget {
 class _CreateVisitView extends StatelessWidget {
   const _CreateVisitView();
 
+  /// The purpose field opens two lines tall and grows to four before it
+  /// scrolls: a sentence or two is the usual answer.
+  static const int _purposeMinLines = 2;
+  static const int _purposeMaxLines = 4;
+
+  void _onStatus(BuildContext context, CreateVisitState state) {
+    final s = context.s;
+    final createdId = state.createdVisitId;
+    switch (state.status) {
+      case CreateVisitStatus.success:
+        context.showSnack(s.wfCreated, kind: SnackKind.success);
+        context.read<VisitsListBloc>().add(const VisitsListLoadRequested());
+        if (createdId != null) {
+          context.go(AppRoutes.visitDetail(createdId));
+        } else {
+          context.pop();
+        }
+      case CreateVisitStatus.failure:
+        final error = state.error;
+        if (error == null) return;
+        final reason = error.localize(context);
+        context.showSnack(
+          // The visit exists — say so, or the user retries a creation that
+          // already happened.
+          state.isCreated ? s.wfParticipantsNotAdded(reason) : reason,
+          kind: SnackKind.error,
+        );
+        if (state.isCreated) {
+          // It exists on the server now, so the list should show it.
+          context.read<VisitsListBloc>().add(const VisitsListLoadRequested());
+        }
+      case CreateVisitStatus.idle:
+      case CreateVisitStatus.submitting:
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final canPlanForOthers =
@@ -49,72 +85,71 @@ class _CreateVisitView extends StatelessWidget {
 
     return BlocConsumer<CreateVisitBloc, CreateVisitState>(
       listenWhen: (p, c) => p.status != c.status,
-      listener: (context, state) {
-        if (state.status == CreateVisitStatus.success) {
-          context.showSnack(context.s.wfCreated, kind: SnackKind.success);
-          // Refresh the list if it's provided app-wide, then leave.
-          try {
-            context.read<VisitsListBloc>().add(const VisitsListLoadRequested());
-          } catch (_) {}
-          final id = state.createdVisitId;
-          if (id != null) {
-            context.go(AppRoutes.visitDetail(id));
-          } else {
-            context.pop();
-          }
-        } else if (state.status == CreateVisitStatus.failure &&
-            state.error != null) {
-          context.showSnack(state.error!.localize(context),
-              kind: SnackKind.error);
-        }
-      },
+      listener: _onStatus,
       builder: (context, state) {
+        final s = context.s;
         final bloc = context.read<CreateVisitBloc>();
+        final submitting = state.status == CreateVisitStatus.submitting;
+        // Once the visit exists only its participants may still change; see
+        // CreateVisitState.createdVisitId.
+        final editable = !state.isCreated && !submitting;
+        final createdId = state.createdVisitId;
+        final customer = state.customerName;
+        final scheduled = state.scheduled;
         return Scaffold(
-          appBar: AppBar(title: Text(context.s.wfCreateTitle)),
+          appBar: AppBar(title: Text(s.wfCreateTitle)),
           body: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: context.padAll(Insets.screen),
             children: [
               // Visit type
-              Text(context.s.wfFieldType, style: context.text.labelLarge),
+              Text(s.wfFieldType, style: context.text.labelLarge),
               context.gapH(Insets.x1h),
               SegmentedButton<VisitType>(
                 segments: [
                   ButtonSegment(
                     value: VisitType.project,
-                    label: Text(context.s.wfTypeProject),
+                    label: Text(s.wfTypeProject),
                     icon: const Icon(Icons.folder_open_outlined),
                   ),
                   ButtonSegment(
                     value: VisitType.opportunity,
-                    label: Text(context.s.wfTypeOpportunity),
+                    label: Text(s.wfTypeOpportunity),
                     icon: const Icon(Icons.emoji_events_outlined),
                   ),
                 ],
                 selected: {state.visitType},
-                onSelectionChanged: (s) =>
-                    bloc.add(CreateVisitTypeChanged(s.first)),
+                onSelectionChanged: editable
+                    ? (types) => bloc.add(CreateVisitTypeChanged(types.first))
+                    : null,
               ),
               context.gapH(Insets.x4),
 
               // Linked project/opportunity
               _PickerTile(
                 label: state.visitType == VisitType.project
-                    ? context.s.wfFieldProject
-                    : context.s.wfFieldOpportunity,
+                    ? s.wfFieldProject
+                    : s.wfFieldOpportunity,
                 value: state.linked?.name,
                 icon: Icons.link,
-                onTap: () => _pickLinked(context, bloc, state.visitType),
+                onTap: editable
+                    ? () => _pickLinked(context, bloc, state.visitType)
+                    : null,
               ),
-              if (state.customerName != null)
+              if (customer != null)
                 Padding(
                   // Directional: this indents under the picker tile above it,
                   // so in Arabic it must indent from the start edge too.
-                  padding: const EdgeInsetsDirectional.only(start: 12, top: 2),
+                  padding: EdgeInsetsDirectional.only(
+                    start: context.r(Insets.x3),
+                    top: context.r(Insets.hair),
+                  ),
                   child: Row(
                     children: [
-                      Icon(Icons.business,
-                          size: 15, color: context.colors.onSurfaceVariant),
+                      Icon(
+                        Icons.business,
+                        size: context.r(IconSz.pill),
+                        color: context.colors.onSurfaceVariant,
+                      ),
                       context.gapW(Insets.x1),
                       // Expanded + ellipsis: the customer auto-fills from the
                       // linked project/opportunity and Odoo company names run
@@ -122,7 +157,7 @@ class _CreateVisitView extends StatelessWidget {
                       // row.
                       Expanded(
                         child: Text(
-                          '${context.s.wfFieldCustomer}: ${state.customerName}',
+                          s.wfLinkedCustomer(customer),
                           style: context.text.bodySmall,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -135,21 +170,24 @@ class _CreateVisitView extends StatelessWidget {
 
               // Schedule
               _PickerTile(
-                label: context.s.wfFieldSchedule,
-                value: state.scheduled != null
-                    ? AppDate.weekdayDateTime(context, state.scheduled!)
+                label: s.wfFieldSchedule,
+                value: scheduled != null
+                    ? AppDate.weekdayDateTime(context, scheduled)
                     : null,
                 icon: Icons.event,
-                onTap: () => _pickSchedule(context, bloc, state.scheduled),
+                onTap: editable
+                    ? () => _pickSchedule(context, bloc, scheduled)
+                    : null,
               ),
               context.gapH(Insets.x3),
 
               // Purpose (required)
               TextField(
-                minLines: 2,
-                maxLines: 4,
+                enabled: editable,
+                minLines: _purposeMinLines,
+                maxLines: _purposeMaxLines,
                 decoration: InputDecoration(
-                  labelText: context.s.wfFieldPurpose,
+                  labelText: s.wfFieldPurpose,
                   border: const OutlineInputBorder(),
                 ),
                 onChanged: (v) => bloc.add(CreateVisitPurposeChanged(v)),
@@ -158,9 +196,9 @@ class _CreateVisitView extends StatelessWidget {
 
               // Location
               TextField(
+                enabled: editable,
                 decoration: InputDecoration(
-                  labelText:
-                      '${context.s.wfFieldLocation} ${context.s.commonOptional}',
+                  labelText: s.wfOptionalField(s.wfFieldLocation),
                   border: const OutlineInputBorder(),
                 ),
                 onChanged: (v) => bloc.add(CreateVisitLocationChanged(v)),
@@ -169,11 +207,19 @@ class _CreateVisitView extends StatelessWidget {
               if (canPlanForOthers) ...[
                 context.gapH(Insets.x3),
                 _PickerTile(
-                  label:
-                      '${context.s.wfFieldResponsible} ${context.s.commonOptional}',
-                  value: state.employee?.name ?? context.s.wfSelfLabel,
+                  label: s.wfOptionalField(s.wfFieldResponsible),
+                  value: state.employee?.name ?? s.wfSelfLabel,
                   icon: Icons.person_outline,
-                  onTap: () => _pickEmployee(context, bloc),
+                  onTap: editable ? () => _pickEmployee(context, bloc) : null,
+                  // The way back to "myself" once someone else was picked.
+                  trailing: editable && state.employee != null
+                      ? IconButton(
+                          icon: const Icon(Icons.close),
+                          tooltip: s.wfPlanForMyself,
+                          onPressed: () =>
+                              bloc.add(const CreateVisitEmployeeSelected(null)),
+                        )
+                      : null,
                 ),
                 context.gapH(Insets.x3),
                 _ParticipantsField(state: state, bloc: bloc),
@@ -181,13 +227,23 @@ class _CreateVisitView extends StatelessWidget {
 
               context.gapH(Insets.x6),
               AppButton(
-                label: context.s.createVisitSubmit,
-                icon: Icons.check,
-                loading: state.status == CreateVisitStatus.submitting,
+                label: state.isCreated
+                    ? s.wfRetryAddParticipants
+                    : s.createVisitSubmit,
+                icon: state.isCreated ? Icons.group_add_outlined : Icons.check,
+                loading: submitting,
                 onPressed: state.isValid
                     ? () => bloc.add(const CreateVisitSubmitted())
                     : null,
               ),
+              if (createdId != null && !submitting) ...[
+                context.gapH(Insets.x2),
+                AppButton.secondary(
+                  label: s.wfOpenCreatedVisit,
+                  icon: Icons.open_in_new,
+                  onPressed: () => context.go(AppRoutes.visitDetail(createdId)),
+                ),
+              ],
             ],
           ),
         );
@@ -201,27 +257,30 @@ class _CreateVisitView extends StatelessWidget {
     VisitType type,
   ) async {
     final repo = sl<VisitsRepository>();
+    final s = context.s;
     final selected = await showPickerBottomSheet<LinkedRecord>(
       context: context,
-      title: type == VisitType.project
-          ? context.s.wfPickProject
-          : context.s.wfPickOpportunity,
-      searchHint: context.s.commonSearch,
-      loader: (search) async {
-        final all = type == VisitType.project
-            ? await repo.listProjects()
-            : await repo.listOpportunities();
-        if (search == null || search.isEmpty) return all;
-        final q = search.toLowerCase();
-        return all.where((e) => e.name.toLowerCase().contains(q)).toList();
+      title: type == VisitType.project ? s.wfPickProject : s.wfPickOpportunity,
+      searchHint: s.commonSearch,
+      // Searched on the server, so a record beyond the first page is still
+      // reachable by name.
+      loader: (search) => type == VisitType.project
+          ? repo.listProjects(search: search)
+          : repo.listOpportunities(search: search),
+      itemBuilder: (ctx, r) {
+        final partner = r.partnerName;
+        return ListTile(
+          title: Text(r.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+          subtitle: partner != null
+              ? Text(partner, maxLines: 1, overflow: TextOverflow.ellipsis)
+              : null,
+          onTap: () => Navigator.of(ctx).pop(r),
+        );
       },
-      itemBuilder: (ctx, r) => ListTile(
-        title: Text(r.name),
-        subtitle: r.partnerName != null ? Text(r.partnerName!) : null,
-        onTap: () => Navigator.of(ctx).pop(r),
-      ),
     );
-    if (selected != null) bloc.add(CreateVisitLinkedSelected(selected));
+    if (selected != null && !bloc.isClosed) {
+      bloc.add(CreateVisitLinkedSelected(selected));
+    }
   }
 
   Future<void> _pickSchedule(
@@ -229,41 +288,33 @@ class _CreateVisitView extends StatelessWidget {
     CreateVisitBloc bloc,
     DateTime? current,
   ) async {
-    final now = DateTime.now();
-    final base = current ?? now;
-    final date = await showDatePicker(
-      context: context,
-      initialDate: base,
-      firstDate: now.subtract(AppConstants.visitSchedulePastGrace),
-      lastDate: now.add(AppConstants.visitScheduleMaxAhead),
-    );
-    if (date == null || !context.mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(base),
-    );
-    final t = time ?? TimeOfDay.fromDateTime(base);
-    bloc.add(CreateVisitScheduleSelected(
-      DateTime(date.year, date.month, date.day, t.hour, t.minute),
-    ));
+    final picked = await pickVisitSchedule(context, current: current);
+    if (picked != null && !bloc.isClosed) {
+      bloc.add(CreateVisitScheduleSelected(picked));
+    }
   }
 
-  Future<void> _pickEmployee(
-    BuildContext context,
-    CreateVisitBloc bloc,
-  ) async {
+  Future<void> _pickEmployee(BuildContext context, CreateVisitBloc bloc) async {
+    final s = context.s;
     final selected = await showPickerBottomSheet<Employee>(
       context: context,
-      title: context.s.wfPickEmployee,
-      searchHint: context.s.employeesSearchHint,
+      title: s.wfPickEmployee,
+      searchHint: s.employeesSearchHint,
       loader: (search) => sl<EmployeesRepository>().list(search: search),
-      itemBuilder: (ctx, e) => ListTile(
-        title: Text(e.name),
-        subtitle: e.login != null ? Text(e.login!) : null,
-        onTap: () => Navigator.of(ctx).pop(e),
-      ),
+      itemBuilder: (ctx, e) {
+        final login = e.login;
+        return ListTile(
+          title: Text(e.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+          subtitle: login != null
+              ? Text(login, maxLines: 1, overflow: TextOverflow.ellipsis)
+              : null,
+          onTap: () => Navigator.of(ctx).pop(e),
+        );
+      },
     );
-    if (selected != null) bloc.add(CreateVisitEmployeeSelected(selected));
+    if (selected != null && !bloc.isClosed) {
+      bloc.add(CreateVisitEmployeeSelected(selected));
+    }
   }
 }
 
@@ -272,48 +323,76 @@ class _ParticipantsField extends StatelessWidget {
   final CreateVisitBloc bloc;
   const _ParticipantsField({required this.state, required this.bloc});
 
+  Future<void> _add(BuildContext context) async {
+    final s = context.s;
+    final chosen = {for (final p in state.participants) p.hrEmployeeId};
+    final employee = await showPickerBottomSheet<Employee>(
+      context: context,
+      title: s.wfPickEmployee,
+      searchHint: s.employeesSearchHint,
+      loader: (search) async {
+        final list = await sl<EmployeesRepository>().list(search: search);
+        // Only people who can be added, and not twice.
+        return list
+            .where(
+              (e) => e.hrEmployeeId != null && !chosen.contains(e.hrEmployeeId),
+            )
+            .toList();
+      },
+      itemBuilder: (ctx, e) => ListTile(
+        title: Text(e.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+        onTap: () => Navigator.of(ctx).pop(e),
+      ),
+    );
+    if (employee != null && !bloc.isClosed) {
+      bloc.add(CreateVisitParticipantAdded(employee));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
+    final busy = state.status == CreateVisitStatus.submitting;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Expanded(
-              child: Text(context.s.wfFieldParticipants,
-                  style: context.text.labelLarge),
+              child: Text(
+                s.wfFieldParticipants,
+                style: context.text.labelLarge,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            TextButton.icon(
-              icon: const Icon(Icons.add, size: 18),
-              label: Text(context.s.wfActionAddParticipant),
-              onPressed: () async {
-                final e = await showPickerBottomSheet<Employee>(
-                  context: context,
-                  title: context.s.wfPickEmployee,
-                  searchHint: context.s.employeesSearchHint,
-                  loader: (search) async {
-                    final list =
-                        await sl<EmployeesRepository>().list(search: search);
-                    return list.where((e) => e.hrEmployeeId != null).toList();
-                  },
-                  itemBuilder: (ctx, e) => ListTile(
-                    title: Text(e.name),
-                    onTap: () => Navigator.of(ctx).pop(e),
-                  ),
-                );
-                if (e != null) bloc.add(CreateVisitParticipantAdded(e));
-              },
+            Flexible(
+              child: TextButton.icon(
+                icon: Icon(Icons.add, size: context.r(IconSz.label)),
+                label: Text(
+                  s.wfActionAddParticipant,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onPressed: busy ? null : () => _add(context),
+              ),
             ),
           ],
         ),
         Wrap(
-          spacing: 6,
-          runSpacing: 6,
+          spacing: context.r(Insets.x1h),
+          runSpacing: context.r(Insets.x1h),
           children: [
             for (final p in state.participants)
               Chip(
-                label: Text(p.name),
-                onDeleted: () => bloc.add(CreateVisitParticipantRemoved(p)),
+                label: Text(
+                  p.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onDeleted: busy
+                    ? null
+                    : () => bloc.add(CreateVisitParticipantRemoved(p)),
               ),
           ],
         ),
@@ -326,12 +405,19 @@ class _PickerTile extends StatelessWidget {
   final String label;
   final String? value;
   final IconData icon;
-  final VoidCallback onTap;
+
+  /// Null disables the tile (the visit already exists).
+  final VoidCallback? onTap;
+
+  /// Replaces the chevron — the responsible-employee tile's "clear" button.
+  final Widget? trailing;
+
   const _PickerTile({
     required this.label,
     required this.value,
     required this.icon,
     required this.onTap,
+    this.trailing,
   });
 
   @override
@@ -339,15 +425,25 @@ class _PickerTile extends StatelessWidget {
     return Card(
       margin: EdgeInsets.zero,
       child: ListTile(
+        enabled: onTap != null,
         leading: Icon(icon),
-        title: Text(label, style: context.text.labelMedium),
+        title: Text(
+          label,
+          style: context.text.labelMedium,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
         subtitle: Text(
           value ?? context.s.commonRequired,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
           style: context.text.bodyLarge?.copyWith(
             color: value == null ? context.colors.outline : null,
           ),
         ),
-        trailing: const Icon(Icons.chevron_right),
+        trailing:
+            trailing ??
+            Icon(context.isRtl ? Icons.chevron_left : Icons.chevron_right),
         onTap: onTap,
       ),
     );

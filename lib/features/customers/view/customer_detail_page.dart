@@ -1,25 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../app/routes.dart';
-import '../../../app/design/app_typography.dart';
-import '../../../app/design/responsive.dart';
-
-import '../../../core/api/api_exceptions.dart';
-import '../../../core/constants.dart';
+import '../../../app/theme.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/utils/communications.dart';
+import '../../../core/utils/relative_time.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../data/customers_repository.dart';
 import '../data/models/customer.dart';
-import '../../../app/design/app_dimens.dart';
+import 'customer_format.dart';
 
 class CustomerDetailPage extends StatefulWidget {
   final int customerId;
 
-  /// Used as cached data while the network fetch is in-flight, and as a
-  /// fallback if the `/api/customers/<id>` endpoint fails (e.g. backend bug).
+  /// The row from the customer list, shown at once while the full record
+  /// loads, and kept on screen if that load fails.
   /// Passed via `context.push(..., extra: customer)` from the list.
   final Customer? fallback;
 
@@ -44,32 +42,41 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
   @override
   void initState() {
     super.initState();
-    _future = sl<CustomersRepository>().getById(widget.customerId);
+    // With a fallback on screen the load's failure would otherwise be silent:
+    // the list's row stays up and nothing says it may be stale.
+    _future = _fetch(announceFailure: widget.fallback != null);
   }
 
-  void _reload() {
-    setState(() {
-      _future = sl<CustomersRepository>().getById(widget.customerId);
-    });
+  /// Starts a load. When [announceFailure] is set, a failure is reported once
+  /// here — not from the builder, which rebuilds and would repeat it.
+  Future<Customer> _fetch({required bool announceFailure}) {
+    final future = sl<CustomersRepository>().getById(widget.customerId);
+    if (announceFailure) {
+      future.then<void>((_) {}, onError: (Object error) {
+        if (!mounted) return;
+        final s = context.s;
+        context.showSnack(
+          s.commonRefreshFailedStale(CustomerFormat.loadFailure(context, error)),
+          kind: SnackKind.error,
+        );
+      });
+    }
+    return future;
+  }
+
+  void _retry() {
+    setState(() => _future = _fetch(announceFailure: false));
   }
 
   Future<void> _refresh() async {
     setState(() {
       _refreshing = true;
-      _future = sl<CustomersRepository>().getById(widget.customerId);
+      _future = _fetch(announceFailure: true);
     });
     try {
       await _future;
-    } catch (e) {
-      // Only surface refresh errors when the user explicitly triggered the
-      // refresh. Initial-load errors are absorbed silently because the
-      // fallback Customer keeps the page usable.
-      if (mounted) {
-        final msg = e is ApiException
-            ? e.localize(context)
-            : context.s.errCustomerLoadFailed;
-        context.showSnack(msg, kind: SnackKind.error);
-      }
+    } catch (_) {
+      // Reported by `_fetch`.
     } finally {
       if (mounted) setState(() => _refreshing = false);
     }
@@ -77,48 +84,35 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: FutureBuilder<Customer>(
-        future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            // While a user-triggered refresh is in-flight, always show the
-            // skeleton so the user can see the data is being re-fetched.
-            // On the initial open of the page, fall back to the cached
-            // Customer (from the list) so the page renders instantly.
-            if (widget.fallback != null && !_refreshing) {
-              return AppRefreshIndicator(
-                onRefresh: _refresh,
-                child: _CustomerBody(customer: widget.fallback!),
-              );
-            }
-            return const _DetailSkeleton();
-          }
-          if (snap.hasError) {
-            if (widget.fallback != null) {
-              // Backend detail endpoint failed — silently fall back to the
-              // data we already have from the list. Refresh failures are
-              // announced via _refresh()'s snackbar, not from inside the
-              // builder (which can rebuild many times and spam snackbars).
-              return AppRefreshIndicator(
-                onRefresh: _refresh,
-                child: _CustomerBody(customer: widget.fallback!),
-              );
-            }
-            final message = snap.error is ApiException
-                ? (snap.error as ApiException).localize(context)
-                : context.s.errCustomerLoadFailed;
-            return Scaffold(
-              appBar: AppBar(title: Text(context.s.customerDetailTitle)),
-              body: ErrorView(message: message, onRetry: _reload),
-            );
-          }
-          return AppRefreshIndicator(
-            onRefresh: _refresh,
-            child: _CustomerBody(customer: snap.data!),
+    return FutureBuilder<Customer>(
+      future: _future,
+      builder: (context, snap) {
+        final Customer? shown = switch (snap.connectionState) {
+          // While a user-triggered refresh is in flight the skeleton shows, so
+          // the reload is visible; on first open the list's row renders at once.
+          != ConnectionState.done => _refreshing ? null : widget.fallback,
+          _ when snap.hasError => widget.fallback,
+          _ => snap.data,
+        };
+        if (shown != null) {
+          return Scaffold(
+            body: AppRefreshIndicator(
+              onRefresh: _refresh,
+              child: _CustomerBody(customer: shown),
+            ),
           );
-        },
-      ),
+        }
+        if (snap.connectionState != ConnectionState.done) {
+          return const _DetailSkeleton();
+        }
+        return Scaffold(
+          appBar: AppBar(title: Text(context.s.customerDetailTitle)),
+          body: ErrorView(
+            message: CustomerFormat.loadFailure(context, snap.error!),
+            onRetry: _retry,
+          ),
+        );
+      },
     );
   }
 }
@@ -130,7 +124,12 @@ class _CustomerBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final s = context.s;
+    final lastVisit = customer.lastVisit;
     return CustomScrollView(
+      // The refresh indicator needs a scrollable that always scrolls, even
+      // when the content is shorter than the screen.
+      physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         SliverAppBar(
           pinned: true,
@@ -170,64 +169,64 @@ class _CustomerBody extends StatelessWidget {
               _QuickActionsRow(customer: customer),
               context.gapH(Insets.x3h),
               SectionHeader.eyebrow(
-                label: context.s.customerSectionInfo,
+                label: s.customerSectionInfo,
                 padding: _sectionLabelPad,
               ),
               context.gapH(Insets.x1h),
               _CustomerInfoCard(customer: customer),
-              if (customer.lastVisit != null) ...[
+              if (lastVisit != null) ...[
                 context.gapH(Insets.x4),
                 SectionHeader.eyebrow(
-                  label: context.s.customerLastVisit,
+                  label: s.customerLastVisit,
                   padding: _sectionLabelPad,
                 ),
                 context.gapH(Insets.x1h),
-                Card(
-                  margin: EdgeInsets.zero,
-                  child: ListTile(
-                    leading: const Icon(Icons.history),
-                    title: Text(
-                      customer.lastVisit!.employeeName ??
-                          '#${customer.lastVisit!.id}',
-                    ),
-                    subtitle: Text(
-                      customer.lastVisit!.checkOutTime != null
-                          ? context.s.wfStateDone
-                          : context.s.wfStateInProgress,
-                    ),
-                    trailing: Icon(
-                      context.isRtl ? Icons.chevron_left : Icons.chevron_right,
-                    ),
-                    onTap: () => context.push(
-                      AppRoutes.visitDetail(customer.lastVisit!.id),
-                      extra: customer.lastVisit,
-                    ),
-                  ),
-                ),
+                _LastVisitCard(visit: lastVisit),
               ],
               context.gapH(Insets.x6),
               AppButton(
-                label: context.s.wfCreateTitle,
-                icon: Icons.add,
+                label: s.wfCreateTitle,
+                icon: Symbols.add,
                 onPressed: () => context.push(AppRoutes.createVisit),
-              ),
-              context.gapH(Insets.x2h),
-              AppButton.secondary(
-                label: context.s.customerActionNearby(
-                  AppConstants.defaultRadiusMeters.toStringAsFixed(0),
-                ),
-                icon: Icons.map_outlined,
-                onPressed: customer.hasCoordinates
-                    ? () => context.push(
-                        AppRoutes.customerNearby(customer.id),
-                        extra: customer,
-                      )
-                    : null,
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The customer's most recent visit; opens it.
+class _LastVisitCard extends StatelessWidget {
+  final CustomerLastVisit visit;
+  const _LastVisitCard({required this.visit});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final checkIn = visit.checkInTime;
+    return AppCard(
+      padding: EdgeInsets.zero,
+      onTap: () => context.push(AppRoutes.visitDetail(visit.id)),
+      child: ListTile(
+        leading: const Icon(Symbols.history),
+        title: Text(
+          visit.employeeName ?? s.visitFallbackTitle(visit.id),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          context.joinFacts([
+            visit.isActive ? s.wfStateInProgress : s.wfStateDone,
+            if (checkIn != null) RelativeTime.format(context, checkIn),
+          ]),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        // `chevron_right` mirrors itself in Arabic (`matchTextDirection`).
+        trailing: const Icon(Symbols.chevron_right),
+      ),
     );
   }
 }
@@ -256,16 +255,7 @@ class _CustomerHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.primary,
-            Color.lerp(colors.primary, colors.tertiary, 0.5) ?? colors.primary,
-          ],
-        ),
-      ),
+      decoration: BoxDecoration(gradient: context.x.brandGradient),
       alignment: Alignment.center,
       // Symmetric, and large enough that the circle clears both the pinned
       // app-bar row above it and the collapsing title below.
@@ -273,31 +263,14 @@ class _CustomerHero extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Not [InitialAvatar]: this one is a white wash over the brand
-          // gradient rather than the gradient itself, and swaps the initial
-          // for a building glyph on company records.
-          Container(
-            width: context.r(CompSz.avatarHero),
-            height: context.r(CompSz.avatarHero),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: colors.onPrimary.withValues(alpha: Alphas.wash),
-            ),
-            alignment: Alignment.center,
-            child: customer.isCompany
-                ? Icon(
-                    Icons.apartment_rounded,
-                    color: colors.onPrimary,
-                    size: context.r(IconSz.hero),
-                  )
-                : Text(
-                    InitialAvatar.initialOf(customer.name),
-                    style: TextStyle(
-                      color: colors.onPrimary,
-                      fontSize: FontSz.heroInitial,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+          // Not [InitialAvatar]'s default look: this one is a white wash over
+          // the brand gradient rather than the gradient itself.
+          InitialAvatar(
+            name: customer.name,
+            size: context.r(CompSz.avatarHero),
+            background: colors.onPrimary.withValues(alpha: Alphas.wash),
+            foreground: colors.onPrimary,
+            icon: customer.isCompany ? Symbols.apartment : null,
           ),
         ],
       ),
@@ -317,9 +290,9 @@ class _QuickActionsRow extends StatelessWidget {
       children: [
         Expanded(
           child: _QuickAction(
-            icon: Icons.phone_rounded,
+            icon: Symbols.call,
             label: context.s.customerActionCall,
-            color: Colors.green.shade600,
+            color: context.x.success,
             onTap: phone == null
                 ? null
                 : () => context.openExternal(() => Communications.dial(phone)),
@@ -329,7 +302,7 @@ class _QuickActionsRow extends StatelessWidget {
         if (email != null) ...[
           Expanded(
             child: _QuickAction(
-              icon: Icons.mail_rounded,
+              icon: Symbols.mail,
               label: context.s.customerActionEmail,
               color: context.colors.tertiary,
               onTap: () =>
@@ -340,17 +313,17 @@ class _QuickActionsRow extends StatelessWidget {
         ],
         Expanded(
           child: _QuickAction(
-            icon: Icons.directions_rounded,
+            icon: Symbols.directions,
             label: context.s.customerActionNavigate,
             color: context.colors.primary,
             onTap: customer.hasCoordinates
                 ? () => context.openExternal(
-                    () => Communications.openInMaps(
-                      customer.latitude,
-                      customer.longitude,
-                      label: customer.name,
-                    ),
-                  )
+                      () => Communications.openInMaps(
+                        customer.latitude,
+                        customer.longitude,
+                        label: customer.name,
+                      ),
+                    )
                 : null,
           ),
         ),
@@ -391,7 +364,7 @@ class _QuickAction extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: context.r(IconSz.sm), color: effectiveColor),
+              Icon(icon, fill: 1, size: context.r(IconSz.sm), color: effectiveColor),
               context.gapW(Insets.x2),
               Flexible(
                 child: Text(
@@ -420,35 +393,23 @@ class _CustomerInfoCard extends StatelessWidget {
   final Customer customer;
   const _CustomerInfoCard({required this.customer});
 
-  String? _fullAddress(BuildContext context) {
-    final parts = <String>[
-      if (customer.street != null && customer.street!.isNotEmpty)
-        customer.street!,
-      [
-        if (customer.city != null && customer.city!.isNotEmpty) customer.city!,
-        if (customer.stateName != null && customer.stateName!.isNotEmpty)
-          customer.stateName!,
-        if (customer.zip != null && customer.zip!.isNotEmpty) customer.zip!,
-      ].join(' '),
-      if (customer.countryName != null && customer.countryName!.isNotEmpty)
-        customer.countryName!,
-    ].map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-    if (parts.isNotEmpty) return parts.join(context.isRtl ? '، ' : ', ');
-    return customer.address; // fallback to contact_address
-  }
-
   @override
   Widget build(BuildContext context) {
     final s = context.s;
     final cs = context.colors;
-    final address = _fullAddress(context);
+    final address = CustomerFormat.fullAddress(context, customer);
+    final coordinates =
+        CustomerFormat.coordinates(context, customer, precise: true);
+    final phone = customer.phone;
+    final email = customer.email;
+    final website = customer.website;
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Company vs individual badge.
           Container(
-            padding: context.padSym(h: Insets.x3, v: Insets.x1h + 1),
+            padding: context.padSym(h: Insets.x3, v: Insets.x1h),
             decoration: BoxDecoration(
               color: cs.primaryContainer.withValues(alpha: Alphas.disabled),
               borderRadius: BorderRadius.circular(Radii.pill),
@@ -457,20 +418,22 @@ class _CustomerInfoCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  customer.isCompany
-                      ? Icons.apartment_rounded
-                      : Icons.person_rounded,
+                  customer.isCompany ? Symbols.apartment : Symbols.person,
                   size: context.r(IconSz.badge),
                   color: cs.onPrimaryContainer,
                 ),
                 context.gapW(Insets.x1h),
-                Text(
-                  customer.isCompany
-                      ? s.customerTypeCompany
-                      : s.customerTypeIndividual,
-                  style: context.text.labelLarge?.copyWith(
-                    color: cs.onPrimaryContainer,
-                    fontWeight: FontWeight.w700,
+                Flexible(
+                  child: Text(
+                    customer.isCompany
+                        ? s.customerTypeCompany
+                        : s.customerTypeIndividual,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.text.labelLarge?.copyWith(
+                      color: cs.onPrimaryContainer,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
@@ -478,63 +441,59 @@ class _CustomerInfoCard extends StatelessWidget {
           ),
           context.gapH(Insets.x2h),
           if (address != null && address.isNotEmpty)
-            InfoRow(icon: Icons.place_outlined, text: address),
-          if (customer.phone != null)
-            InkWell(
-              onTap: () => context.openExternal(
-                () => Communications.dial(customer.phone!),
-              ),
-              child: InfoRow(icon: Icons.phone_outlined, text: customer.phone!),
+            InfoRow(icon: Symbols.location_on, text: address),
+          if (phone != null)
+            _TappableInfo(
+              icon: Symbols.call,
+              text: phone,
+              onTap: () => Communications.dial(phone),
             ),
-          if (customer.email != null)
-            InkWell(
-              onTap: () => context.openExternal(
-                () => Communications.mailto(customer.email!),
-              ),
-              child: InfoRow(icon: Icons.mail_outline, text: customer.email!),
+          if (email != null)
+            _TappableInfo(
+              icon: Symbols.mail,
+              text: email,
+              onTap: () => Communications.mailto(email),
             ),
           if (customer.jobPosition != null)
             InfoRow(
-              icon: Icons.work_outline,
-              text: '${s.customerFieldJob}: ${customer.jobPosition!}',
+              icon: Symbols.work,
+              text: s.commonLabeledValue(s.customerFieldJob, customer.jobPosition!),
             ),
           if (customer.parentCompanyName != null)
             InfoRow(
-              icon: Icons.business_outlined,
-              text: '${s.customerFieldParent}: ${customer.parentCompanyName!}',
+              icon: Symbols.business,
+              text: s.commonLabeledValue(
+                  s.customerFieldParent, customer.parentCompanyName!),
             ),
-          if (customer.website != null)
-            InkWell(
-              onTap: () => context.openExternal(
-                () => Communications.openWeb(customer.website!),
-              ),
-              child: InfoRow(icon: Icons.link, text: customer.website!),
+          if (website != null)
+            _TappableInfo(
+              icon: Symbols.link,
+              text: website,
+              onTap: () => Communications.openWeb(website),
             ),
           if (customer.vat != null)
             InfoRow(
-              icon: Icons.badge_outlined,
-              text: '${s.customerFieldVat}: ${customer.vat!}',
+              icon: Symbols.badge,
+              text: s.commonLabeledValue(s.customerFieldVat, customer.vat!),
             ),
           // Coordinates: always shown (explicit requirement). Tappable when
           // present so the user can jump straight into their maps app.
-          if (customer.hasCoordinates)
-            InkWell(
-              onTap: () => context.openExternal(
-                () => Communications.openInMaps(
-                  customer.latitude,
-                  customer.longitude,
-                  label: customer.name,
-                ),
-              ),
-              child: InfoRow(
-                icon: Icons.my_location,
-                text:
-                    '${customer.latitude.toStringAsFixed(6)}, '
-                    '${customer.longitude.toStringAsFixed(6)}',
+          if (coordinates != null)
+            _TappableInfo(
+              icon: Symbols.my_location,
+              text: coordinates,
+              onTap: () => Communications.openInMaps(
+                customer.latitude,
+                customer.longitude,
+                label: customer.name,
               ),
             )
           else
-            const InfoRow(icon: Icons.my_location, text: '—'),
+            InfoRow(
+              icon: Symbols.my_location,
+              text: s.commonLabeledValue(
+                  s.customerFieldCoordinates, s.commonNoValue),
+            ),
           if (customer.categories.isNotEmpty) ...[
             context.gapH(Insets.x2h),
             Text(
@@ -554,7 +513,7 @@ class _CustomerInfoCard extends StatelessWidget {
                     color: cs.tertiary,
                     fontSize: context.text.labelMedium?.fontSize ?? FontSz.sm,
                     fontWeight: FontWeight.w600,
-                    padding: context.padSym(h: Insets.x2h, v: Insets.x1 + 1),
+                    padding: context.padSym(h: Insets.x2h, v: Insets.x1),
                   ),
               ],
             ),
@@ -565,12 +524,32 @@ class _CustomerInfoCard extends StatelessWidget {
   }
 }
 
+/// An [InfoRow] that hands its value to another app (dialler, mail, browser,
+/// maps) and says so when no app can take it.
+class _TappableInfo extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Future<bool> Function() onTap;
+  const _TappableInfo({
+    required this.icon,
+    required this.text,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: () => context.openExternal(onTap),
+        borderRadius: BorderRadius.circular(Radii.xs),
+        child: InfoRow(icon: icon, text: text),
+      );
+}
+
 /// Inset of this screen's eyebrows: nudged in to line up with the card text
 /// beneath them, and held tight to it.
 const _sectionLabelPad = EdgeInsetsDirectional.only(
   start: Insets.x1,
   end: Insets.x1,
-  bottom: 2,
+  bottom: Insets.hair,
 );
 
 /// Placeholder heights for [_DetailSkeleton] — the measured heights of the

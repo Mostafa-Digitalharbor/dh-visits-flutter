@@ -6,10 +6,13 @@ import 'package:equatable/equatable.dart';
 import '../../../core/api/api_exceptions.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/pending_actions_queue.dart';
+import '../../../core/network/server_clock.dart';
+import '../../../core/utils/app_log.dart';
 import '../data/models/visit.dart';
 import '../data/models/visit_attachment.dart';
 import '../data/visit_trail_tracker.dart';
 import '../data/visits_repository.dart';
+import '../domain/visit_action.dart';
 
 enum VisitDetailStatus { loading, ready, acting, error }
 
@@ -20,7 +23,7 @@ class VisitDetailState extends Equatable {
 
   /// Set once after a successful action so the UI can show a snackbar and
   /// (for terminal actions like end/cancel) pop back.
-  final String? lastAction;
+  final VisitActionOutcome? lastAction;
 
   /// Attachments live in state rather than being fetched by the view: built as
   /// a `FutureBuilder` whose future was created inside `build()`, they were
@@ -53,33 +56,32 @@ class VisitDetailState extends Equatable {
     VisitDetailStatus? status,
     Visit? visit,
     ApiException? error,
-    String? lastAction,
+    VisitActionOutcome? lastAction,
     List<VisitAttachment>? attachments,
     ApiException? attachmentsError,
     bool? mockFlagged,
-  }) =>
-      VisitDetailState(
-        status: status ?? this.status,
-        visit: visit ?? this.visit,
-        error: error,
-        lastAction: lastAction,
-        attachments: attachments ?? this.attachments,
-        attachmentsError: attachmentsError,
-        // Sticky like [visit]: once raised, a flag must not vanish because some
-        // later partial emit forgot to carry it.
-        mockFlagged: mockFlagged ?? this.mockFlagged,
-      );
+  }) => VisitDetailState(
+    status: status ?? this.status,
+    visit: visit ?? this.visit,
+    error: error,
+    lastAction: lastAction,
+    attachments: attachments ?? this.attachments,
+    attachmentsError: attachmentsError,
+    // Sticky like [visit]: once raised, a flag must not vanish because some
+    // later partial emit forgot to carry it.
+    mockFlagged: mockFlagged ?? this.mockFlagged,
+  );
 
   @override
   List<Object?> get props => [
-        status,
-        visit,
-        error,
-        lastAction,
-        attachments,
-        attachmentsError,
-        mockFlagged,
-      ];
+    status,
+    visit,
+    error,
+    lastAction,
+    attachments,
+    attachmentsError,
+    mockFlagged,
+  ];
 }
 
 /// Loads a single visit in full detail and runs the workflow actions on it,
@@ -94,14 +96,21 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
   /// [start] / [end] threw `GetIt: not registered` before either action ran.
   final VisitTrailTracker? _tracker;
 
+  /// Holds Start / End while offline. Same injection rule as [_tracker].
+  final PendingActionsQueue? _queue;
+
   VisitDetailCubit({
     required this.repository,
     required this.visitId,
     VisitTrailTracker? tracker,
-  })  : _tracker = tracker,
-        super(const VisitDetailState());
+    PendingActionsQueue? pendingActions,
+  }) : _tracker = tracker,
+       _queue = pendingActions,
+       super(const VisitDetailState());
 
   VisitTrailTracker? get _trail => _tracker ?? slMaybe<VisitTrailTracker>();
+
+  PendingActionsQueue? get _pending => _queue ?? slMaybe<PendingActionsQueue>();
 
   /// Guards every post-`await` emit. Each action here is fire-and-forget from
   /// an `onPressed`, so the user can pop the page (disposing the cubit) while
@@ -112,73 +121,77 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
     emit(next);
   }
 
+  /// Loads the visit, its attachments and its mock-location flag together.
+  ///
+  /// Skipped while an action runs: a pull-to-refresh landing mid-action used
+  /// to drop the `acting` status, which is what keeps a second tap out.
   Future<void> load() async {
-    _safeEmit(state.copyWith(status: VisitDetailStatus.loading, error: null));
-    try {
-      // Prefer the rich call_kw read (managers, participants, history, GPS).
-      // Attachments are fetched alongside it rather than after, so the extra
-      // round-trip doesn't delay the screen.
-      final visitFuture = repository.readVisitFull(visitId);
-      final attachmentsFuture = _readAttachments();
-      // Fired alongside the others so the spoofing check costs no extra wait.
-      final mockFuture = repository.hasMockLocationFlag(visitId);
-      final visit = await visitFuture;
-      final (attachments, attachmentsError) = await attachmentsFuture;
-      final mockFlagged = await mockFuture;
+    if (_busy) return;
+    _safeEmit(state.copyWith(status: VisitDetailStatus.loading));
+    // Fired alongside the visit read so neither costs the screen extra time.
+    final attachmentsFuture = _readAttachments();
+    final mockFuture = repository.hasMockLocationFlag(visitId);
 
-      if (visit != null) {
-        _safeEmit(VisitDetailState(
-          status: VisitDetailStatus.ready,
-          visit: visit,
-          attachments: attachments,
-          attachmentsError: attachmentsError,
-          mockFlagged: mockFlagged,
-        ));
-        return;
-      }
-      // Fall back to the slim REST /api/visit/get payload if the full read
-      // returned nothing (e.g. call_kw restricted for this user).
-      final slim = await repository.getVisit(visitId);
-      if (slim == null) {
-        // Both reads came back empty. Neither throws on a missing record —
-        // `_rows()` degrades any non-List result to `[]`, and `getVisit`
-        // degrades a non-Map to null — so without this the cubit would emit
-        // `ready` with a null visit and the view would sit on a bare spinner
-        // with no error, no retry and no pull-to-refresh, forever. Reachable
-        // by opening a deleted visit from the notifications feed.
-        _safeEmit(state.copyWith(
+    final (visit, failure) = await _readVisit();
+    final (attachments, attachmentsError) = await attachmentsFuture;
+    final mockFlagged = await mockFuture;
+
+    if (visit == null) {
+      // Neither read throws on a missing record — `_rows()` degrades any
+      // non-List result to `[]`, and `getVisit` degrades a non-Map to null —
+      // so without the notFound fallback the view would sit on a bare spinner
+      // with no error and no retry. Reachable by opening a deleted visit from
+      // the notifications feed.
+      _safeEmit(
+        state.copyWith(
           status: VisitDetailStatus.error,
-          error: ApiException(code: ApiErrorCode.notFound),
-        ));
-        return;
-      }
-      _safeEmit(VisitDetailState(
+          error: failure ?? ApiException(code: ApiErrorCode.notFound),
+        ),
+      );
+      return;
+    }
+    _reconcileTrail(visit);
+    _safeEmit(
+      VisitDetailState(
         status: VisitDetailStatus.ready,
-        visit: slim,
+        visit: visit,
         attachments: attachments,
         attachmentsError: attachmentsError,
-        mockFlagged: mockFlagged,
-      ));
-    } on ApiException catch (e) {
-      // Last resort: try the REST endpoint before surfacing the error.
-      try {
-        final slim = await repository.getVisit(visitId);
-        if (slim != null) {
-          _safeEmit(
-              VisitDetailState(status: VisitDetailStatus.ready, visit: slim));
-          return;
-        }
-      } catch (_) {}
-      _safeEmit(state.copyWith(status: VisitDetailStatus.error, error: e));
+        mockFlagged: state.mockFlagged || mockFlagged,
+      ),
+    );
+  }
+
+  /// Stops recording this visit's trail once the server shows it is no longer
+  /// in progress — cancelled, rescheduled, ended on another device. Never
+  /// starts recording: only a confirmed Start does that.
+  void _reconcileTrail(Visit? visit) {
+    final tracker = _trail;
+    if (visit == null || tracker == null) return;
+    if (tracker.activeVisitId != visitId || visit.isInProgress) return;
+    appLog(
+      '[VisitDetailCubit] visit $visitId is ${visit.state.name}; '
+      'stopping its trail',
+    );
+    unawaited(_guardTrail('stop', tracker.stop));
+  }
+
+  /// The rich `call_kw` read (managers, participants, history, GPS), falling
+  /// back to the slim REST payload when that returns nothing or fails — e.g.
+  /// a user whose `call_kw` access is restricted. Never throws: the first
+  /// failure comes back for the caller to show when both reads miss.
+  Future<(Visit?, ApiException?)> _readVisit() async {
+    ApiException? failure;
+    try {
+      final full = await repository.readVisitFull(visitId);
+      if (full != null) return (full, null);
     } catch (e) {
-      // Never leave the UI stuck on the loading skeleton. A schema change or an
-      // Odoo field serialised as `false` throws a TypeError, not an
-      // ApiException, and would otherwise escape the handler above and freeze
-      // the screen. Every sibling bloc has this arm; this one was the gap.
-      _safeEmit(state.copyWith(
-        status: VisitDetailStatus.error,
-        error: ApiException.unexpected(e),
-      ));
+      failure = _asApiException(e);
+    }
+    try {
+      return (await repository.getVisit(visitId), failure);
+    } catch (e) {
+      return (null, failure ?? _asApiException(e));
     }
   }
 
@@ -187,106 +200,116 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
   Future<(List<VisitAttachment>, ApiException?)> _readAttachments() async {
     try {
       return (await repository.readAttachments(visitId), null);
-    } on ApiException catch (e) {
-      return (const <VisitAttachment>[], e);
     } catch (e) {
-      return (const <VisitAttachment>[], ApiException.unexpected(e));
+      return (const <VisitAttachment>[], _asApiException(e));
     }
   }
+
+  static ApiException _asApiException(Object error) =>
+      error is ApiException ? error : ApiException.unexpected(error);
 
   /// True while a workflow action is already in flight. Every action is
   /// fire-and-forget from an `onPressed`, so without this a second tap starts a
   /// second request — and the loser of that race overwrites the winner's state.
   bool get _busy => state.status == VisitDetailStatus.acting;
 
-  Future<bool> _run(String action, Future<void> Function() body) async {
+  /// Marks an action as running, or returns false when one already is. Every
+  /// action claims *before* its first `await`, so two taps can never both pass.
+  bool _claim() {
     if (_busy) return false;
-    _safeEmit(state.copyWith(status: VisitDetailStatus.acting, error: null));
+    _safeEmit(state.copyWith(status: VisitDetailStatus.acting));
+    return true;
+  }
+
+  /// Runs [body] as [action] and reports the outcome.
+  ///
+  /// Only [body] decides success. The re-read afterwards is presentation: if
+  /// it fails, the action still succeeded on the server, and reporting it as
+  /// failed made users repeat it — a second attachment upload, say.
+  Future<bool> _run(VisitAction action, Future<Object?> Function() body) async {
+    if (!_claim()) return false;
     try {
       await body();
-      final (visit, attachments, attachmentsError) = await _reload();
-      _safeEmit(VisitDetailState(
+    } catch (e) {
+      await _emitFailure(_asApiException(e));
+      return false;
+    }
+    await _emitSuccess(VisitActionOutcome(action));
+    return true;
+  }
+
+  /// Settles back to `ready` after a successful action, showing the freshest
+  /// copy of the visit the server will give — or the one already on screen if
+  /// the re-read fails. Never throws.
+  Future<void> _emitSuccess(
+    VisitActionOutcome outcome, {
+    bool recheckMockFlag = false,
+  }) async {
+    final attachmentsFuture = _readAttachments();
+    final (visit, _) = await _readVisit();
+    final (attachments, attachmentsError) = await attachmentsFuture;
+    // Start and End are the two actions that can *raise* the flag, and they
+    // do it server-side inside the action, so the record is re-read for them.
+    final mockFlagged =
+        state.mockFlagged ||
+        (recheckMockFlag && await repository.hasMockLocationFlag(visitId));
+    _reconcileTrail(visit);
+    _safeEmit(
+      VisitDetailState(
         status: VisitDetailStatus.ready,
-        visit: visit,
-        lastAction: action,
+        visit: visit ?? state.visit,
+        lastAction: outcome,
         attachments: attachments,
         attachmentsError: attachmentsError,
         // These emits build a fresh state rather than copyWith, so every one of
         // them has to carry the flag forward explicitly — otherwise approving a
         // visit would quietly clear a spoofing warning raised at check-in.
-        mockFlagged: state.mockFlagged,
-      ));
-      return true;
-    } on ApiException catch (e) {
-      await _emitFailure(e);
-      return false;
-    } catch (e) {
-      await _emitFailure(ApiException.unexpected(e));
-      return false;
-    }
+        mockFlagged: mockFlagged,
+      ),
+    );
   }
 
   /// Settles back to `ready` with [error] attached, after re-reading the visit
   /// so the header and action bar stay truthful even though the action failed.
-  ///
-  /// Both action runners have an `ApiException` arm and a catch-all arm, and
-  /// each used to spell this state out by hand — four copies of the same
-  /// six-field constructor. They are easy to write *almost* right: dropping
-  /// `mockFlagged` from one of them silently clears a spoofing warning, which
-  /// is exactly the kind of bug a reviewer does not catch by eye.
   Future<void> _emitFailure(ApiException error) async {
-    final visit = await _safeReload();
-    _safeEmit(VisitDetailState(
-      status: VisitDetailStatus.ready,
-      visit: visit ?? state.visit,
-      error: error,
-      attachments: state.attachments,
-      mockFlagged: state.mockFlagged,
-    ));
+    final (visit, _) = await _readVisit();
+    _safeEmit(
+      VisitDetailState(
+        status: VisitDetailStatus.ready,
+        visit: visit ?? state.visit,
+        error: error,
+        attachments: state.attachments,
+        attachmentsError: state.attachmentsError,
+        mockFlagged: state.mockFlagged,
+      ),
+    );
   }
 
-  /// Re-reads the visit and its attachments together after an action. Uploads
-  /// change the attachment list, and any action can change the visit, so both
-  /// are refreshed in parallel.
-  Future<(Visit?, List<VisitAttachment>, ApiException?)> _reload() async {
-    final visitFuture = repository.readVisitFull(visitId);
-    final attachmentsFuture = _readAttachments();
-    final visit = await visitFuture;
-    final (attachments, attachmentsError) = await attachmentsFuture;
-    return (visit, attachments, attachmentsError);
-  }
+  Future<bool> submit() =>
+      _run(VisitAction.submit, () => repository.submit(visitId));
 
-  Future<Visit?> _safeReload() async {
-    try {
-      return await repository.readVisitFull(visitId);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<bool> submit() => _run('submit', () => repository.submit(visitId));
-
-  Future<bool> approve() => _run('approve', () => repository.approve(visitId));
+  Future<bool> approve() =>
+      _run(VisitAction.approve, () => repository.approve(visitId));
 
   Future<bool> reject(String reason) =>
-      _run('reject', () => repository.reject(visitId, reason));
+      _run(VisitAction.reject, () => repository.reject(visitId, reason));
 
-  Future<bool> cancel() => _run('cancel', () => repository.cancel(visitId));
+  Future<bool> cancel() =>
+      _run(VisitAction.cancel, () => repository.cancel(visitId));
 
   Future<bool> reschedule({
     DateTime? scheduledDatetime,
     String? purpose,
     String? location,
-  }) =>
-      _run(
-        'reschedule',
-        () => repository.reschedule(
-          visitId,
-          scheduledDatetime: scheduledDatetime,
-          purpose: purpose,
-          location: location,
-        ),
-      );
+  }) => _run(
+    VisitAction.reschedule,
+    () => repository.reschedule(
+      visitId,
+      scheduledDatetime: scheduledDatetime,
+      purpose: purpose,
+      location: location,
+    ),
+  );
 
   /// Coordinates are required, not optional: a visit is GPS evidence, and
   /// these used to be nullable, so a denied permission or a cancelled
@@ -296,36 +319,59 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
   /// [isMocked] the OS mock-provider verdict. Both travel in the queue payload
   /// too — an action replayed hours later must carry the same evidence as one
   /// sent live, or going offline would become a way to launder a spoofed fix.
+  ///
+  /// The trail is recorded only once the server has confirmed the visit is
+  /// `in_progress`. A Start that could only be queued offline records
+  /// nothing; recording begins when the queue has replayed it (see
+  /// `VisitTrailTracker.onQueuedStartSynced`).
   Future<bool> start({
     required double latitude,
     required double longitude,
     String? location,
     bool isMocked = false,
   }) async {
-    final ok = await _runQueueable(
-      'start',
-      {
-        'type': 'start',
-        'latitude': latitude,
-        'longitude': longitude,
-        if (location != null) 'location': location,
-        if (isMocked) 'is_mocked': true,
+    if (!_claim()) return false;
+    return _runQueueable(
+      VisitAction.start,
+      _queuedPayload(
+        VisitAction.start,
+        latitude: latitude,
+        longitude: longitude,
+        location: location,
+        isMocked: isMocked,
+      ),
+      () => repository.start(
+        visitId,
+        latitude: latitude,
+        longitude: longitude,
+        location: location,
+        isMocked: isMocked,
+      ),
+      onSent: (transition) {
+        if (transition.state != VisitState.inProgress) {
+          appLog(
+            '[VisitDetailCubit] start of $visitId answered '
+            '${transition.state?.name}; trail not recorded',
+          );
+          return;
+        }
+        unawaited(
+          _startTrail(
+            startedAt: transition.at,
+            seedLatitude: latitude,
+            seedLongitude: longitude,
+          ),
+        );
       },
-      () => repository.start(visitId,
-          latitude: latitude,
-          longitude: longitude,
-          location: location,
-          isMocked: isMocked),
     );
-    // The trail starts the moment the visit does — including when the Start
-    // itself only reached the offline queue. The fixes buffer on the device and
-    // upload once the queued Start has replayed, which is the whole reason the
-    // tracker checks that queue before it flushes.
-    if (ok) unawaited(_trail?.start(visitId) ?? Future<void>.value());
-    return ok;
   }
 
   /// See [start] on why the coordinates are required.
+  ///
+  /// Recording stops *before* the End goes out, and everything recorded up to
+  /// then is pushed: the server stamps `end_datetime` on End, so a fix taken
+  /// while the request is in flight would land after it. The End's own
+  /// coordinates, acquired fresh by the caller, are the trail's final point.
   Future<bool> end({
     required String outcome,
     required double latitude,
@@ -333,151 +379,224 @@ class VisitDetailCubit extends Cubit<VisitDetailState> {
     String? location,
     bool isMocked = false,
   }) async {
-    if (_busy) return false;
+    // Claimed before the tracker is touched, so a second End tapped while the
+    // first is still stopping the tracker is refused as busy instead of being
+    // read as a failed End that restarts recording.
+    if (!_claim()) return false;
     final tracker = _trail;
     // Only this visit's own recording is stopped; a tracker busy with another
-    // running visit keeps going and just gets flushed.
-    final trackingThis = tracker != null &&
+    // visit keeps going and just gets flushed.
+    final trackingThis =
+        tracker != null &&
         (tracker.activeVisitId == null || tracker.activeVisitId == visitId);
-    // Stop sampling, then push what is buffered, *before* the End goes out.
-    // A late flush is supported — the server accepts a point transmitted after
-    // the end as long as its `logged_at` falls inside the start–end window —
-    // but the End stamps `end_datetime`, so a fix sampled while the request is
-    // in flight (or between its response and a later stop) lands after it and
-    // is refused for good. The End's own coordinates, acquired fresh by the
-    // caller, are the trail's final point.
     if (trackingThis) {
-      await tracker.stop();
-    } else {
-      await tracker?.flushNow();
+      await _guardTrail('stop before End', tracker.stop);
+    } else if (tracker != null) {
+      await _guardTrail(
+        'flush before End',
+        () => tracker.drain().then((_) => tracker.flushNow()),
+      );
     }
     final ok = await _runQueueable(
-      'end',
-      {
-        'type': 'end',
-        'outcome': outcome,
-        'latitude': latitude,
-        'longitude': longitude,
-        if (location != null) 'location': location,
-        if (isMocked) 'is_mocked': true,
-      },
-      () => repository.end(visitId,
-          outcome: outcome,
-          latitude: latitude,
-          longitude: longitude,
-          location: location,
-          isMocked: isMocked),
+      VisitAction.end,
+      _queuedPayload(
+        VisitAction.end,
+        outcome: outcome,
+        latitude: latitude,
+        longitude: longitude,
+        location: location,
+        isMocked: isMocked,
+      ),
+      () => repository.end(
+        visitId,
+        outcome: outcome,
+        latitude: latitude,
+        longitude: longitude,
+        location: location,
+        isMocked: isMocked,
+      ),
     );
-    // Refused (no outcome, state moved on): if the visit is in fact still
-    // running, its route must keep recording. An End that only reached the
-    // offline queue counts as success — the buffered tail stays on the device
-    // and flushes once the queued End has replayed.
+    // Refused (no outcome, state moved on): if the server still has the visit
+    // in progress, its route must keep recording. An End that only reached
+    // the offline queue counts as success — recording stays stopped, and the
+    // buffered tail uploads while the server still has the visit open.
     if (!ok && trackingThis && (state.visit?.isInProgress ?? false)) {
-      unawaited(tracker.start(visitId));
+      unawaited(_startTrail(startedAt: state.visit?.startDatetime));
     }
     return ok;
   }
 
-  /// Like [_run] but for the GPS-stamped Start / End actions: if the network is
-  /// down we persist the action to the offline queue and report a soft success
-  /// (`<action>_queued`) instead of an error, so a field rep in a dead zone can
-  /// keep working. The queue replays it automatically when connectivity is back.
-  Future<bool> _runQueueable(
-    String action,
-    Map<String, dynamic> payload,
-    Future<void> Function() body,
-  ) async {
-    if (_busy) return false;
-    _safeEmit(state.copyWith(status: VisitDetailStatus.acting, error: null));
+  /// Starts recording this visit's trail. Never throws — it runs unawaited,
+  /// and a tracker failure must not surface as an unhandled async error.
+  Future<void> _startTrail({
+    DateTime? startedAt,
+    double? seedLatitude,
+    double? seedLongitude,
+  }) =>
+      _guardTrail(
+        'start',
+        () async => _trail?.start(
+          visitId,
+          startedAt: startedAt,
+          seedLatitude: seedLatitude,
+          seedLongitude: seedLongitude,
+        ),
+      );
+
+  Future<void> _guardTrail(String what, Future<void> Function() body) async {
     try {
       await body();
-      final (visit, attachments, attachmentsError) = await _reload();
-      // Re-read rather than carry forward: unlike the other actions, Start and
-      // End are the two that can *raise* the flag, and they do it server-side
-      // inside `body()`. The payload's own `is_mocked` is not consulted here so
-      // the banner reflects what is actually on the record.
-      final mockFlagged = await repository.hasMockLocationFlag(visitId);
-      _safeEmit(VisitDetailState(
-        status: VisitDetailStatus.ready,
-        visit: visit,
-        lastAction: action,
-        attachments: attachments,
-        attachmentsError: attachmentsError,
-        mockFlagged: mockFlagged,
-      ));
-      return true;
+    } catch (e) {
+      // The buffered tail stays on the device and flushes later; the visit
+      // action itself must not be held back by the trail.
+      appLog('[VisitDetailCubit] trail $what failed: $e');
+    }
+  }
+
+  /// The offline-queue record for a Start / End. Keys are shared with the
+  /// queue that replays it, and `type` keeps the values stored data already
+  /// uses (`start` / `end`).
+  static Map<String, dynamic> _queuedPayload(
+    VisitAction action, {
+    required double latitude,
+    required double longitude,
+    String? outcome,
+    String? location,
+    required bool isMocked,
+  }) => {
+    QueuedVisitActionFields.type: action.name,
+    if (outcome != null) QueuedVisitActionFields.outcome: outcome,
+    QueuedVisitActionFields.latitude: latitude,
+    QueuedVisitActionFields.longitude: longitude,
+    if (location != null) QueuedVisitActionFields.location: location,
+    if (isMocked) QueuedVisitActionFields.isMocked: true,
+  };
+
+  /// A failure that means the request never reached a working server, so the
+  /// action is safe to hold and replay. Anything else is a verdict on the
+  /// action itself, and replaying it would only fail again later.
+  static bool _isOffline(ApiException e) =>
+      e.code == ApiErrorCode.network ||
+      e.code == ApiErrorCode.timeout ||
+      e.code == ApiErrorCode.serverUnavailable;
+
+  /// Like [_run] but for the GPS-stamped Start / End actions, which the caller
+  /// has already claimed: if the network is down we persist the action to the
+  /// offline queue and report a soft success (a queued [VisitActionOutcome])
+  /// instead of an error, so a field rep in a dead zone can keep working. The
+  /// queue replays it automatically when connectivity is back.
+  ///
+  /// [onSent] runs with the server's answer as soon as it arrives — before the
+  /// visit is re-read — and never for a queued action.
+  ///
+  /// Only a failure of [body] is queued. A re-read failing *after* the server
+  /// accepted the action used to land here too, and queued a Start the server
+  /// already had — replayed later, refused, and reported to the rep as lost.
+  Future<bool> _runQueueable(
+    VisitAction action,
+    Map<String, dynamic> payload,
+    Future<VisitTransition> Function() body, {
+    void Function(VisitTransition transition)? onSent,
+  }) async {
+    assert(action.isQueueable, '$action cannot be held offline');
+    final VisitTransition transition;
+    try {
+      transition = await body();
     } on ApiException catch (e) {
-      if (e.code == ApiErrorCode.network || e.code == ApiErrorCode.timeout) {
-        // The enqueue needs its own guard: it sits inside a catch block, so a
-        // SharedPreferences write failure (storage full, channel error) would
-        // escape _runQueueable entirely, leaving status stuck on `acting` — the
-        // full-screen busy overlay spinning forever, with the action lost and
-        // nothing said about it.
-        try {
-          await sl<PendingActionsQueue>().enqueue(visitId, payload);
-        } catch (queueError) {
-          await _emitFailure(ApiException.unexpected(queueError));
-          return false;
-        }
-        // Advance the local state to match what was queued. Without this the
-        // visit still reads `approved` after an offline Start, so the action
-        // bar keeps offering Start and never offers End (`canEnd` requires
-        // `inProgress`) — a rep who starts a visit in a dead zone could not
-        // finish it until connectivity returned, which is the exact situation
-        // the queue exists to cover.
-        final queuedType = payload['type']?.toString();
-        final optimistic = switch (queuedType) {
-          'start' => state.visit?.copyWith(
-              state: VisitState.inProgress,
-              startDatetime: DateTime.now(),
-            ),
-          'end' => state.visit?.copyWith(
-              state: VisitState.done,
-              endDatetime: DateTime.now(),
-              outcome: payload['outcome']?.toString(),
-            ),
-          _ => state.visit,
-        };
-        _safeEmit(state.copyWith(
-          status: VisitDetailStatus.ready,
-          visit: optimistic,
-          lastAction: '${action}_queued',
-          // Queued offline: the note has not been posted yet, but the verdict
-          // is already known locally, so warn now rather than after the sync.
-          mockFlagged: state.mockFlagged || payload['is_mocked'] == true,
-        ));
-        return true;
-      }
+      if (_isOffline(e)) return _holdOffline(action, payload, e);
       await _emitFailure(e);
       return false;
     } catch (e) {
       await _emitFailure(ApiException.unexpected(e));
       return false;
     }
+    onSent?.call(transition);
+    await _emitSuccess(VisitActionOutcome(action), recheckMockFlag: true);
+    return true;
+  }
+
+  /// Holds [payload] for replay and moves the screen on as if it had been
+  /// accepted. Falls back to reporting [cause] when the action can't be held.
+  Future<bool> _holdOffline(
+    VisitAction action,
+    Map<String, dynamic> payload,
+    ApiException cause,
+  ) async {
+    final queue = _pending;
+    if (queue == null) {
+      await _emitFailure(cause);
+      return false;
+    }
+    // The enqueue needs its own guard: a SharedPreferences write failure
+    // (storage full, channel error) would otherwise escape, leaving status
+    // stuck on `acting` — the full-screen busy overlay spinning forever, with
+    // the action lost and nothing said about it.
+    try {
+      await queue.enqueue(visitId, payload);
+    } catch (queueError) {
+      await _emitFailure(ApiException.unexpected(queueError));
+      return false;
+    }
+    // Advance the local state to match what was queued. Without this the
+    // visit still reads `approved` after an offline Start, so the action bar
+    // keeps offering Start and never offers End (`canEnd` requires
+    // `inProgress`) — a rep who starts a visit in a dead zone could not finish
+    // it until connectivity returned, which is the exact situation the queue
+    // exists to cover.
+    // On the server's clock, like the times the server will stamp: the bar's
+    // running timer measures from this.
+    final now = slMaybe<ServerClock>()?.now() ?? DateTime.now().toUtc();
+    final optimistic = switch (action) {
+      VisitAction.start => state.visit?.copyWith(
+        state: VisitState.inProgress,
+        startDatetime: now,
+      ),
+      VisitAction.end => state.visit?.copyWith(
+        state: VisitState.done,
+        endDatetime: now,
+        outcome: payload[QueuedVisitActionFields.outcome]?.toString(),
+      ),
+      _ => state.visit,
+    };
+    _safeEmit(
+      state.copyWith(
+        status: VisitDetailStatus.ready,
+        visit: optimistic,
+        lastAction: VisitActionOutcome(action, queued: true),
+        // Queued offline: the note has not been posted yet, but the verdict is
+        // already known locally, so warn now rather than after the sync.
+        mockFlagged:
+            state.mockFlagged ||
+            payload[QueuedVisitActionFields.isMocked] == true,
+      ),
+    );
+    return true;
   }
 
   Future<bool> addParticipants(List<int> employeeIds) => _run(
-        'add_participants',
-        () => repository.addParticipants(visitId, employeeIds),
-      );
+    VisitAction.addParticipants,
+    () => repository.addParticipants(visitId, employeeIds),
+  );
 
   Future<bool> approveParticipant(int participantId) => _run(
-        'participant_approve',
-        () => repository.approveParticipant(participantId),
-      );
+    VisitAction.participantApprove,
+    () => repository.approveParticipant(participantId),
+  );
 
   Future<bool> rejectParticipant(int participantId, String reason) => _run(
-        'participant_reject',
-        () => repository.rejectParticipant(participantId, reason),
-      );
+    VisitAction.participantReject,
+    () => repository.rejectParticipant(participantId, reason),
+  );
 
   Future<bool> uploadAttachment({
     required String filename,
     required String dataB64,
-  }) =>
-      _run(
-        'attachment',
-        () => repository.uploadAttachment(visitId,
-            filename: filename, dataB64: dataB64),
-      );
+  }) => _run(
+    VisitAction.attachment,
+    () => repository.uploadAttachment(
+      visitId,
+      filename: filename,
+      dataB64: dataB64,
+    ),
+  );
 }

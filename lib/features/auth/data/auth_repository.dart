@@ -4,13 +4,17 @@ import 'package:flutter/foundation.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exceptions.dart';
 import '../../../core/api/endpoints.dart';
+import '../../../core/api/odoo_parse.dart';
 import '../../../core/api/odoo_rpc.dart';
-import '../../../core/config/server_config_repository.dart';
 import '../../../core/config/server_config.dart';
+import '../../../core/config/server_config_repository.dart';
 import '../../../core/constants.dart';
 import '../../../core/storage/session_storage.dart';
-import 'models/user.dart';
 import '../../../core/utils/app_log.dart';
+import 'login_rejection.dart';
+import 'models/user.dart';
+
+export 'login_rejection.dart';
 
 class AuthRepository {
   final ApiClient api;
@@ -57,20 +61,8 @@ class AuthRepository {
     // Never log `result` itself: it is the session payload (session id, user
     // context). debugPrint survives release builds, so that would write live
     // credentials to logcat on every login.
-    if (result is! Map || result['uid'] == null) {
-      throw ApiException(code: ApiErrorCode.invalidCredentials);
-    }
-
-    var user = AuthUser.fromJson(Map<String, dynamic>.from(result));
-
-    // Kept (in the secure keystore only) so an expired session can be renewed
-    // by [reauthenticate] instead of logging the rep out mid-visit. Best-effort:
-    // a keystore failure costs that convenience, never the login itself.
-    try {
-      await session.saveCredentials(login: login, password: password);
-    } catch (e) {
-      appLog('[AuthRepository] could not store credentials for renewal: $e');
-    }
+    final payload = await _sessionPayload(result);
+    var user = AuthUser.fromJson(payload);
 
     // The session_info payload doesn't carry the tz (sometimes `false`) nor the
     // visit security groups, so read both directly from the user model right
@@ -95,8 +87,72 @@ class AuthRepository {
       user = user.copyWith(profileIncomplete: true);
     }
 
+    // Only a *successful* profile read can say "no role": when it failed, the
+    // role is a fallback and the user is let in with the incomplete-profile
+    // notice instead of being turned away for our own read error.
+    if (!user.profileIncomplete && !user.hasVisitAccess) {
+      await _discardServerSession();
+      throw const LoginRejectedException(LoginRejection.noVisitRole);
+    }
+
+    // Kept (in the secure keystore only) so an expired session can be renewed
+    // by [reauthenticate] instead of logging the rep out mid-visit. Best-effort:
+    // a keystore failure costs that convenience, never the login itself.
+    try {
+      await session.saveCredentials(login: login, password: password);
+    } catch (e) {
+      appLog('[AuthRepository] could not store credentials for renewal: $e');
+    }
+
     await session.saveUser(user.toJson());
+    api.sessionEstablished();
     return user;
+  }
+
+  /// The `/web/session/authenticate` answer as a session payload, or the
+  /// specific reason it isn't one.
+  ///
+  /// A refused password never reaches here — Odoo raises `AccessDenied`, which
+  /// the client maps to `invalidCredentials`. What does reach here:
+  /// * `{"uid": null}` — Odoo's documented answer for an account with
+  ///   two-step verification, which only the web login can complete. Reading
+  ///   it as "invalid credentials" sent users retyping a correct password.
+  /// * anything without a `uid` key — not Odoo's sign-in route talking.
+  Future<Map<String, dynamic>> _sessionPayload(dynamic result) async {
+    final payload = odooMap(result);
+    if (payload == null || !payload.containsKey(SessionUserFields.uid)) {
+      throw ApiException(
+        code: ApiErrorCode.invalidResponse,
+        details: 'authenticate answered without a uid',
+      );
+    }
+    final uid = payload[SessionUserFields.uid];
+    if (uid == null) {
+      await _discardServerSession();
+      throw const LoginRejectedException(LoginRejection.twoFactorRequired);
+    }
+    if (odooInt(uid) == null) {
+      throw ApiException(
+        code: ApiErrorCode.invalidResponse,
+        details: 'authenticate answered a non-numeric uid',
+      );
+    }
+    return payload;
+  }
+
+  /// Ends the half-open session a rejected sign-in left on the server, and
+  /// drops its cookie. Best-effort: the rejection is what the user must see.
+  Future<void> _discardServerSession() async {
+    try {
+      await api.jsonRpc(Endpoints.destroySession);
+    } catch (e) {
+      appLog('[AuthRepository] could not end the rejected session: $e');
+    }
+    try {
+      await cookieJar.deleteAll();
+    } catch (e) {
+      appLog('[AuthRepository] could not clear cookies: $e');
+    }
   }
 
   Future<dynamic> _authenticate(
@@ -113,34 +169,77 @@ class AuthRepository {
   /// `odoo.http.SessionExpiredException`, so `ApiClient` can retry the refused
   /// call once. Returns whether a fresh session cookie is now in the jar.
   ///
-  /// Never throws, and refuses to "renew" into a different account: if the
-  /// credentials now resolve to another uid (the login was reassigned
-  /// server-side), the caller must fall through to a real logout rather than
-  /// keep showing the previous user's data under someone else's session.
+  /// Throws only a transient [ApiException] (the server could not be
+  /// reached), which leaves the session as it is. Refuses to "renew" into a
+  /// different account: if the credentials now resolve to another uid (the
+  /// login was reassigned server-side), the caller must fall through to a real
+  /// logout rather than keep showing the previous user's data under someone
+  /// else's session.
   Future<bool> reauthenticate() async {
+    final creds = await _storedCredentials();
+    final int? storedUid;
     try {
-      final creds = await session.readCredentials();
-      final stored = await session.getUser();
-      if (creds == null || stored == null) return false;
-      final db = serverConfig.read().database ?? AppConstants.database;
-      final result = await _authenticate(db, creds.login, creds.password);
-      if (result is! Map || result['uid'] is! num) return false;
-      final storedUid = (stored['uid'] as num?)?.toInt();
-      return storedUid == null || (result['uid'] as num).toInt() == storedUid;
+      storedUid = await session.readUid();
+    } catch (e) {
+      appLog('[AuthRepository] signed-in user unreadable: $e');
+      return false;
+    }
+    if (creds == null || storedUid == null) return false;
+    final db = serverConfig.read().database ?? AppConstants.database;
+    final dynamic result;
+    try {
+      result = await _authenticate(db, creds.login, creds.password);
+    } on ApiException catch (e) {
+      // Offline or the server is down: nothing is known about the
+      // credentials, so the caller must not sign the user out over it.
+      if (e.isTransient) rethrow;
+      appLog('[AuthRepository] session renewal refused: ${e.code}');
+      return false;
     } catch (e) {
       appLog('[AuthRepository] session renewal failed: $e');
       return false;
     }
+    final renewedUid = odooInt(odooMap(result)?[SessionUserFields.uid]);
+    if (renewedUid != null && renewedUid == storedUid) return true;
+    // The login now opens another account. Its cookie must not be used for a
+    // single further call while the sign-out runs.
+    try {
+      await cookieJar.deleteAll();
+    } catch (e) {
+      appLog('[AuthRepository] could not clear cookies: $e');
+    }
+    return false;
+  }
+
+  Future<({String login, String password})?> _storedCredentials() async {
+    try {
+      return await session.readCredentials();
+    } catch (e) {
+      appLog('[AuthRepository] stored credentials unreadable: $e');
+      return null;
+    }
   }
 
   static bool _isMissingDatabase(ApiException error) =>
-      error.serverMessage?.trim().toLowerCase() == 'database not found.';
+      error.code == ApiErrorCode.databaseNotFound;
 
+  /// The server's only database, or null when it has several or won't say.
+  ///
+  /// Never throws. With `list_db = False` Odoo answers this route with
+  /// `AccessDenied` — which the client reads as "invalid credentials" — and
+  /// letting that escape replaced the real "database not found" with a wrong
+  /// password message.
   Future<String?> _detectSingleDatabase() async {
-    final result = await api.jsonRpc(Endpoints.databaseList);
-    if (result is! List || result.length != 1) return null;
-    final db = result.single.toString().trim();
-    return db.isEmpty ? null : db;
+    try {
+      final names = odooList(await api.jsonRpc(Endpoints.databaseList))
+          .map(odooString)
+          .whereType<String>()
+          .toList();
+      return names.length == 1 ? names.single : null;
+    } catch (e) {
+      appLog('[AuthRepository] database list unavailable: $e');
+      return null;
+    }
   }
 
   /// Asks Odoo whether [uid] is in one specific `dh_visit_management` group.
@@ -195,37 +294,27 @@ class AuthRepository {
   /// derives the visit role. `tz` is `null` when unset (Odoo serialises `false`).
   Future<({String? tz, VisitRole visitRole, int? employeeId})> _readUserProfile(
       int uid) async {
-    // Fired alongside the profile read rather than before it — neither depends
-    // on the other, so they share one round-trip instead of stacking two.
-    final groupsFuture = _resolveVisitGroups(uid);
-    final rows = await api.readRecords(
-      AppConstants.usersModel,
-      [uid],
-      const ['tz', 'employee_id'],
+    // Fired together — neither depends on the other, so they share one
+    // round-trip instead of stacking two. `Future.wait` rather than two bare
+    // futures: if the profile read threw first, the group lookup's own failure
+    // would otherwise surface as an unhandled async error.
+    final (rows, groups) = await (
+      api.readRecords(
+        AppConstants.usersModel,
+        [uid],
+        const ['tz', SessionUserFields.employeeId],
+      ),
+      _resolveVisitGroups(uid),
+    ).wait;
+    // No profile row still leaves the group answers authoritative — the role
+    // must not be thrown away just because tz/employee_id are missing.
+    final row = rows.isEmpty ? const <String, dynamic>{} : rows.first;
+    return (
+      tz: odooString(row['tz']),
+      visitRole: groups.role,
+      // A many2one: `[id, name]` or `false`.
+      employeeId: odooMany2one(row[SessionUserFields.employeeId]).id,
     );
-    final groups = await groupsFuture;
-    if (rows.isEmpty) {
-      // No profile row, but the group answers are still authoritative — the
-      // role must not be thrown away just because tz/employee_id are missing.
-      return (tz: null, visitRole: groups.role, employeeId: null);
-    }
-    final row = rows.first;
-
-    String? tz;
-    final rawTz = row['tz'];
-    if (rawTz != null && rawTz != false) {
-      final s = rawTz.toString().trim();
-      if (s.isNotEmpty && s != 'false') tz = s;
-    }
-
-    // `employee_id` on res.users is a many2one → `[id, name]` or `false`.
-    int? employeeId;
-    final emp = row['employee_id'];
-    if (emp is List && emp.isNotEmpty && emp.first is num) {
-      employeeId = (emp.first as num).toInt();
-    }
-
-    return (tz: tz, visitRole: groups.role, employeeId: employeeId);
   }
 
   Future<AuthUser?> currentUser() async {
@@ -234,21 +323,34 @@ class AuthRepository {
     return AuthUser.fromJson(stored);
   }
 
+  /// Ends the session on the server (best-effort: signing out must work
+  /// offline) and then locally.
   Future<void> logout() async {
     try {
       await api.jsonRpc(Endpoints.destroySession);
-    } catch (_) {
-      // ignore network errors during logout
+    } catch (e) {
+      appLog('[AuthRepository] server-side logout skipped: $e');
     }
-    await session.clear();
-    await cookieJar.deleteAll();
+    await clearLocalSession();
   }
 
   /// Clears the locally stored session and cookies *without* calling the
   /// backend. Used when the user switches to a different company's server —
   /// the previous session belongs to the old host and is meaningless now.
+  ///
+  /// Never throws, and runs both steps even if the first fails: a keystore
+  /// error (common after a device restore) must not leave the user stuck
+  /// "signed in" with a sign-out button that does nothing.
   Future<void> clearLocalSession() async {
-    await session.clear();
-    await cookieJar.deleteAll();
+    try {
+      await session.clear();
+    } catch (e) {
+      appLog('[AuthRepository] could not clear the stored session: $e');
+    }
+    try {
+      await cookieJar.deleteAll();
+    } catch (e) {
+      appLog('[AuthRepository] could not clear cookies: $e');
+    }
   }
 }

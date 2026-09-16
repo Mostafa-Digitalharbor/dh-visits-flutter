@@ -4,7 +4,10 @@ class Endpoints {
   // Auth (Odoo built-in JSON-RPC) — works on any vanilla Odoo.
   static const String authenticate = '/web/session/authenticate';
   static const String destroySession = '/web/session/destroy';
-  static const String sessionInfo = '/web/session/get_session_info';
+
+  /// The server's version. Public (no session needed) and tiny, which makes it
+  /// the reachability probe while the app believes it is offline.
+  static const String versionInfo = '/web/webclient/version_info';
 
   /// Lists the databases exposed by an Odoo server. Only works when the
   /// server has `list_db` enabled (single-tenant / on-prem instances). Used to
@@ -16,18 +19,10 @@ class Endpoints {
   /// standard models — no custom REST controllers required on the server.
   static const String callKw = '/web/dataset/call_kw';
 
-  /// Odoo's built-in attendance toggle (the same route the web "systray"
-  /// check-in/out button uses). Runs server-side with elevated rights, so a
-  /// regular employee can clock themselves in/out even though they can't
-  /// `create` an `hr.attendance` row directly. Accepts `{latitude, longitude}`
-  /// and records them in the native `in_/out_latitude/longitude` fields.
-  /// Toggles state: returns `attendance_state` = 'checked_in' | 'checked_out'.
-  static const String attendanceSystray = '/hr_attendance/systray_check_in_out';
-
   // ---- dh_visit_management mobile REST API (JSON-RPC `type='json'`) --------
   // Dedicated controllers for the visit approval workflow. All are POST with
   // the JSON-RPC envelope; auth is the same session cookie as the rest of the
-  // app. See docs/VISITS_API.md.
+  // app. The contract is docs/API.md.
   static const String visitMy = '/api/visit/my';
   static const String visitGet = '/api/visit/get';
   static const String visitCreate = '/api/visit/create';
@@ -56,22 +51,21 @@ class Endpoints {
   static const String visitLogLocations = '/api/visit/log_locations';
   static const String visitTrack = '/api/visit/track';
 
-  // ---- Whole work day (dh_workday_tracking) --------------------------------
-  // Start Work Day -> End Work Day, including the movement between visits.
-  // Same JSON-RPC conventions as /api/visit/*. `start` is idempotent on the
-  // app's client uid and never opens a second active day; `log_locations`
-  // reports refused points by index and already-stored ones as duplicates.
-  // See docs/WORKDAY_TRACKING.md.
-  static const String workdayStart = '/api/workday/start';
-  static const String workdayActive = '/api/workday/active';
-  static const String workdayGet = '/api/workday/get';
-  static const String workdayLogLocations = '/api/workday/log_locations';
-  static const String workdayEnd = '/api/workday/end';
-  static const String workdayTrack = '/api/workday/track';
-
   // ---- Push notifications (device token registration) ---------------------
   // The app registers its FCM token after login so the backend can push visit
   // workflow events. See docs/BACKEND_PUSH_NOTIFICATIONS.md.
   static const String registerDevice = '/api/visit/register_device';
   static const String unregisterDevice = '/api/visit/unregister_device';
+
+  /// Routes that carry a file. They get [AppConstants.apiUploadTimeout]
+  /// instead of the default timeouts: a photo over a weak mobile link takes
+  /// far longer to send, and the server longer to store, than a JSON call.
+  static const Set<String> uploads = {visitUploadAttachment};
+
+  /// Odoo's sign-in page. A request that ends up here was bounced by an
+  /// expired session, whatever the route it was sent to.
+  static const String loginPage = '/web/login';
+
+  /// Prefix of Odoo's core routes, which exist on every Odoo.
+  static const String coreRoutePrefix = '/web/';
 }

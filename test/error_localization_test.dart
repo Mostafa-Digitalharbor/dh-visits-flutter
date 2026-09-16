@@ -236,12 +236,27 @@ void main() {
       );
       for (final locale in [en, ar]) {
         final shown = await localize(t, e, locale);
-        expect(shown, contains('Purpose'));
+        // The field is named in the reader's language: the technical name
+        // `purpose` maps to the app's own label, not Odoo's English one.
+        expect(shown, contains(lookupAppLocalizations(locale).wfFieldPurpose));
         // The internal technical name and model are not for the user.
         expect(shown, isNot(contains('dh.visit')));
         expect(shown, isNot(contains('(purpose)')));
       }
-      expect(await localize(t, e, ar), matches(RegExp(r'[؀-ۿ]')));
+      expect(await localize(t, e, ar), isNot(contains('Purpose')));
+    });
+
+    testWidgets('an unmapped field keeps its label only in its own language',
+        (t) async {
+      final e = ApiException(
+        code: ApiErrorCode.validation,
+        serverMessage: "Missing required value for the field 'Region' "
+            "(x_region)",
+      );
+      expect(await localize(t, e, en), contains('Region'));
+      final arabic = await localize(t, e, ar);
+      expect(arabic, isNot(contains('Region')));
+      expect(arabic, lookupAppLocalizations(ar).errMissingRequiredFieldGeneric);
     });
   });
 

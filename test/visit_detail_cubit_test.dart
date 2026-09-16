@@ -56,7 +56,7 @@ class _FakeRepo implements VisitsRepository {
   }
 
   @override
-  Future<String?> start(
+  Future<VisitTransition> start(
     int visitId, {
     double? latitude,
     double? longitude,
@@ -71,11 +71,11 @@ class _FakeRepo implements VisitsRepository {
     });
     // The server records the verdict, so a later read sees it.
     if (isMocked) mockFlagged = true;
-    return 'in_progress';
+    return (state: VisitState.inProgress, at: DateTime.utc(2026, 9, 16, 10));
   }
 
   @override
-  Future<String?> end(
+  Future<VisitTransition> end(
     int visitId, {
     required String outcome,
     double? latitude,
@@ -91,7 +91,7 @@ class _FakeRepo implements VisitsRepository {
       'isMocked': isMocked,
     });
     if (isMocked) mockFlagged = true;
-    return 'done';
+    return (state: VisitState.done, at: DateTime.utc(2026, 9, 16, 11));
   }
 
   @override

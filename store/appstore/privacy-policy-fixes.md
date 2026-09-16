@@ -6,47 +6,67 @@
 > "The App does not collect or transmit your location when it is in the background"
 > و"No background tracking"، وتاريخ السريان ما زال نصًا مؤقتًا ("Replace with the date
 > you publish this policy"). انشر مكانها النص الكامل من
-> [docs/PRIVACY_POLICY.md](../../docs/PRIVACY_POLICY.md) (أو `PRIVACY_POLICY.docx`)
-> **قبل** رفع أي build فيه يوم العمل، وإلا يتناقض مع التطبيق وإعلانات المتجرين.
+> [docs/PRIVACY_POLICY.md](../../docs/PRIVACY_POLICY.md) (أو `PRIVACY_POLICY.html` /
+> `PRIVACY_POLICY.docx`، آخر تحديث 16 سبتمبر 2026) **قبل** رفع أي build يسجّل مسار
+> الزيارة في الخلفية، وإلا يتناقض مع التطبيق وإعلانات المتجرين.
+>
+> **تحديث 2026-09-16:** "يوم العمل" ومشاركة الموقع اللحظي ورادار "الموظفين القريبين"
+> وانعكاس الحضور اتشالوا من التطبيق. أي نص عن "مسار يوم العمل" أو "Start/End work day"
+> **ممنوع ينشر** — البند 0 تحت اتكتب من جديد على أساس الزيارات فقط.
 
 الصفحة جيدة في تغطية الموقع، لكنها تناقض إعلان App Privacy المنشور في App Store Connect
 في ثلاث نقاط. المراجع لدى Apple يقارن الاثنين، والتناقض سبب رفض مباشر.
 
 ---
 
-## 0. الموقع في الخلفية أثناء يوم العمل — تغيير جوهري (الأهم الآن)
+## 0. الموقع في الخلفية أثناء الزيارة الجارية — تغيير جوهري (الأهم الآن)
 
-الصفحة تقول إن التطبيق لا يتتبع الموقع في الخلفية. هذا لم يعد صحيحًا منذ إضافة
-"يوم العمل": بين "بدء يوم العمل" و"إنهاء يوم العمل" يسجّل التطبيق المسار في الخلفية
-ومع قفل الشاشة (Android: خدمة foreground من نوع location مع إشعار ظاهر؛ iOS: وضع
-الخلفية location). احذف أي عبارة "لا يوجد تتبع في الخلفية" وأضِف ما يلي. النص
-الإنجليزي الكامل في [docs/PRIVACY_POLICY.md](../../docs/PRIVACY_POLICY.md) (البندان 2.2 و4).
+الصفحة تقول إن التطبيق لا يتتبع الموقع في الخلفية. هذا لم يعد صحيحًا بالكامل: أثناء
+الزيارة الجارية فقط — من تأكيد الخادم لبدء الزيارة حتى "إنهاء الزيارة" أو تسجيل
+الخروج — يسجّل التطبيق مسار الزيارة في الخلفية ومع قفل الشاشة (Android: خدمة
+foreground من نوع location مع إشعار ظاهر وبإذن "أثناء الاستخدام" فقط؛ iOS: وضع
+الخلفية location مع مؤشر الموقع الأزرق). احذف أي عبارة "لا يوجد تتبع في الخلفية"
+وأضِف ما يلي. النص الإنجليزي الكامل في
+[docs/PRIVACY_POLICY.md](../../docs/PRIVACY_POLICY.md) (البندان 2.2 و4).
 
 **عربي:**
 
-> **مسار يوم العمل**: عند الضغط على "بدء يوم العمل" يسجّل التطبيق موقع جهازك الدقيق
-> (تقريبًا كل 5 ثوانٍ أثناء الحركة) حتى الضغط على "إنهاء يوم العمل" أو تسجيل الخروج،
-> بما في ذلك والتطبيق في الخلفية أو الشاشة مقفلة. على Android يظهر إشعار "تتبع يوم
-> العمل نشط" طوال مدة التسجيل، وعلى iOS يظهر مؤشر الموقع الخاص بالنظام. يُستخدم المسار
-> — بما فيه التنقل بين الزيارات — لتقارير يوم العمل والزيارات لدى جهة عملك. عند انقطاع
-> الشبكة تُحفظ المواقع على الجهاز حتى تُرفع إلى خادم جهة عملك ثم تُحذف من الجهاز.
-> لرسم المسارات على الطرق قد تُرسَل الإحداثيات المسجّلة (دون اسمك أو معرّفك أو معرّف
-> الجهاز) إلى خدمة مطابقة طرق تديرها Digital Harbor على بنية تحتية تتحكم فيها (وليست
-> خدمة توجيه عامة)؛ ولا تُغيَّر المواقع المسجّلة. لا يُسجَّل أي مسار خارج يوم عمل نشط.
+> **موقع الزيارات ومسارها**: يستخدم التطبيق موقع جهازك لزيارات العملاء فقط. يسجّل
+> موقعًا واحدًا عند الضغط على "بدء الزيارة" لزيارة معتمدة، وموقعًا واحدًا عند الضغط على
+> "إنهاء الزيارة"، ومسار الزيارة أثناء تنفيذها. يبدأ تسجيل المسار بعد أن يؤكد خادم جهة
+> عملك بدء الزيارة، ويستمر والتطبيق في الخلفية أو الشاشة مقفلة، ويتوقف فور الضغط على
+> "إنهاء الزيارة" أو تسجيل الخروج. على Android يظهر إشعار "تتبع الزيارة نشط" طوال مدة
+> التسجيل، وعلى iOS يظهر مؤشر الموقع الأزرق الخاص بالنظام. لا يُجمع أي موقع قبل بدء
+> الزيارة أو بين الزيارات أو بعد إنهائها، ولا يُسجَّل مسار يوم العمل كاملًا، ولا تُشارَك
+> مواقعك لحظيًا مع أحد. تشمل كل نقطة خط العرض وخط الطول ووقت التقاطها الفعلي والدقة
+> والارتفاع والسرعة والاتجاه ومعرّفًا عشوائيًا خاصًا بهذا التثبيت. عند انقطاع الشبكة
+> تُحفظ النقاط في مساحة التطبيق الخاصة على الجهاز وتُرفع لاحقًا بأوقاتها الأصلية —
+> حتى بعد انتهاء الزيارة — ولا يقبل الخادم إلا النقاط الواقعة بين بدء الزيارة وإنهائها،
+> ثم تُحذف من الجهاز بعد رفعها أو رفضها نهائيًا. لرسم مسار الزيارة على الطرق قد تُرسَل
+> نقاط تلك الزيارة فقط (دون اسمك أو معرّفك أو معرّف الجهاز) إلى خدمة مطابقة طرق تديرها
+> Digital Harbor على بنية تحتية تتحكم فيها (وليست خدمة توجيه عامة)؛ ولا تُغيَّر المواقع
+> المسجّلة.
 
 **English:**
 
-> **Work-day route**: When you tap "Start work day", the App records your device's
-> precise location (about every 5 seconds while moving) until you tap "End work day" or
-> sign out, including while the App is in the background or the screen is locked. On
-> Android a "Workday tracking active" notification is shown for as long as recording
-> runs; on iOS the system location indicator is shown. The route — including travel
-> between visits — is used for your employer's work-day and visit reports. Without a
-> network, positions are kept on the device until they are uploaded to your employer's
-> server, then removed from the device. To draw routes along roads, recorded coordinates
+> **Visit locations and routes**: The App uses your device's location only for customer
+> visits. It records one position when you tap "Start Visit" on an approved visit, one
+> when you tap "End Visit", and the route of the visit while it is in progress. Route
+> recording starts once your employer's server confirms the start, continues while the
+> App is in the background or the screen is locked, and stops as soon as you tap "End
+> Visit" or sign out. On Android a "Visit tracking active" notification is shown for as
+> long as recording runs; on iOS the system's blue location indicator is shown. No
+> location is collected before a visit starts, between visits or after it ends; the App
+> does not record a whole work day and does not share your live position with anyone.
+> Each point contains latitude, longitude, the time it was actually taken, accuracy,
+> altitude, speed, heading and a random identifier for this installation. Without a
+> network, points are kept in the App's private storage and uploaded later — even after
+> the visit ended — with their original times; the server accepts only points taken
+> between the visit's start and end, and points are deleted from the device once uploaded
+> or permanently refused. To draw a visit's route along roads, only that visit's points
 > (without your name, ID or device ID) may be sent to a road-matching service operated by
 > Digital Harbor on infrastructure it controls (never a public routing service); the
-> recorded positions are not changed. No route is recorded outside an active work day.
+> recorded positions are not changed.
 
 ---
 

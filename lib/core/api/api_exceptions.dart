@@ -8,12 +8,30 @@ enum ApiErrorCode {
   notFound,
   locationRequired,
   server,
-  locationPermission,
-  customerLoadFailed,
 
-  /// The feature isn't supported by the connected Odoo server. Used for
-  /// capabilities (live employee location / nearby map) that have no
-  /// storage in a vanilla Odoo without the custom visits module.
+  /// The server is down for maintenance or overloaded (HTTP 502 / 503 / 504).
+  /// Unlike [server], nothing the user sent is at fault and waiting is the fix.
+  serverUnavailable,
+
+  /// Too many requests in a short time (HTTP 429).
+  rateLimited,
+
+  /// The request body is larger than the server accepts (HTTP 413) — in this
+  /// app, always an attachment.
+  payloadTooLarge,
+
+  /// The server answered, but not with anything this app can read: a non-JSON
+  /// body, or JSON whose shape does not match the API contract. Usually a proxy
+  /// or captive portal in the way, or a server-side upgrade the app predates.
+  invalidResponse,
+
+  /// The Odoo database name configured for this company does not exist on the
+  /// server.
+  databaseNotFound,
+  locationPermission,
+
+  /// The feature isn't supported by the connected Odoo server: a route the
+  /// server has no controller for (an older `dh_visit_management`).
   notSupported,
 
   /// The stored session could not be read back on startup (corrupted keystore
@@ -62,13 +80,34 @@ class ApiException implements Exception {
     this.odooName,
   });
 
+  /// Odoo's exception class for a dead session cookie.
+  static const sessionExpiredName = 'odoo.http.SessionExpiredException';
+
   /// The session cookie is no longer valid. The one Odoo failure a client may
   /// retry: re-authenticate, then repeat the call once (see `ApiClient`).
-  bool get isSessionExpired =>
-      odooName == 'odoo.http.SessionExpiredException';
+  bool get isSessionExpired => odooName == sessionExpiredName;
+
+  /// A failure that says nothing about the request itself — the same call may
+  /// well succeed later. Offline queues and trackers retry these and give up
+  /// only on the others, which are verdicts on the data.
+  bool get isTransient => switch (code) {
+        ApiErrorCode.network ||
+        ApiErrorCode.timeout ||
+        ApiErrorCode.serverUnavailable ||
+        ApiErrorCode.rateLimited ||
+        ApiErrorCode.server ||
+        ApiErrorCode.invalidResponse ||
+        ApiErrorCode.insecureConnection =>
+          true,
+        _ => false,
+      };
+
+  /// The traceback key inside Odoo's `error.data`.
+  static const String _debugKey = 'debug';
 
   factory ApiException.fromJson(Map<String, dynamic> json) {
-    final err = json['error'] is Map ? json['error'] as Map<String, dynamic> : json;
+    final rawError = json['error'];
+    final err = rawError is Map ? Map<String, dynamic>.from(rawError) : json;
     final rawCode = (err['code'] ?? '').toString();
 
     // Odoo JSON-RPC error shape:
@@ -91,12 +130,18 @@ class ApiException implements Exception {
     final code = _mapCode(rawCode, dataName, rawMessage);
     final showable = _isUserFacingMessage(dataName, rawMessage);
 
+    // `data.debug` is the server's Python traceback: record contents, SQL and
+    // file paths. It never leaves the device — not on screen, and not in the
+    // [details] that [toString] hands to crash reports.
+    final diagnostic = data == null
+        ? null
+        : (Map<String, dynamic>.from(data)..remove(_debugKey));
     return ApiException(
       code: code,
       serverMessage: showable ? rawMessage : null,
       // The diagnostic is never lost — it just moves somewhere the UI can't
       // render it from.
-      details: err['details'] ?? err['data'] ?? (showable ? null : rawMessage),
+      details: err['details'] ?? diagnostic ?? (showable ? null : rawMessage),
       odooName: dataName,
     );
   }
@@ -146,8 +191,14 @@ class ApiException implements Exception {
   factory ApiException.unauthorized() =>
       ApiException(code: ApiErrorCode.unauthorized);
 
-  factory ApiException.unknown(String? message) =>
-      ApiException(code: ApiErrorCode.unknown, serverMessage: message);
+  /// A dead session that Odoo reported some other way than its JSON error —
+  /// a redirect to its sign-in page. Carries the same [odooName] so the
+  /// client re-authenticates exactly as for the JSON form.
+  factory ApiException.sessionExpired(Object? details) => ApiException(
+        code: ApiErrorCode.unauthorized,
+        odooName: sessionExpiredName,
+        details: details,
+      );
 
   /// An unexpected failure that carries no server-authored message: a JSON
   /// parse error, a null cast, a plugin throw, an unclassified Dio failure.
@@ -168,11 +219,19 @@ class ApiException implements Exception {
         details: error?.toString(),
       );
 
+  /// Odoo's answer to `/web/session/authenticate` with a database name the
+  /// server doesn't have. It arrives as an `AccessError`, which would otherwise
+  /// read as "you don't have permission" — the wrong cause and the wrong fix.
+  static const _databaseNotFoundMessage = 'database not found.';
+
   static ApiErrorCode _mapCode(
     String raw, [
     String? odooName,
     String? message,
   ]) {
+    if (message?.trim().toLowerCase() == _databaseNotFoundMessage) {
+      return ApiErrorCode.databaseNotFound;
+    }
     switch (raw) {
       case 'AUTH_REQUIRED':
         // The addon's REST controllers sometimes leak field-level access
@@ -203,7 +262,7 @@ class ApiException implements Exception {
     // Odoo JSON-RPC errors carry a Python exception name (e.g.
     // "odoo.exceptions.AccessDenied"). Treat the well-known ones.
     switch (odooName) {
-      case 'odoo.http.SessionExpiredException':
+      case sessionExpiredName:
         return ApiErrorCode.unauthorized;
       case 'odoo.exceptions.AccessDenied':
         return ApiErrorCode.invalidCredentials;
@@ -214,6 +273,11 @@ class ApiException implements Exception {
         return ApiErrorCode.validation;
       case 'odoo.exceptions.MissingError':
         return ApiErrorCode.notFound;
+      // `call_kw` on a model this database doesn't have (a module that isn't
+      // installed) — measured on Odoo 19. Older versions raise a KeyError
+      // instead, which stays `unknown`: it is also what a genuine bug raises.
+      case 'werkzeug.exceptions.NotFound':
+        return ApiErrorCode.notSupported;
     }
     return ApiErrorCode.unknown;
   }

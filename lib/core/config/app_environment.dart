@@ -57,12 +57,13 @@ class AppEnvironment {
   /// The public OSRM demo server (OpenStreetMap data, like the map tiles).
   /// Development only: its usage policy rules out production traffic, it has
   /// no SLA, and it would receive employees' coordinates — see
-  /// docs/WORKDAY_TRACKING.md "Road matching". Never used by a release build.
-  static const String publicOsrmUrl = 'https://router.project-osrm.org';
+  /// docs/MAP_MATCHING_DEPLOYMENT.md. Never used by a release build.
+  static const String publicOsrmUrl = 'https://$publicOsrmHost';
+  static const String publicOsrmHost = 'router.project-osrm.org';
 
   /// Public demo routing servers a release build refuses to talk to.
   static const Set<String> _publicDemoHosts = {
-    'router.project-osrm.org',
+    publicOsrmHost,
     'routing.openstreetmap.de',
   };
 
@@ -112,16 +113,19 @@ class AppEnvironment {
       int.fromEnvironment('MAP_MATCHING_MAX_POINTS');
 
   /// OSRM profile the server was built with (`driving`, `foot`, ...).
-  static const String mapMatchingProfile =
-      String.fromEnvironment('MAP_MATCHING_PROFILE', defaultValue: 'driving');
+  static const String mapMatchingProfile = String.fromEnvironment(
+    'MAP_MATCHING_PROFILE',
+    defaultValue: defaultMapMatchingProfile,
+  );
+
+  /// The OSRM profile assumed when none is configured: reps travel by car.
+  static const String defaultMapMatchingProfile = 'driving';
 
   /// Build flavour name surfaced in logs / settings screen.
   static const String flavor = String.fromEnvironment(
     'APP_FLAVOR',
     defaultValue: 'dev',
   );
-
-  static bool get isProduction => flavor == 'production';
 
   /// The Digital Harbor / Visits Sentry project.
   ///

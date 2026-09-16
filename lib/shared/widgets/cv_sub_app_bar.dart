@@ -28,7 +28,15 @@ class CvSubAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.topInset = 0,
   });
 
-  static const double _barHeight = 60;
+  static const double _barHeight = CompSz.subAppBarHeight;
+
+  /// How far the title block may grow with the OS text size. The bar is fixed
+  /// chrome (a PreferredSize), and two lines at the app-wide cap would push
+  /// past it; 1.1× stays comfortably legible.
+  static const double _maxTitleScale = 1.1;
+
+  /// The title and eyebrow sit as a tight pair.
+  static const double _lineHeight = 1.15;
 
   @override
   Size get preferredSize => Size.fromHeight(_barHeight + topInset);
@@ -43,7 +51,12 @@ class CvSubAppBar extends StatelessWidget implements PreferredSizeWidget {
       color: cs.surfaceContainerLowest,
       child: Container(
         height: _barHeight + topInset,
-        padding: EdgeInsets.fromLTRB(14, 10 + topInset, 14, 10),
+        padding: EdgeInsetsDirectional.fromSTEB(
+          Insets.x3h,
+          Insets.x2h + topInset,
+          Insets.x3h,
+          Insets.x2h,
+        ),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: x.outlineVariant)),
         ),
@@ -51,6 +64,7 @@ class CvSubAppBar extends StatelessWidget implements PreferredSizeWidget {
           children: [
             IconActionChip(
               icon: rtl ? Symbols.arrow_forward_ios : Symbols.arrow_back_ios_new,
+              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
               onTap: () {
                 if (context.canPop()) {
                   context.pop();
@@ -61,12 +75,8 @@ class CvSubAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
             context.gapW(Insets.x3),
             Expanded(
-              // The bar is a fixed-height chrome element (PreferredSize). Cap
-              // how far the eyebrow + title can scale up so a large system
-              // font setting can't push the two lines past the 60px bar and
-              // trigger a vertical overflow; 1.1x stays comfortably legible.
               child: MediaQuery.withClampedTextScaling(
-                maxScaleFactor: 1.1,
+                maxScaleFactor: _maxTitleScale,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -76,20 +86,16 @@ class CvSubAppBar extends StatelessWidget implements PreferredSizeWidget {
                       Text(eyebrow!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontSize: FontSz.xs,
-                              height: 1.15,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.3,
+                          style: AppType.eyebrow.copyWith(
+                              height: _lineHeight,
+                              letterSpacing: rtl ? 0 : null,
                               color: cs.onSurfaceVariant)),
                     Text(title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            fontSize: FontSz.appBar,
-                            height: 1.15,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.2,
+                        style: AppType.appBarTitle.copyWith(
+                            height: _lineHeight,
+                            letterSpacing: rtl ? 0 : null,
                             color: cs.onSurface)),
                   ],
                 ),

@@ -34,15 +34,14 @@ class VisitTrailState extends Equatable {
     VisitTrack? track,
     ApiException? error,
     int? pendingUploads,
-  }) =>
-      VisitTrailState(
-        status: status ?? this.status,
-        track: track ?? this.track,
-        // One-shot, like the other cubits in this feature: an error that
-        // survived into the next successful read would keep a stale banner up.
-        error: error,
-        pendingUploads: pendingUploads ?? this.pendingUploads,
-      );
+  }) => VisitTrailState(
+    status: status ?? this.status,
+    track: track ?? this.track,
+    // One-shot, like the other cubits in this feature: an error that
+    // survived into the next successful read would keep a stale banner up.
+    error: error,
+    pendingUploads: pendingUploads ?? this.pendingUploads,
+  );
 
   bool get hasPath => track.hasPath;
 
@@ -64,9 +63,16 @@ class VisitTrailCubit extends Cubit<VisitTrailState> {
 
   /// Whether the visit is still running. Drives polling — a `done` visit's
   /// trail is final and polling it would be pure battery.
-  final bool live;
+  bool get live => _live;
+  bool _live;
 
   Timer? _poll;
+
+  /// Numbers each [load]; only the newest may land. A poll and a
+  /// flush-triggered refetch overlap, and the slower (older) answer used to
+  /// replace the newer path.
+  int _loadSeq = 0;
+
   VoidCallback? _revisionListener;
   VoidCallback? _pendingListener;
 
@@ -74,8 +80,9 @@ class VisitTrailCubit extends Cubit<VisitTrailState> {
     required this.repository,
     required this.visitId,
     this.tracker,
-    this.live = false,
-  }) : super(const VisitTrailState()) {
+    bool live = false,
+  }) : _live = live,
+       super(const VisitTrailState()) {
     final t = tracker;
     if (t != null) {
       _revisionListener = () => unawaited(load(silent: true));
@@ -86,12 +93,32 @@ class VisitTrailCubit extends Cubit<VisitTrailState> {
       };
       t.pendingCount.addListener(_pendingListener!);
     }
+    if (live) _startPolling();
+  }
+
+  void _startPolling() {
+    _poll?.cancel();
+    _poll = Timer.periodic(
+      AppConstants.trailLiveRefreshInterval,
+      (_) => unawaited(load(silent: true)),
+    );
+  }
+
+  /// Follows the visit starting or ending while its screen is open — or a
+  /// screen opened without knowing (a notification tap) learning that the
+  /// visit is running. Polling used to be fixed at construction, so such a
+  /// screen never refreshed a route that was still growing.
+  void setLive(bool live) {
+    if (isClosed || live == _live) return;
+    _live = live;
     if (live) {
-      _poll = Timer.periodic(
-        AppConstants.trailLiveRefreshInterval,
-        (_) => unawaited(load(silent: true)),
-      );
+      _startPolling();
+    } else {
+      _poll?.cancel();
+      _poll = null;
     }
+    // Either way the path just changed: it is growing, or it was closed off.
+    unawaited(load(silent: true));
   }
 
   /// Fetches the trail. [silent] keeps the current points on screen while the
@@ -99,36 +126,44 @@ class VisitTrailCubit extends Cubit<VisitTrailState> {
   /// spinner, and a failed poll must not replace a good path with an error.
   Future<void> load({bool silent = false}) async {
     if (isClosed) return;
+    final seq = ++_loadSeq;
     if (!silent) {
-      emit(state.copyWith(status: VisitTrailStatus.loading, error: null));
+      emit(state.copyWith(status: VisitTrailStatus.loading));
     }
     try {
       final track = await repository.readTrack(visitId);
-      if (isClosed) return;
-      emit(state.copyWith(
-        status: VisitTrailStatus.ready,
-        track: track,
-        pendingUploads: tracker?.pendingCount.value ?? 0,
-      ));
-    } on ApiException catch (e) {
-      if (isClosed) return;
-      if (silent && state.status == VisitTrailStatus.ready) return;
-      emit(state.copyWith(status: VisitTrailStatus.error, error: e));
+      if (isClosed || seq != _loadSeq) return;
+      emit(
+        state.copyWith(
+          status: VisitTrailStatus.ready,
+          track: track,
+          pendingUploads: tracker?.pendingCount.value ?? 0,
+        ),
+      );
     } catch (e) {
-      if (isClosed) return;
+      if (isClosed || seq != _loadSeq) return;
       if (silent && state.status == VisitTrailStatus.ready) return;
-      emit(state.copyWith(
-        status: VisitTrailStatus.error,
-        error: ApiException.unexpected(e),
-      ));
+      emit(
+        state.copyWith(
+          status: VisitTrailStatus.error,
+          error: e is ApiException ? e : ApiException.unexpected(e),
+        ),
+      );
     }
   }
 
   /// Pushes the device buffer now, then re-reads — the "upload my points"
   /// action behind the pending-uploads chip.
-  Future<void> flushAndReload() async {
-    await tracker?.flushNow();
+  ///
+  /// Returns how many fixes are still on the device afterwards, so the tap
+  /// can say whether it worked: the flush itself never throws, and offline it
+  /// simply sends nothing.
+  Future<int> flushAndReload() async {
+    // What the native capture recorded since its last drain goes out too.
+    await tracker?.drain();
+    await tracker?.flushNow(probe: true);
     await load(silent: true);
+    return tracker?.pendingCount.value ?? 0;
   }
 
   @override
@@ -136,7 +171,9 @@ class VisitTrailCubit extends Cubit<VisitTrailState> {
     _poll?.cancel();
     final t = tracker;
     if (t != null) {
-      if (_revisionListener != null) t.revision.removeListener(_revisionListener!);
+      if (_revisionListener != null) {
+        t.revision.removeListener(_revisionListener!);
+      }
       if (_pendingListener != null) {
         t.pendingCount.removeListener(_pendingListener!);
       }

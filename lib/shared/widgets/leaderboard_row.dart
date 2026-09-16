@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../core/utils/app_number.dart';
 import '../extensions/context_extensions.dart';
 import 'initial_avatar.dart';
 import 'progress_track.dart';
@@ -149,7 +150,7 @@ class RankMedalAvatar extends StatelessWidget {
     // back to the theme-adaptive onSurfaceVariant, which is light in dark mode
     // — so white text would vanish there. Use the surface tone (its inverse)
     // for those so the number stays legible in both themes.
-    final medalText = rank <= 3 ? Colors.white : cs.surface;
+    final medalText = rank <= _medalRanks ? AppColors.onMap : cs.surface;
     final badge = context.r(CompSz.medal);
 
     return Stack(
@@ -175,7 +176,11 @@ class RankMedalAvatar extends StatelessWidget {
               ),
             ),
             child: Text(
-              '$rank',
+              AppNumber.whole(rank),
+              maxLines: 1,
+              // The disc can't grow with the OS text size, so neither may the
+              // numeral: at a large setting a two-digit rank spilled out of it.
+              textScaler: TextScaler.noScaling,
               style: TextStyle(
                 color: medalText,
                 fontSize: FontSz.micro,
@@ -191,4 +196,7 @@ class RankMedalAvatar extends StatelessWidget {
   /// How far the medal sits outside the avatar, and the width of its ring —
   /// the same 2dp, which is what makes the ring read as a cut-out.
   static const double _medalOverhang = 2.0;
+
+  /// Ranks drawn on a metal colour (gold, silver, bronze).
+  static const int _medalRanks = 3;
 }

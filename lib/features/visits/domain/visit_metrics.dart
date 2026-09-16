@@ -10,6 +10,7 @@
 //
 // Everything here is a plain value type built in a single pass and covered by
 // unit tests, so the widgets are left doing nothing but layout.
+import '../../../core/utils/app_number.dart';
 import '../../../core/utils/distance.dart';
 import '../data/models/visit.dart';
 
@@ -41,10 +42,11 @@ bool isSameDay(DateTime a, DateTime b) =>
 
 /// Sorts [counts] highest-first and keeps the top [limit] rows.
 List<LeaderboardEntry> _rank(Map<String, int> counts, int limit) {
-  final entries = counts.entries
-      .map((e) => LeaderboardEntry(e.key, e.value))
-      .toList(growable: false)
-    ..sort((a, b) => b.count.compareTo(a.count));
+  final entries =
+      counts.entries
+          .map((e) => LeaderboardEntry(e.key, e.value))
+          .toList(growable: false)
+        ..sort((a, b) => b.count.compareTo(a.count));
   return entries.length <= limit ? entries : entries.sublist(0, limit);
 }
 
@@ -101,12 +103,19 @@ class DashboardSummary {
     topEmployees: [],
   );
 
-  /// Field time as hours with one decimal, dropping a trailing `.0`.
+  /// Field time as hours with at most one decimal, dropping a trailing `.0`.
+  ///
+  /// Decided on the rounded figure: 61 minutes is "1", not "1.0" — the old
+  /// check looked at `minutes % 60` and kept a decimal that rounded away.
   String get fieldHoursLabel =>
-      (fieldMinutes / 60).toStringAsFixed(fieldMinutes % 60 == 0 ? 0 : 1);
+      AppNumber.decimal(fieldMinutes / Duration.minutesPerHour);
 
   /// [now] is injectable so the tests don't depend on the wall clock.
-  factory DashboardSummary.from(List<Visit> visits, {DateTime? now, int topN = 5}) {
+  factory DashboardSummary.from(
+    List<Visit> visits, {
+    DateTime? now,
+    int topN = 5,
+  }) {
     final today = now ?? DateTime.now();
     var overdue = 0, pending = 0, todayCount = 0, active = 0;
     var todayDone = 0, minutes = 0;
@@ -174,8 +183,12 @@ class WindowMetrics {
     required this.avgMinutes,
   });
 
-  static const empty =
-      WindowMetrics(count: 0, onTimePct: 0, km: 0, avgMinutes: 0);
+  static const empty = WindowMetrics(
+    count: 0,
+    onTimePct: 0,
+    km: 0,
+    avgMinutes: 0,
+  );
 
   factory WindowMetrics.from(List<Visit> visits) {
     var completed = 0, onTime = 0, durationCount = 0, durationMinutes = 0;
@@ -194,8 +207,11 @@ class WindowMetrics {
       if (v.hasCheckInLocation) track.add(v);
     }
 
-    track.sort((a, b) => (a.checkInTime ?? DateTime(0))
-        .compareTo(b.checkInTime ?? DateTime(0)));
+    track.sort(
+      (a, b) => (a.checkInTime ?? DateTime(0)).compareTo(
+        b.checkInTime ?? DateTime(0),
+      ),
+    );
     var meters = 0.0;
     for (var i = 1; i < track.length; i++) {
       meters += haversineMeters(
@@ -210,8 +226,9 @@ class WindowMetrics {
       count: visits.length,
       onTimePct: completed == 0 ? 0 : (onTime / completed * 100).round(),
       km: (meters / 1000).round(),
-      avgMinutes:
-          durationCount == 0 ? 0 : (durationMinutes / durationCount).round(),
+      avgMinutes: durationCount == 0
+          ? 0
+          : (durationMinutes / durationCount).round(),
     );
   }
 }
@@ -237,6 +254,8 @@ class AnalyticsSummary {
     required this.byEmployee,
   });
 
+  static const int _daysPerWeek = 7;
+
   /// Tallest bar in the weekly chart; `0` when there is no data at all.
   int get weeklyMax =>
       weeklyCounts.isEmpty ? 0 : weeklyCounts.reduce((a, b) => a > b ? a : b);
@@ -248,18 +267,28 @@ class AnalyticsSummary {
     return (((current - previous) / previous) * 100).round();
   }
 
-  factory AnalyticsSummary.from(List<Visit> visits, {DateTime? now, int topN = 5}) {
+  factory AnalyticsSummary.from(
+    List<Visit> visits, {
+    DateTime? now,
+    int topN = 5,
+  }) {
     final ref = now ?? DateTime.now();
-    final today = DateTime(ref.year, ref.month, ref.day);
-    final weekAgo = today.subtract(const Duration(days: 6));
-    final prevStart = today.subtract(const Duration(days: 13));
-    final prevEnd = today.subtract(const Duration(days: 7));
+    // Calendar arithmetic (`day - n`), never `subtract(Duration(days: n))`:
+    // across a daylight-saving change that lands on 23:00 or 01:00, and the
+    // oldest day of the window then fell outside both weeks.
+    DateTime daysAgo(int n) => DateTime(ref.year, ref.month, ref.day - n);
+    final today = daysAgo(0);
+    final weekAgo = daysAgo(_daysPerWeek - 1);
+    final prevStart = daysAgo(2 * _daysPerWeek - 1);
+    final prevEnd = daysAgo(_daysPerWeek);
 
     final current = <Visit>[];
     final previous = <Visit>[];
-    final weeklyDays =
-        List.generate(7, (i) => today.subtract(Duration(days: 6 - i)));
-    final weeklyCounts = List.filled(7, 0);
+    final weeklyDays = List.generate(
+      _daysPerWeek,
+      (i) => daysAgo(_daysPerWeek - 1 - i),
+    );
+    final weeklyCounts = List.filled(_daysPerWeek, 0);
     final byEmployee = <String, List<Visit>>{};
 
     for (final v in visits) {
@@ -276,23 +305,24 @@ class AnalyticsSummary {
 
       if (!day.isBefore(weekAgo) && !day.isAfter(today)) {
         current.add(v);
-        // `weekAgo` is exactly 6 days back, so this index is always 0..6.
-        weeklyCounts[day.difference(weekAgo).inDays]++;
+        // Counted by calendar position rather than `difference().inDays`,
+        // which floors a 23-hour DST day to the previous index.
+        weeklyCounts[weeklyDays.indexWhere((d) => isSameDay(d, day))]++;
       } else if (!day.isBefore(prevStart) && !day.isAfter(prevEnd)) {
         previous.add(v);
       }
     }
 
     final rows = byEmployee.entries.map((e) {
-      final onTime =
-          e.value.where((v) => (v.executionDaysDelta ?? 0) == 0).length;
+      final onTime = e.value
+          .where((v) => (v.executionDaysDelta ?? 0) == 0)
+          .length;
       return EmployeeOnTime(
         name: e.key,
         onTimePct: (onTime / e.value.length * 100).round(),
         visits: e.value.length,
       );
-    }).toList()
-      ..sort((a, b) => b.onTimePct.compareTo(a.onTimePct));
+    }).toList()..sort((a, b) => b.onTimePct.compareTo(a.onTimePct));
 
     return AnalyticsSummary(
       current: WindowMetrics.from(current),

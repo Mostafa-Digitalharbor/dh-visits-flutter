@@ -51,26 +51,30 @@
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
 		<!-- ============================================================ -->
-		<!-- Location. Visit check-in/out and live sharing read location   -->
-		<!-- while the app is in use. Between "Start Work Day" and "End     -->
-		<!-- Work Day" the work-day route is also recorded in the          -->
-		<!-- background and with the screen locked (WorkdayLocation.swift, -->
-		<!-- UIBackgroundModes "location" below). "While Using" is enough  -->
-		<!-- for that because capture always starts in the foreground;     -->
-		<!-- "Always" is asked for afterwards, explained first in the app, -->
-		<!-- and only adds relaunch after iOS terminated the app.          -->
-		<!-- geolocator_apple still requests When In Use first: it checks  -->
-		<!-- for NSLocationWhenInUseUsageDescription before Always.        -->
+		<!-- Location — customer visits only. A one-off fix is read when a  -->
+		<!-- visit is started or ended, and while a visit is in progress   -->
+		<!-- (between a server-confirmed Start Visit and End Visit) its    -->
+		<!-- GPS trail is also recorded in the background and with the     -->
+		<!-- screen locked (VisitLocation.swift, UIBackgroundModes          -->
+		<!-- "location" below). Nothing is recorded outside an active      -->
+		<!-- visit. "While Using" is enough because capture always starts   -->
+		<!-- in the foreground; the app never asks for "Always" itself (the -->
+		<!-- Always string is still required: geolocator_apple references  -->
+		<!-- requestAlwaysAuthorization, and Apple's static check wants a   -->
+		<!-- purpose string for it). If the user grants Always in Settings, -->
+		<!-- iOS may relaunch the app to continue an active visit.         -->
+		<!-- geolocator_apple requests When In Use: it checks for           -->
+		<!-- NSLocationWhenInUseUsageDescription before Always.            -->
 		<!-- Localized in en.lproj / ar.lproj InfoPlist.strings.           -->
 		<!-- ============================================================ -->
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>Visits uses your location to record customer visit check-in and check-out, to share your position with your manager while you use the app, and — while your work day is active — to record your work-day route, including in the background and with the screen locked. Route recording stops when you end your work day.</string>
+		<string>Visits uses your location when you start and end a customer visit, and records the route of a visit while it is in progress — including in the background and with the screen locked. Recording stops when you end the visit. No location is collected outside an active visit.</string>
 		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-		<string>While your work day is active, Visits records your work-day route in the background. Allowing location access "Always" lets recording resume if iOS closes the app during your work day. No route is recorded outside an active work day.</string>
+		<string>Visits records your route only while a customer visit is in progress. Allowing location access "Always" lets recording resume if iOS closes the app during an active visit. No location is collected outside an active visit.</string>
 		<key>NSLocationTemporaryUsageDescriptionDictionary</key>
 		<dict>
-			<key>WorkdayRoute</key>
-			<string>Precise location is needed to record your work-day route and visits on the correct streets.</string>
+			<key>VisitRoute</key>
+			<string>Precise location is needed to record the route of your active visit on the correct streets.</string>
 		</dict>
 		<!-- Camera: proof-of-visit photos attached to a visit. -->
 		<key>NSCameraUsageDescription</key>
@@ -97,20 +101,19 @@
 		<false/>
 		<key>UIStatusBarHidden</key>
 		<false/>
-		<!-- Push notifications: allow the app to be woken by a remote push so
-		     FCM can deliver visit-workflow events in the background. Also enable
-		     "Push Notifications" + "Background Modes → Remote notifications" in
-		     the Xcode target Signing & Capabilities, and upload an APNs Auth Key
-		     (.p8) to Firebase → Cloud Messaging.
-		     "location": work-day route capture continues in the background and
-		     with the screen locked, only between Start and End Work Day. App
-		     Review needs that explained in the review notes
-		     (store/appstore/listing-en.md). -->
+		<!-- Background modes.
+		     "remote-notification": lets FCM deliver visit-workflow events in the
+		     background. Also enable "Push Notifications" + "Background Modes →
+		     Remote notifications" in the Xcode target Signing & Capabilities, and
+		     upload an APNs Auth Key (.p8) to Firebase → Cloud Messaging.
+		     "location": the GPS trail of a customer visit keeps recording in the
+		     background and with the screen locked, only while that visit is in
+		     progress. App Review needs that explained in the review notes
+		     (store/appstore/). -->
 		<key>UIBackgroundModes</key>
 		<array>
 			<string>location</string>
 			<string>remote-notification</string>
-			<string>fetch</string>
 		</array>
 	</dict>
 </plist>

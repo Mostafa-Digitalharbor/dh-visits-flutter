@@ -15,6 +15,7 @@ import 'core/di/service_locator.dart';
 import 'core/observability/sentry_bloc_observer.dart';
 import 'core/observability/sentry_noise_filter.dart';
 import 'core/push/push_notification_service.dart';
+import 'core/storage/session_storage.dart';
 import 'firebase_options.dart';
 import 'core/utils/app_log.dart';
 
@@ -72,11 +73,10 @@ Future<void> main() async {
 ///
 /// The default is 100 MiB / 1000 entries, which is sized for a device with
 /// memory to spare. This app's only images are OSM map tiles — 256×256 PNGs
-/// that decode to ~256 KB each in RGBA — plus one logo, and four screens show a
-/// map (dashboard, route, visit detail, nearby radar). The nearby map alone
-/// keeps a 5-tile buffer around the viewport, so a rep who pans around a city
-/// can fill the default cache with tiles they will never look at again and hold
-/// ~100 MB resident. On the 1–2 GB phones this app is deployed to, that is the
+/// that decode to ~256 KB each in RGBA — plus one logo, and several screens
+/// show a map (dashboard, route, visit detail, visit trail). A rep who pans
+/// around a city can fill the default cache with tiles they will never look at
+/// again and hold ~100 MB resident. On the 1–2 GB phones this app is deployed to, that is the
 /// difference between staying alive in the background and being killed — which
 /// for a GPS check-in app means losing the visit in progress.
 ///
@@ -129,6 +129,11 @@ Future<void> _bootstrap() async {
   await setupServiceLocator();
 
   runApp(const CustomerVisitsApp());
+
+  // Stored credentials move to the keychain class that stays readable while
+  // the phone is locked (see SessionStorage.secureStorage) — done here, in the
+  // foreground, before any background renewal needs them.
+  unawaited(sl<SessionStorage>().refreshProtection());
 
   // Deliberately after `runApp` and deliberately not awaited: this asks the OS
   // for notification permission and registers platform handlers, none of which

@@ -29,8 +29,10 @@ class VisitSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsetsDirectional.only(
-              start: Insets.x1, bottom: Insets.x2),
+          padding: EdgeInsetsDirectional.only(
+            start: context.r(Insets.x1),
+            bottom: context.r(Insets.x2),
+          ),
           child: Row(
             children: [
               Icon(icon, size: context.r(IconSz.badge), color: cs.primary),
@@ -41,7 +43,6 @@ class VisitSection extends StatelessWidget {
                   style: context.text.labelLarge?.copyWith(
                     color: cs.primary,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 0.2,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -59,9 +60,11 @@ class VisitSection extends StatelessWidget {
                 for (var i = 0; i < rows.length; i++) ...[
                   if (i > 0)
                     Divider(
-                        height: 1,
-                        color: cs.outlineVariant
-                            .withValues(alpha: Alphas.subdued)),
+                      height: 1,
+                      color: cs.outlineVariant.withValues(
+                        alpha: Alphas.subdued,
+                      ),
+                    ),
                   rows[i],
                 ],
               ],

@@ -1,4 +1,12 @@
-# Customer Visits — Mobile API Reference
+# Customer Visits — Mobile API Reference (LEGACY)
+
+> **Legacy reference.** This file documents the early `dh_customer_visits`
+> API. The app now talks to `dh_visit_management`; the current contract is
+> [API.md](API.md), and location handling is in
+> [VISIT_TRACKING.md](VISIT_TRACKING.md). Live location sharing
+> (`/api/employee/location`) and the nearby-employees radar were **removed
+> from the app on 2026-09-16** (together with the work-day route and the
+> hr.attendance mirror); the app collects location only for customer visits.
 
 Backend: Odoo 19 module `dh_customer_visits`.
 Audience: Flutter mobile developer.
@@ -11,10 +19,9 @@ All responses JSON. All timestamps ISO 8601 UTC (`...Z`). All distances meters.
 
 ## 1. Architecture
 
-- Mobile sends location every ~30s while app open + sharing enabled.
 - Employee performs **check-in** at customer site → server records timestamp + coords.
 - Employee performs **check-out** when done → server records timestamp + coords + duration.
-- Manager dashboard can query **nearby-employees** of a customer to locate field staff in real time (default 10m radius around customer office).
+- No periodic location pings and no "nearby employees" lookup: both were removed from the app (2026-09-16).
 
 ---
 
@@ -213,56 +220,18 @@ Cache `visit_id` locally until check-out succeeds.
 }
 ```
 
-### 3.5 Update live location
+### 3.5 ~~Update live location~~ — REMOVED
 
-`POST /api/employee/location`
+`POST /api/employee/location` is **not used** by the app any more (live
+location sharing was removed on 2026-09-16). Do not call it. The only location
+data the app sends is per visit: Start/End coordinates and the trail of a
+visit in progress (`/api/visit/start`, `/api/visit/end`,
+`/api/visit/log_locations` — see [API.md](API.md)).
 
-Call every ~30s while app foregrounded and sharing toggle on.
+### 3.6 ~~Nearby employees~~ — REMOVED
 
-```json
-{
-  "latitude": 30.044500,
-  "longitude": 31.236000,
-  "timestamp": "2026-05-11T11:05:00Z",
-  "accuracy": 12.5
-}
-```
-
-`accuracy` accepted but not currently stored. Server sets `location_sharing=true` automatically on each call.
-
-**Response:** `{ "status": "success" }`
-
-Throttle on client side. Skip send if location unchanged > X meters since last send (suggested 5m) to save battery.
-
-To stop sharing, mobile should call `/api/employee/location/stop` — **NOT YET IMPLEMENTED**. For now toggle handled client-side (just stop calling endpoint); backend `location_sharing` flag stays true. Backend filter additionally requires `last_location_update >= since` (default last 5 min), so stale employees drop out automatically.
-
-### 3.6 Nearby employees (manager / admin use case)
-
-`GET /api/customers/<customer_id>/nearby-employees`
-
-Query params:
-- `radius` — meters, default `10`.
-- `since` — ISO datetime, default `now - 5 min`. Employees with `last_location_update < since` excluded.
-
-**Response:**
-
-```json
-{
-  "status": "success",
-  "data": [
-    {
-      "employee_id": 12,
-      "name": "Ahmed Ali",
-      "latitude": 30.044425,
-      "longitude": 31.235720,
-      "distance_meters": 4.3,
-      "last_update": "2026-05-11T11:05:00Z"
-    }
-  ]
-}
-```
-
-Returned sorted ascending by distance. Empty array if nobody inside radius.
+`GET /api/customers/<customer_id>/nearby-employees` is **not used** by the app
+any more (the manager "nearby employees" radar was removed on 2026-09-16).
 
 ### 3.7 Visits history
 
@@ -389,7 +358,10 @@ checked_out (terminal)
 | `mobile_state` | selection | checked_in / checked_out |
 | `description` | text | notes |
 
-### `hr.employee` extensions
+### `hr.employee` extensions (legacy, not used by the app)
+
+These fields belonged to the removed live-location feature; the app neither
+reads nor writes them.
 
 | Field | Type |
 |-------|------|
@@ -423,8 +395,6 @@ lib/
       data/visit_repo.dart
       ui/check_in_page.dart
       ui/visit_history_page.dart
-    live/
-      ui/nearby_employees_map.dart
   main.dart
 ```
 
@@ -436,15 +406,13 @@ Required packages:
 - `riverpod` or `bloc` (state)
 - `freezed` + `json_serializable` (models)
 
-Permissions (as shipped — see docs/WORKDAY_TRACKING.md):
-- Android: `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_LOCATION` (work-day route), `INTERNET`. `ACCESS_BACKGROUND_LOCATION` is not used: the foreground service is started from the foreground.
-- iOS: `NSLocationWhenInUseUsageDescription`, `NSLocationAlwaysAndWhenInUseUsageDescription`, `NSLocationTemporaryUsageDescriptionDictionary`, `UIBackgroundModes` = `location`.
+Permissions (as shipped — see docs/VISIT_TRACKING.md):
+- Android: `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_LOCATION` (visit trail while a visit is in progress), `INTERNET`. `ACCESS_BACKGROUND_LOCATION` is not used: the foreground service is started from the foreground.
+- iOS: `NSLocationWhenInUseUsageDescription`, `NSLocationAlwaysAndWhenInUseUsageDescription` (required because `geolocator_apple` links the Always API, and lets Settings offer "Always"; the app never asks for it), `NSLocationTemporaryUsageDescriptionDictionary`, `UIBackgroundModes` = `location` (visit trail only; "While Using" is sufficient).
 
-Location service config:
-- Distance filter: 5m.
-- Time interval: 30s.
-- Accuracy: high.
-- Send to `/api/employee/location` whenever new fix received AND user has toggled sharing on.
+Location use: only for customer visits — one fix at Start, one at End, and
+the trail while the visit is in progress (sampling and upload rules in
+docs/VISIT_TRACKING.md). No periodic location pings.
 
 ---
 
@@ -497,15 +465,6 @@ class ApiClient {
     final body = await _unwrap(r);
     return body['data']['duration_minutes'] as int;
   }
-
-  Future<void> pushLocation(double lat, double lng, {double? accuracy}) async {
-    await _dio.post('/api/employee/location', data: {
-      'latitude': lat,
-      'longitude': lng,
-      'timestamp': DateTime.now().toUtc().toIso8601String(),
-      if (accuracy != null) 'accuracy': accuracy,
-    });
-  }
 }
 ```
 
@@ -517,7 +476,7 @@ class ApiClient {
 # Login
 curl -c cookies.txt -X POST https://dh-abdelrahmanwael-odoo-19-test.odoo.com/web/session/authenticate \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","params":{"db":"dh-abdelrahmanwael-odoo-19-test","login":"admin","password":"admin"}}'
+  -d '{"jsonrpc":"2.0","params":{"db":"dh-abdelrahmanwael-odoo-19-test","login":"<login>","password":"<password>"}}'
 
 # List customers
 curl -b cookies.txt "https://dh-abdelrahmanwael-odoo-19-test.odoo.com/api/customers?limit=10"
@@ -534,9 +493,9 @@ curl -b cookies.txt -X POST https://dh-abdelrahmanwael-odoo-19-test.odoo.com/api
 
 - **Cold start with active visit:** on app launch, call `GET /api/visits?state=checked_in&employee_id=<self>` to detect any open visit. Resume check-out flow if found.
 - **Network loss during check-in:** queue request; retry until success. Backend rejects duplicate via "already checked-in" guard, so dedupe is automatic.
-- **Network loss during location push:** drop the sample (next sample replaces it). Never queue location updates — stale GPS is worse than gap.
+- **Network loss during a visit:** trail points are buffered on the device with their real fix time and uploaded later (even after the visit ended); the server accepts them while they fall inside the visit's start–end window. See docs/VISIT_TRACKING.md.
 - **Clock skew:** always send `timestamp` from device, server trusts it for `check_in_time` etc. If device clock is wrong, visit timeline will be wrong. Consider syncing via NTP / using `DateTime.now().toUtc()` only.
-- **Background mode:** live sharing stays foreground-only. The work-day route records in the background through an Android foreground service (type `location`) and iOS background location updates (works with While Using when started in the app; Always adds relaunch after termination). See docs/WORKDAY_TRACKING.md.
+- **Background mode:** location is collected in the background only while a visit is in progress — through an Android foreground service (type `location`) and iOS background location updates started from the foreground (While Using is sufficient). Nothing before Start, between visits or after End. See docs/VISIT_TRACKING.md.
 - **Session expiry:** intercept 401 → redirect to login, preserve in-flight check-in payload to retry after re-auth.
 - **Customers without coords:** never appear in `/api/customers`. If user opens deep link to such customer, `GET /api/customers/<id>` returns full record but check-in will fail with `LOCATION_REQUIRED`.
 
@@ -545,9 +504,8 @@ curl -b cookies.txt -X POST https://dh-abdelrahmanwael-odoo-19-test.odoo.com/api
 ## 11. Open backend questions (not yet decided)
 
 - Min distance threshold to allow check-in (spec §7 Q1) — currently no enforcement, any distance accepted.
-- Default `radius` for nearby-employees configurable from admin — currently per-request param, default 10m.
 - Webhook on check-in / check-out — not implemented.
-- Live-location history (full track vs. last point only) — only last point stored.
+- (Closed 2026-09-16: the nearby-employees radius and live-location history questions no longer apply — both features were removed from the app.)
 
 Mobile dev: assume current behavior, flag any of the above if business changes mind.
 
@@ -569,7 +527,8 @@ Or via UI: Apps → Update Apps List → search "Customer Visits" → Upgrade.
 
 - URL: `https://dh-abdelrahmanwael-odoo-19-test.odoo.com`
 - DB: `dh-abdelrahmanwael-odoo-19-test`
-- Login: `admin`
-- Password: `admin`
+- Login: `<login>`
+- Password: `<password>` — from the team password manager, never in Git.
 
-Rotate before production.
+The password previously written here was in Git history: treat it as exposed
+and rotate it on that instance.

@@ -10,8 +10,9 @@
 ## 1. Product context
 
 **Customer Visits** is a Flutter field-sales app for Digital Harbor. Field employees
-check in / check out at customer locations with live GPS tracking; managers oversee the
-team from a dashboard. Backend is Odoo (single source of truth — the app is mostly
+check in / check out at customer locations, and the app records the GPS route of a visit
+only while it is in progress (no live tracking of employees); managers oversee the
+team's visits from a dashboard. Backend is Odoo (single source of truth — the app is mostly
 read + check-in/out, not a full editor).
 
 Two roles drive the UI:
@@ -77,7 +78,7 @@ roles, refined typography, micro-states, and brand presence.
 | **Customers list** | Searchable list of customer cards. |
 | **Customer detail** | Customer info + their visits, contact actions (call/map via `url_launcher`). |
 | **Employees list** | List of employees (manager). |
-| **Nearby Map** | Full `flutter_map` page showing nearby employees/customers as markers. |
+| ~~**Nearby Map**~~ | Removed from the app on 2026-09-16 (nearby-employees radar); do not redesign. |
 | **Settings** | Language toggle (AR/EN), theme mode (system/light/dark), server, app version, logout. |
 | **Persistent Visit Bar** | Bottom bar pinned for field users showing the currently active visit (customer + elapsed time + quick action). |
 

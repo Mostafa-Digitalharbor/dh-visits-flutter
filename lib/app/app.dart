@@ -12,8 +12,9 @@ import '../core/api/api_exceptions.dart';
 import '../core/config/server_config_cubit.dart';
 import '../core/config/server_config_repository.dart';
 import '../core/di/service_locator.dart';
-import '../core/location/location_service.dart';
 import '../core/map_matching/route_matcher.dart';
+import '../core/network/connectivity_status.dart';
+import '../core/network/pending_actions_queue.dart';
 import '../core/push/push_notification_service.dart';
 import '../core/settings/settings_cubit.dart';
 import '../core/settings/settings_repository.dart';
@@ -21,14 +22,10 @@ import '../features/auth/bloc/auth_bloc.dart';
 import '../features/auth/data/auth_repository.dart';
 import '../features/customers/bloc/customers_bloc.dart';
 import '../features/customers/data/customers_repository.dart';
-import '../features/live_location/bloc/live_location_bloc.dart';
-import '../features/live_location/data/live_location_repository.dart';
-import '../features/nearby/bloc/nearby_bloc.dart';
-import '../features/nearby/data/nearby_repository.dart';
 import '../features/visits/bloc/visit_bloc.dart';
 import '../features/visits/bloc/visits_list_bloc.dart';
 import '../features/visits/data/visits_repository.dart';
-import '../features/workday/data/workday_tracker.dart';
+import '../features/visits/data/visit_trail_tracker.dart';
 import '../l10n/generated/app_localizations.dart';
 import 'router.dart';
 import 'theme.dart';
@@ -41,7 +38,8 @@ class CustomerVisitsApp extends StatefulWidget {
   State<CustomerVisitsApp> createState() => _CustomerVisitsAppState();
 }
 
-class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
+class _CustomerVisitsAppState extends State<CustomerVisitsApp>
+    with WidgetsBindingObserver {
   late final AuthBloc _authBloc;
   late final SettingsCubit _settingsCubit;
   late final ServerConfigCubit _serverConfigCubit;
@@ -55,23 +53,36 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
   /// (e.g. cold launch straight from a push). Navigated once logged in.
   int? _pendingVisitId;
 
+  /// The sign-out clean-up in progress, shared by every logout request that
+  /// arrives meanwhile. Unregistering the push token can itself be refused
+  /// with a 401, which used to queue a second logout that ran the whole
+  /// clean-up again in parallel.
+  Future<void>? _logoutCleanup;
+
+  AuthStatus? _lastStatus;
+
   @override
   void initState() {
     super.initState();
     _authBloc = AuthBloc(
       repository: sl<AuthRepository>(),
-      // Unregister the FCM token while the session is still valid, and stop
-      // work-day capture (nobody is tracked while signed out) after pushing
-      // what it recorded.
-      onBeforeLogout: () async {
-        await _push.unregister();
-        await slMaybe<WorkdayTracker>()?.suspend();
-        // Matched road geometry describes where this employee went.
-        await slMaybe<RouteMatcher>()?.clear();
-      },
+      // Stop recording the visit trail (nobody is tracked while signed out)
+      // after pushing what it recorded, and unregister the FCM token — both
+      // while the session is still valid.
+      onBeforeLogout: () => _logoutCleanup ??= _cleanUpBeforeLogout(),
     )..add(const AuthStarted());
-    _settingsCubit =
-        SettingsCubit(repository: sl<SettingsRepository>());
+    _settingsCubit = SettingsCubit(
+      repository: sl<SettingsRepository>(),
+      // The Android channel name is shown in system settings, in the app's
+      // language.
+      onLocaleChanged: (_) => _push.refreshChannel(),
+      // Only a signed-in device has a token the server knows about.
+      onNotificationsChanged: (enabled) async {
+        if (_authBloc.state.status == AuthStatus.authenticated) {
+          await _push.setEnabled(enabled);
+        }
+      },
+    );
     _serverConfigCubit = ServerConfigCubit(
       repository: sl<ServerConfigRepository>(),
       apiClient: sl<ApiClient>(),
@@ -83,7 +94,8 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
     // Any API call returning 401/AUTH_REQUIRED forces a logout, which the
     // router will pick up and redirect to /login.
     _unauthorizedSub = sl<ApiClient>().onUnauthorized.listen((_) {
-      if (_authBloc.state.status == AuthStatus.authenticated) {
+      if (_authBloc.state.status == AuthStatus.authenticated &&
+          _logoutCleanup == null) {
         // Pass the cause along: without it the user is thrown back to the
         // login screen mid-task with no idea whether they were signed out,
         // mis-tapped, or hit a crash.
@@ -95,14 +107,57 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
     // both a fresh login and a cold start with an existing session), and flush
     // any visit deep-link that arrived before login.
     _authSub = _authBloc.stream.listen((state) {
+      final changed = state.status != _lastStatus;
+      _lastStatus = state.status;
+      if (!changed) return;
+      // Offline work is scoped to the signed-in user: re-scope on every
+      // change, and send what this user has waiting once they're in.
+      final queue = slMaybe<PendingActionsQueue>();
       if (state.status == AuthStatus.authenticated) {
-        _push.registerToken();
+        _logoutCleanup = null;
+        unawaited(_push.registerToken());
+        unawaited(queue?.refreshOwner().then((_) => queue.flush()));
         _flushPendingVisit();
+      } else {
+        unawaited(queue?.refreshOwner());
       }
     });
 
     // A tapped visit notification → open the visit (or defer until logged in).
     _visitTapSub = _push.onVisitTap.listen(_handleVisitTap);
+
+    // A token registration that failed (offline at sign-in, APNs not ready)
+    // is retried once the network is back and whenever the app is reopened.
+    _connectivity = slMaybe<ConnectivityStatus>();
+    _connectivity?.addListener(_onConnectivity);
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  ConnectivityStatus? _connectivity;
+
+  void _onConnectivity() {
+    if (_connectivity?.isOnline ?? false) _retryPushRegistration();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _retryPushRegistration();
+  }
+
+  void _retryPushRegistration() {
+    if (_authBloc.state.status == AuthStatus.authenticated) {
+      unawaited(_push.retryRegistration());
+    }
+  }
+
+  /// Stops recording the visit trail (nobody is tracked while signed out)
+  /// after pushing what it recorded, then unregisters the FCM token — all
+  /// while the session is still valid.
+  Future<void> _cleanUpBeforeLogout() async {
+    await slMaybe<VisitTrailTracker>()?.suspend();
+    await _push.unregister();
+    // Matched road geometry describes where this employee went.
+    await slMaybe<RouteMatcher>()?.clear();
   }
 
   void _handleVisitTap(int visitId) {
@@ -130,9 +185,12 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _connectivity?.removeListener(_onConnectivity);
     _unauthorizedSub?.cancel();
     _authSub?.cancel();
     _visitTapSub?.cancel();
+    _router.dispose();
     _authBloc.close();
     _settingsCubit.close();
     _serverConfigCubit.close();
@@ -156,18 +214,6 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
         BlocProvider(
           create: (_) =>
               VisitsListBloc(repository: sl<VisitsRepository>()),
-        ),
-        BlocProvider(
-          create: (_) => LiveLocationBloc(
-            repository: sl<LiveLocationRepository>(),
-            locationService: sl<LocationService>(),
-          ),
-        ),
-        BlocProvider(
-          create: (_) => NearbyBloc(
-            nearbyRepository: sl<NearbyRepository>(),
-            customersRepository: sl<CustomersRepository>(),
-          ),
         ),
       ],
       child: BlocListener<AuthBloc, AuthState>(
@@ -193,18 +239,11 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
             // design's fixed-height components (app bar, cards, chips, nav)
             // stay legible without overflowing on very large / small font
             // accessibility settings.
-            builder: (context, child) {
-              final mq = MediaQuery.of(context);
-              return MediaQuery(
-                data: mq.copyWith(
-                  textScaler: mq.textScaler.clamp(
-                    minScaleFactor: 0.9,
-                    maxScaleFactor: 1.25,
-                  ),
-                ),
-                child: child!,
-              );
-            },
+            builder: (context, child) => MediaQuery.withClampedTextScaling(
+              minScaleFactor: Responsive.minTextScale,
+              maxScaleFactor: Responsive.maxTextScale,
+              child: child!,
+            ),
             locale: settings.locale,
             supportedLocales: AppLocalizations.supportedLocales,
             localizationsDelegates: const [
@@ -227,8 +266,5 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp> {
     context.read<VisitsListBloc>().add(const VisitsListReset());
     context.read<VisitBloc>().add(const VisitCleared());
     context.read<CustomersBloc>().add(const ListReset());
-    context.read<NearbyBloc>().add(const NearbyReset());
-    // Stop pinging the employee's GPS once they're signed out.
-    context.read<LiveLocationBloc>().add(const LiveLocationStopRequested());
   }
 }

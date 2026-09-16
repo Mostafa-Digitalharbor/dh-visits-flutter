@@ -1,4 +1,5 @@
 import 'package:bloc/bloc.dart';
+import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
 
 import '../../core/api/api_exceptions.dart';
@@ -82,26 +83,40 @@ abstract class SearchableListBloc<T, S extends SearchableListState<T>>
 
   final S _initialState;
 
+  /// Bumped by every [ListReset]. A load that started before the bump belongs
+  /// to the previous session and must not write its rows into the reset state.
+  int _generation = 0;
+
   SearchableListBloc({required this.loader, required S initialState})
       : _initialState = initialState,
         super(initialState) {
-    on<ListLoadRequested>(_onLoad);
+    // Restartable: a newer load (the user typed again) cancels the one in
+    // flight, so a slow answer for an old query can't land after — and
+    // overwrite — the answer for the current one.
+    on<ListLoadRequested>(_onLoad, transformer: restartable());
     on<ListSearchChanged>(_onSearch);
-    on<ListReset>((_, emit) => emit(_initialState));
+    on<ListReset>((_, emit) {
+      _generation++;
+      emit(_initialState);
+    });
   }
 
   Future<void> _onLoad(ListLoadRequested event, Emitter<S> emit) async {
+    final generation = _generation;
     emit(state.copyWithBase(status: ListStatus.loading) as S);
     try {
       final items = await loader(search: state.search);
+      if (generation != _generation) return;
       emit(state.copyWithBase(
         status: ListStatus.success,
         items: items,
         error: null,
       ) as S);
     } on ApiException catch (e) {
+      if (generation != _generation) return;
       emit(state.copyWithBase(status: ListStatus.failure, error: e) as S);
     } catch (e) {
+      if (generation != _generation) return;
       // Never leave the UI stuck on the loading skeleton. Repositories map raw
       // Odoo rows client-side, so a schema change throws a TypeError rather
       // than an ApiException and would otherwise escape the handler above.

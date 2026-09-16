@@ -10,25 +10,37 @@
 //
 // Fakes are hand-rolled via noSuchMethod, matching the other suites — no
 // mocking package.
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:location_gps/core/api/api_exceptions.dart';
+import 'package:location_gps/core/constants.dart';
 import 'package:location_gps/core/network/connectivity_status.dart';
 import 'package:location_gps/core/network/pending_actions_queue.dart';
 import 'package:location_gps/features/auth/data/models/user.dart';
+import 'package:location_gps/features/visits/data/models/visit.dart';
 import 'package:location_gps/features/visits/data/visits_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeRepo implements VisitsRepository {
-  _FakeRepo({this.startError});
+  _FakeRepo({this.startError, this.serverState, this.startDelay});
 
   /// Thrown by [start] when set, to simulate a replay that can't go through.
-  final Object? startError;
+  Object? startError;
+
+  /// What [getVisit] reports the visit's state as (wire value); null → the
+  /// visit can't be found.
+  String? serverState;
+
+  /// Holds [start] open until completed, to interleave other queue calls.
+  Completer<void>? startDelay;
+
   int startCalls = 0;
+  int endCalls = 0;
 
   @override
-  Future<String?> start(
+  Future<VisitTransition> start(
     int visitId, {
     double? latitude,
     double? longitude,
@@ -36,8 +48,30 @@ class _FakeRepo implements VisitsRepository {
     bool isMocked = false,
   }) async {
     startCalls++;
+    await startDelay?.future;
     if (startError != null) throw startError!;
-    return 'in_progress';
+    return (state: VisitState.inProgress, at: DateTime.utc(2026, 9, 16, 10));
+  }
+
+  @override
+  Future<VisitTransition> end(
+    int visitId, {
+    required String outcome,
+    double? latitude,
+    double? longitude,
+    String? location,
+    bool isMocked = false,
+  }) async {
+    endCalls++;
+    return (state: VisitState.done, at: DateTime.utc(2026, 9, 16, 11));
+  }
+
+  @override
+  Future<Visit?> getVisit(int visitId) async {
+    final state = serverState;
+    return state == null
+        ? null
+        : Visit.fromApi({'id': visitId, 'state': state});
   }
 
   @override
@@ -45,13 +79,19 @@ class _FakeRepo implements VisitsRepository {
       throw UnimplementedError('${invocation.memberName} not stubbed');
 }
 
-Future<PendingActionsQueue> _queue(_FakeRepo repo) async {
+Future<PendingActionsQueue> _queue(
+  _FakeRepo repo, {
+  Future<String?> Function()? owner,
+}) async {
   final prefs = await SharedPreferences.getInstance();
-  return PendingActionsQueue(
+  final q = PendingActionsQueue(
     prefs: prefs,
     repository: repo,
     connectivity: ConnectivityStatus(),
+    ownerResolver: owner,
   );
+  await q.refreshOwner();
+  return q;
 }
 
 void main() {
@@ -262,6 +302,200 @@ void main() {
       await q.enqueue(1, {'type': 'start'});
       await q.enqueue(2, {'type': 'start'});
       expect(q.pendingCount.value, 2);
+    });
+  });
+
+  group('PendingActionsQueue replay policy', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    test('a transient failure keeps the action and does not announce it',
+        () async {
+      // The defect: anything but network/timeout was dropped, so a 502 during
+      // a server deploy threw away GPS-stamped work for good.
+      final repo = _FakeRepo(
+        startError: ApiException(code: ApiErrorCode.serverUnavailable),
+      );
+      final q = await _queue(repo);
+      await q.enqueue(1, {'type': 'start'});
+      final dropped = <DroppedAction>[];
+      q.onDropped.listen(dropped.add);
+
+      final result = await q.flush();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(result.remaining, 1);
+      expect(result.dropped, 0);
+      expect(dropped, isEmpty);
+      expect(q.pending.single.attempts, 1, reason: 'counts towards the cap');
+    });
+
+    test('offline failures never use up attempts', () async {
+      final repo =
+          _FakeRepo(startError: ApiException(code: ApiErrorCode.network));
+      final q = await _queue(repo);
+      await q.enqueue(1, {'type': 'start'});
+      for (var i = 0; i < AppConstants.pendingActionMaxAttempts + 2; i++) {
+        await q.flush();
+      }
+      expect(q.pending.single.attempts, 0);
+    });
+
+    test('a failing action is given up after the attempt cap', () async {
+      final repo =
+          _FakeRepo(startError: ApiException(code: ApiErrorCode.server));
+      final q = await _queue(repo);
+      await q.enqueue(1, {'type': 'start'});
+      final dropped = <DroppedAction>[];
+      q.onDropped.listen(dropped.add);
+
+      for (var i = 0; i < AppConstants.pendingActionMaxAttempts; i++) {
+        await q.flush();
+      }
+      await Future<void>.delayed(Duration.zero);
+
+      expect(q.pendingCount.value, 0);
+      expect(dropped.single.action?.name, 'start');
+    });
+
+    test('an expired session keeps the action for after sign-in', () async {
+      final repo =
+          _FakeRepo(startError: ApiException(code: ApiErrorCode.unauthorized));
+      final q = await _queue(repo);
+      await q.enqueue(1, {'type': 'start'});
+      await q.flush();
+      expect(q.pending.single.attempts, 0);
+    });
+
+    test('a refused replay whose effect is already on the server is a sync',
+        () async {
+      // The first attempt timed out after the server had applied it; the
+      // replay is refused because the visit is already running.
+      final repo = _FakeRepo(
+        startError: ApiException(code: ApiErrorCode.validation),
+        serverState: 'in_progress',
+      );
+      final q = await _queue(repo);
+      await q.enqueue(1, {'type': 'start'});
+      final dropped = <DroppedAction>[];
+      q.onDropped.listen(dropped.add);
+
+      final result = await q.flush();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(result.synced, 1);
+      expect(result.dropped, 0);
+      expect(dropped, isEmpty);
+      expect(q.lastSyncedAt.value, isNotNull);
+    });
+
+    test('a refused replay the server has not applied is dropped', () async {
+      final repo = _FakeRepo(
+        startError: ApiException(code: ApiErrorCode.validation),
+        serverState: 'cancelled',
+      );
+      final q = await _queue(repo);
+      await q.enqueue(1, {'type': 'start'});
+      final result = await q.flush();
+      expect(result.dropped, 1);
+      expect(result.remaining, 0);
+    });
+
+    test('an action queued during a flush survives it', () async {
+      // The defect: flush wrote back its starting snapshot, so an End queued
+      // while the Start was replaying was silently overwritten.
+      final gate = Completer<void>();
+      final repo = _FakeRepo(startDelay: gate);
+      final q = await _queue(repo);
+      await q.enqueue(1, {'type': 'start'});
+
+      final running = q.flush();
+      await Future<void>.delayed(Duration.zero);
+      await q.enqueue(1, {'type': 'end', 'outcome': 'ok'});
+      gate.complete();
+      final result = await running;
+
+      expect(result.synced, 1);
+      expect(q.pending.map((a) => a.payload['type']), ['end']);
+    });
+
+    test('a second flush waits for the running one and shares its result',
+        () async {
+      final gate = Completer<void>();
+      final repo = _FakeRepo(startDelay: gate);
+      final q = await _queue(repo);
+      await q.enqueue(1, {'type': 'start'});
+
+      final first = q.flush();
+      final second = q.flush();
+      gate.complete();
+
+      expect((await second).synced, 1);
+      expect((await first).synced, 1);
+      expect(repo.startCalls, 1);
+    });
+
+    test('a drop with nobody listening reaches the next listener', () async {
+      final repo = _FakeRepo(
+        startError: ApiException(code: ApiErrorCode.permissionDenied),
+      );
+      final q = await _queue(repo);
+      await q.enqueue(7, {'type': 'start'});
+      await q.flush();
+
+      final dropped = <DroppedAction>[];
+      q.onDropped.listen(dropped.add);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(dropped.single.visitId, 7);
+    });
+  });
+
+  group('PendingActionsQueue per-user scope', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    test("another user neither sees nor replays the first user's actions",
+        () async {
+      var who = 'https://odoo.test|1';
+      final repo = _FakeRepo();
+      final q = await _queue(repo, owner: () async => who);
+      await q.enqueue(1, {'type': 'start'});
+      expect(q.pendingCount.value, 1);
+
+      who = 'https://odoo.test|2';
+      await q.refreshOwner();
+      expect(q.pendingCount.value, 0);
+      await q.flush();
+      expect(repo.startCalls, 0, reason: 'never sent as someone else');
+
+      who = 'https://odoo.test|1';
+      await q.refreshOwner();
+      expect(q.pendingCount.value, 1, reason: 'kept for its owner');
+    });
+
+    test('signed out, nothing is visible or replayed', () async {
+      String? who = 'https://odoo.test|1';
+      final repo = _FakeRepo();
+      final q = await _queue(repo, owner: () async => who);
+      await q.enqueue(1, {'type': 'start'});
+
+      who = null;
+      final result = await q.flush();
+      expect(result.remaining, 0);
+      expect(repo.startCalls, 0);
+    });
+
+    test('entries from before scoping are adopted by the first user', () async {
+      SharedPreferences.setMockInitialValues({
+        StorageKeys.pendingActions: jsonEncode([
+          {
+            'visitId': 4,
+            'payload': {'type': 'start'},
+            'queuedAt': DateTime.now().toIso8601String(),
+          },
+        ]),
+      });
+      final q = await _queue(_FakeRepo(), owner: () async => 'srv|9');
+      expect(q.pending.single.owner, 'srv|9');
     });
   });
 }

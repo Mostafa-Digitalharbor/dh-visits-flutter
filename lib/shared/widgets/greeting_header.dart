@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../core/utils/app_number.dart';
 import '../extensions/context_extensions.dart';
 import 'initial_avatar.dart';
+import 'progress_track.dart';
 import 'tone_pill.dart';
 
 /// Brand-gradient greeting/day header used on the manager dashboard and the
@@ -17,6 +19,9 @@ class GreetingHeader extends StatelessWidget {
   /// Optional trailing stats shown under the progress bar (e.g. field time).
   final List<GreetingStat> stats;
 
+  /// The current time, for the greeting. Injectable for tests.
+  final DateTime Function() now;
+
   const GreetingHeader({
     super.key,
     required this.name,
@@ -25,17 +30,40 @@ class GreetingHeader extends StatelessWidget {
     required this.done,
     required this.total,
     this.stats = const [],
+    this.now = DateTime.now,
   });
+
+  /// Hours (local) at which the greeting changes.
+  static const int _afternoonFrom = 12;
+  static const int _eveningFrom = 17;
+
+  /// A friendly mark after the greeting. Not a word, so not in the ARBs.
+  static const String _wave = '👋';
+
+  /// Text and chrome on the brand gradient.
+  static const Color _onBrand = AppColors.onMap;
+
+  String _greeting(BuildContext context) {
+    final hour = now().hour;
+    final s = context.s;
+    if (hour >= _eveningFrom) return s.commonGreetingEvening;
+    if (hour >= _afternoonFrom) return s.commonGreetingAfternoon;
+    return s.commonGreetingMorning;
+  }
 
   @override
   Widget build(BuildContext context) {
     final x = context.x;
     final pct = total == 0 ? 0.0 : (done / total).clamp(0.0, 1.0);
-    final initial = InitialAvatar.initialOf(name);
-    const white = Colors.white;
+    final muted = _onBrand.withValues(alpha: Alphas.onBrandMuted);
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      padding: EdgeInsetsDirectional.fromSTEB(
+        context.r(Insets.x4h),
+        context.r(Insets.x4h),
+        context.r(Insets.x4h),
+        context.r(Insets.x4),
+      ),
       decoration: BoxDecoration(
         gradient: x.brandGradient,
         borderRadius: BorderRadius.circular(Radii.xl),
@@ -46,17 +74,11 @@ class GreetingHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 46,
-                height: 46,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: white.withValues(alpha: 0.18),
-                  shape: BoxShape.circle,
-                ),
-                child: Text(initial,
-                    style: const TextStyle(
-                        color: white, fontSize: FontSz.avatar, fontWeight: FontWeight.w800)),
+              InitialAvatar(
+                name: name,
+                size: context.r(CompSz.avatar),
+                background: _onBrand.withValues(alpha: Alphas.wash),
+                foreground: _onBrand,
               ),
               context.gapW(Insets.x3),
               Expanded(
@@ -64,15 +86,11 @@ class GreetingHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Was wrapped in a bare `Row` purely to left-align, which
-                    // handed the Text an unbounded width and overflowed once
-                    // the greeting got long (Arabic, or a large font scale).
-                    // The Column already aligns to the start.
-                    Text('${context.s.dashboardGreeting} 👋',
+                    Text('${_greeting(context)} $_wave',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            color: white.withValues(alpha: 0.85),
+                            color: muted,
                             fontSize: FontSz.base,
                             fontWeight: FontWeight.w600)),
                     context.gapH(Insets.hair),
@@ -80,7 +98,9 @@ class GreetingHeader extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                            color: white, fontSize: FontSz.greeting, fontWeight: FontWeight.w800)),
+                            color: _onBrand,
+                            fontSize: FontSz.greeting,
+                            fontWeight: FontWeight.w800)),
                   ],
                 ),
               ),
@@ -103,39 +123,32 @@ class GreetingHeader extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                        color: white.withValues(alpha: 0.85),
+                        color: muted,
                         fontSize: FontSz.base,
                         fontWeight: FontWeight.w600)),
               ),
               context.gapW(Insets.x2),
-              // ٪ in Arabic, % in English — the one place the sign was hard-coded.
-              Text('$done/$total · ${(pct * 100).round()}${context.s.unitPercent}',
+              Text(
+                  context.joinFacts([
+                    context.s.commonFraction(
+                        AppNumber.whole(done), AppNumber.whole(total)),
+                    AppNumber.percent(context.s, (pct * 100).round()),
+                  ]),
                   maxLines: 1,
                   style: const TextStyle(
-                      color: white,
+                      color: _onBrand,
                       fontSize: FontSz.base,
                       fontWeight: FontWeight.w800,
                       fontFeatures: [FontFeature.tabularFigures()])),
             ],
           ),
           context.gapH(Insets.x2),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(Radii.pill),
-            child: Stack(
-              children: [
-                Container(height: 8, color: white.withValues(alpha: 0.20)),
-                LayoutBuilder(
-                  builder: (_, c) => Container(
-                    height: 8,
-                    width: c.maxWidth * pct,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(Radii.pill),
-                      gradient: const LinearGradient(
-                          colors: [Colors.white, AppColors.cyan400]),
-                    ),
-                  ),
-                ),
-              ],
+          ProgressTrack(
+            value: pct,
+            height: context.r(CompSz.headerTrackHeight),
+            trackColor: _onBrand.withValues(alpha: Alphas.onBrandTrack),
+            gradient: const LinearGradient(
+              colors: [_onBrand, AppColors.cyan400],
             ),
           ),
           if (stats.isNotEmpty) ...[
@@ -143,7 +156,7 @@ class GreetingHeader extends StatelessWidget {
             Row(
               children: [
                 for (var i = 0; i < stats.length; i++) ...[
-                  if (i > 0) SizedBox(width: context.r(20)),
+                  if (i > 0) context.gapW(Insets.x5),
                   Flexible(child: _Stat(stat: stats[i])),
                 ],
               ],
@@ -168,15 +181,17 @@ class _Stat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const white = Colors.white;
+    const onBrand = GreetingHeader._onBrand;
+    final muted = onBrand.withValues(alpha: Alphas.onBrandMuted);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(stat.icon, size: 18, color: white.withValues(alpha: 0.85)),
+        Icon(stat.icon, size: context.r(IconSz.label), color: muted),
         context.gapW(Insets.x1h),
         Text(stat.value,
+            maxLines: 1,
             style: const TextStyle(
-                color: white,
+                color: onBrand,
                 fontSize: FontSz.lg,
                 fontWeight: FontWeight.w800,
                 fontFeatures: [FontFeature.tabularFigures()])),
@@ -186,7 +201,7 @@ class _Stat extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                  color: white.withValues(alpha: 0.82),
+                  color: muted,
                   fontSize: FontSz.sm,
                   fontWeight: FontWeight.w500)),
         ),
@@ -208,10 +223,10 @@ class _RoleChip extends StatelessWidget {
       label: label,
       icon: icon,
       flexibleLabel: true,
-      color: Colors.white,
-      tintAlpha: 0.18,
+      color: GreetingHeader._onBrand,
+      tintAlpha: Alphas.wash,
       fontSize: FontSz.sm,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: context.padSym(h: Insets.x2h, v: Insets.x1h),
     );
   }
 }

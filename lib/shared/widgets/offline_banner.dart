@@ -1,21 +1,18 @@
 import 'package:flutter/material.dart';
 
+import '../../app/theme.dart';
 import '../../core/di/service_locator.dart';
 import '../../core/network/connectivity_status.dart';
 import '../../core/network/pending_actions_queue.dart';
 import '../extensions/context_extensions.dart';
 import 'status_banner.dart';
 
-/// Slim status strip that sits under the AppBar whenever connectivity
-/// drops *or* the offline queue has pending writes. Two-line worst
-/// case (offline + N pending actions). When everything is fine it
-/// collapses to zero height so layout doesn't shift.
+/// Slim status strip under the app bar:
 ///
-/// We deliberately don't show this when only `pendingCount > 0` and
-/// already online — the queue flushes automatically within seconds, so
-/// flashing a banner in that case would feel noisy. The cases where it
-/// matters are "you're offline" and "you're offline AND have work
-/// waiting to sync".
+/// * offline → red, saying whether work is waiting on the device;
+/// * online with queued work → amber "syncing N actions", so the user knows
+///   the work is on its way rather than lost;
+/// * online with nothing queued → nothing at all (zero height, no shift).
 class OfflineBanner extends StatelessWidget {
   const OfflineBanner({super.key});
 
@@ -29,19 +26,16 @@ class OfflineBanner extends StatelessWidget {
         return ValueListenableBuilder<int>(
           valueListenable: queue.pendingCount,
           builder: (context, pending, __) {
-            // Online + no queue = render nothing. Online + queue >0 =
-            // a tiny "syncing" pill so the user knows their work is in
-            // flight rather than lost.
             if (online && pending == 0) return const SizedBox.shrink();
-            if (online && pending > 0) {
+            if (online) {
               return StatusBanner(
-                color: Colors.amber.shade700,
+                color: context.x.warning,
                 icon: Icons.sync_rounded,
                 message: context.s.offlineSyncing(pending),
               );
             }
             return StatusBanner(
-              color: Colors.red.shade600,
+              color: context.colors.error,
               icon: Icons.cloud_off_rounded,
               message: pending > 0
                   ? context.s.offlineWithQueue(pending)
@@ -53,4 +47,3 @@ class OfflineBanner extends StatelessWidget {
     );
   }
 }
-

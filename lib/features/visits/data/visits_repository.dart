@@ -6,10 +6,11 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exceptions.dart';
 import '../../../core/api/endpoints.dart';
+import '../../../core/api/odoo_parse.dart';
 import '../../../core/api/odoo_rpc.dart';
 import '../../../core/constants.dart';
 import '../../../core/storage/session_storage.dart';
-import '../../attendance/data/attendance_repository.dart';
+import '../visit_constants.dart';
 import 'mock_location_note.dart';
 import 'models/visit.dart';
 import 'models/visit_activity.dart';
@@ -21,6 +22,12 @@ import '../../../core/utils/app_log.dart';
 // Re-exported so existing importers of this repository keep seeing the marker
 // and the phase enum at their original location.
 export 'mock_location_note.dart' show kMockLocationMarker, SpoofPhase;
+
+/// The server's answer to Start / End: the visit's resulting state and the
+/// moment the server stamped for the transition (`start_datetime` /
+/// `end_datetime`, server clock, UTC). Either may be null when the response
+/// leaves it out.
+typedef VisitTransition = ({VisitState? state, DateTime? at});
 
 /// Which slice of visits a manager is looking at. Backing domains are applied
 /// on top of Odoo record rules (which already scope to the manager's
@@ -42,21 +49,43 @@ class VisitsRepository {
   final ApiClient api;
   final SessionStorage session;
 
-  /// Optional: mirror Start/End into Odoo `hr.attendance` (best-effort).
-  final AttendanceRepository? attendance;
+  VisitsRepository({required this.api, required this.session});
 
-  VisitsRepository({required this.api, required this.session, this.attendance});
+  // Odoo names this repository calls by string. Each is used only here.
+  static const _mailMessageModel = 'mail.message';
+  static const _messagePost = 'message_post';
+  static const _messageTypeComment = 'comment';
+
+  /// The subtype that makes a chatter post notify the record's followers.
+  static const _commentSubtype = 'mail.mt_comment';
+  static const _actionApprove = 'action_approve';
+  static const _actionReject = 'action_reject';
+  static const _actionCancel = 'action_cancel';
+
+  /// `crm.lead` rows that are opportunities rather than leads.
+  static const _opportunityType = 'opportunity';
+
+  /// States a manager's "pending" tab lists. The current backend uses
+  /// `submitted` as the single pending-approval state; the `waiting_*` states
+  /// are kept for forward-compatibility.
+  static const _pendingStates = [
+    VisitState.submitted,
+    VisitState.waitingParticipantManagerApproval,
+    VisitState.waitingDirectManagerApproval,
+    VisitState.rescheduleRequested,
+  ];
 
   // Locale pinned: a bare `DateFormat` follows `Intl.defaultLocale`, and under
   // an Arabic locale intl emits Arabic-Indic digits ("٢٠٢٦-٠٩-١٢ …"), which the
   // server refuses as "not a valid date and time". This is a wire format, not
   // a display string.
-  static final DateFormat _odooDateTime =
-      DateFormat('yyyy-MM-dd HH:mm:ss', 'en_US');
+  static final DateFormat _odooDateTime = DateFormat(
+    'yyyy-MM-dd HH:mm:ss',
+    'en_US',
+  );
 
   /// Formats a [DateTime] as Odoo's naive-UTC string (`yyyy-MM-dd HH:mm:ss`).
-  static String formatOdooUtc(DateTime dt) =>
-      _odooDateTime.format(dt.toUtc());
+  static String formatOdooUtc(DateTime dt) => _odooDateTime.format(dt.toUtc());
 
   // ---------------------------------------------------------------------------
   // REST actions (/api/visit/*)
@@ -65,19 +94,29 @@ class VisitsRepository {
   /// The current user's own visits (server scopes to the caller).
   Future<List<Visit>> myVisits({
     List<dynamic> domain = const [],
-    int limit = 80,
+    int limit = AppConstants.visitsPageLimit,
     int offset = 0,
   }) async {
     final result = await api.jsonRpc(
       Endpoints.visitMy,
       params: {'domain': domain, 'limit': limit, 'offset': offset},
     );
-    final visits = (result is Map ? result['visits'] : null);
-    if (visits is! List) return const [];
-    return visits
-        .whereType<Map>()
-        .map((m) => Visit.fromApi(Map<String, dynamic>.from(m)))
-        .toList();
+    return parseRows(
+      odooMap(result)?['visits'],
+      Visit.fromApi,
+      label: 'VisitsRepository.myVisits',
+    );
+  }
+
+  /// The caller's visit that is running right now, if any.
+  Future<Visit?> myRunningVisit() async {
+    final running = await myVisits(
+      domain: [
+        ['state', '=', visitStateToWire(VisitState.inProgress)],
+      ],
+      limit: 1,
+    );
+    return running.isEmpty ? null : running.first;
   }
 
   /// Reads one visit via the REST endpoint (slim shape). For the full detail
@@ -87,9 +126,8 @@ class VisitsRepository {
       Endpoints.visitGet,
       params: {'visit_id': visitId},
     );
-    final v = (result is Map ? result['visit'] : null);
-    if (v is! Map) return null;
-    return Visit.fromApi(Map<String, dynamic>.from(v));
+    final v = odooMap(odooMap(result)?['visit']);
+    return v == null ? null : Visit.fromApi(v);
   }
 
   /// Creates a draft visit. [vals] accepts only the whitelisted keys
@@ -100,36 +138,46 @@ class VisitsRepository {
       Endpoints.visitCreate,
       params: {'vals': vals},
     );
-    final v = (result is Map ? result['visit'] : null);
-    if (v is! Map) {
-      throw StateError('create: unexpected response $result');
+    final v = odooMap(odooMap(result)?['visit']);
+    if (v == null) {
+      // The server may well have created the visit; the caller must not treat
+      // this as "nothing happened" and retry blindly.
+      throw ApiException(
+        code: ApiErrorCode.invalidResponse,
+        details: 'visit/create returned no visit: $result',
+      );
     }
-    return Visit.fromApi(Map<String, dynamic>.from(v));
+    try {
+      return Visit.fromApi(v);
+    } on FormatException catch (e) {
+      throw ApiException(code: ApiErrorCode.invalidResponse, details: e);
+    }
   }
 
-  Future<String?> submit(int visitId) => _stateAction(Endpoints.visitSubmit, visitId);
+  Future<String?> submit(int visitId) =>
+      _stateAction(Endpoints.visitSubmit, visitId);
 
   Future<String?> approve(int visitId) =>
       _stateAction(Endpoints.visitApprove, visitId);
 
-  Future<String?> reject(int visitId, String reason) => _stateAction(
-        Endpoints.visitReject,
-        visitId,
-        extra: {'reason': reason},
-      );
+  Future<String?> reject(int visitId, String reason) =>
+      _stateAction(Endpoints.visitReject, visitId, extra: {'reason': reason});
 
   Future<String?> reschedule(
     int visitId, {
     DateTime? scheduledDatetime,
     String? purpose,
     String? location,
-  }) =>
-      _stateAction(Endpoints.visitReschedule, visitId, extra: {
-        if (scheduledDatetime != null)
-          'scheduled_datetime': formatOdooUtc(scheduledDatetime),
-        if (purpose != null) 'purpose': purpose,
-        if (location != null) 'location': location,
-      });
+  }) => _stateAction(
+    Endpoints.visitReschedule,
+    visitId,
+    extra: {
+      if (scheduledDatetime != null)
+        'scheduled_datetime': formatOdooUtc(scheduledDatetime),
+      if (purpose != null) 'purpose': purpose,
+      if (location != null) 'location': location,
+    },
+  );
 
   /// Adds additional participants; each participant's manager must approve.
   Future<List<VisitParticipant>> addParticipants(
@@ -140,19 +188,19 @@ class VisitsRepository {
       Endpoints.visitAddParticipants,
       params: {'visit_id': visitId, 'employee_ids': employeeIds},
     );
-    final parts = (result is Map ? result['participants'] : null);
-    if (parts is! List) return const [];
-    return parts
-        .whereType<Map>()
-        .map((m) => VisitParticipant.fromApi(Map<String, dynamic>.from(m)))
-        .toList();
+    return parseRows(
+      odooMap(result)?['participants'],
+      VisitParticipant.fromApi,
+      label: 'VisitsRepository.addParticipants',
+    );
   }
 
-  /// Starts an approved visit (records GPS). Mirrors into `hr.attendance`.
+  /// Starts an approved visit. The coordinates become the first point of its
+  /// GPS trail (`source: start`).
   ///
   /// [isMocked] is the OS mock-provider verdict. See [_recordSpoofAttempt] for
   /// why it is posted to the chatter rather than written to a field.
-  Future<String?> start(
+  Future<VisitTransition> start(
     int visitId, {
     double? latitude,
     double? longitude,
@@ -169,25 +217,20 @@ class VisitsRepository {
       },
     );
     if (isMocked) {
-      await _recordSpoofAttempt(visitId,
-          phase: SpoofPhase.start,
-          latitude: latitude,
-          longitude: longitude,
-          location: location);
+      await _recordSpoofAttempt(
+        visitId,
+        phase: SpoofPhase.start,
+        latitude: latitude,
+        longitude: longitude,
+        location: location,
+      );
     }
-    if (latitude != null && longitude != null) {
-      try {
-        await attendance?.checkIn(latitude: latitude, longitude: longitude);
-      } catch (e) {
-        appLog('[VisitsRepository] attendance check-in failed: $e');
-      }
-    }
-    return (result is Map ? result['state']?.toString() : null);
+    return _transition(result, 'start_datetime');
   }
 
-  /// Ends an in-progress visit (outcome required, records GPS). Mirrors into
-  /// `hr.attendance`.
-  Future<String?> end(
+  /// Ends an in-progress visit (outcome required). The coordinates become the
+  /// last point of its GPS trail (`source: end`).
+  Future<VisitTransition> end(
     int visitId, {
     required String outcome,
     double? latitude,
@@ -206,20 +249,24 @@ class VisitsRepository {
       },
     );
     if (isMocked) {
-      await _recordSpoofAttempt(visitId,
-          phase: SpoofPhase.end,
-          latitude: latitude,
-          longitude: longitude,
-          location: location);
+      await _recordSpoofAttempt(
+        visitId,
+        phase: SpoofPhase.end,
+        latitude: latitude,
+        longitude: longitude,
+        location: location,
+      );
     }
-    if (latitude != null && longitude != null) {
-      try {
-        await attendance?.checkOut(latitude: latitude, longitude: longitude);
-      } catch (e) {
-        appLog('[VisitsRepository] attendance check-out failed: $e');
-      }
-    }
-    return (result is Map ? result['state']?.toString() : null);
+    return _transition(result, 'end_datetime');
+  }
+
+  static VisitTransition _transition(Object? result, String timeField) {
+    final body = odooMap(result);
+    final state = odooString(body?['state']);
+    return (
+      state: state == null ? null : visitStateFromWire(state),
+      at: parseOdooUtc(body?[timeField]),
+    );
   }
 
   /// Writes a mock-location verdict onto the visit's chatter, permanently and
@@ -257,28 +304,28 @@ class VisitsRepository {
     try {
       final posted = await api.callMethod(
         AppConstants.visitModel,
-        'message_post',
+        _messagePost,
         args: [
-          [visitId]
+          [visitId],
         ],
         kwargs: {
           'body': note.plain,
-          'message_type': 'comment',
+          'message_type': _messageTypeComment,
           // 'comment' + this subtype is what makes Odoo notify the record's
           // followers (the manager is one) rather than filing a silent log.
           // Verified live: posting this way notifies both Sam and Mona.
-          'subtype_xmlid': 'mail.mt_comment',
+          'subtype_xmlid': _commentSubtype,
         },
       );
       final messageId = posted is List && posted.isNotEmpty
-          ? posted.first
-          : (posted is num ? posted : null);
-      if (messageId is num) {
+          ? odooInt(posted.first)
+          : odooInt(posted);
+      if (messageId != null) {
         // Formatting only — the note above is already complete without it.
         try {
           await api.writeRecord(
-            'mail.message',
-            [messageId.toInt()],
+            _mailMessageModel,
+            [messageId],
             {'body': note.html},
           );
         } catch (e) {
@@ -290,15 +337,17 @@ class VisitsRepository {
       // field employee does not have on their own visit. Losing the note must
       // not lose the visit, but we must know it happened.
       appLog('[VisitsRepository] spoof-attempt note failed: $e');
-      unawaited(Sentry.captureException(
-        e,
-        stackTrace: StackTrace.current,
-        withScope: (scope) => scope.setContexts('mock_location', {
-          'visit_id': visitId,
-          'phase': phase.name,
-          'coordinates': MockLocationNote.formatCoords(latitude, longitude),
-        }),
-      ));
+      unawaited(
+        Sentry.captureException(
+          e,
+          stackTrace: StackTrace.current,
+          withScope: (scope) => scope.setContexts('mock_location', {
+            'visit_id': visitId,
+            'phase': phase.name,
+            'coordinates': MockLocationNote.formatCoords(latitude, longitude),
+          }),
+        ),
+      );
     }
   }
 
@@ -329,8 +378,10 @@ class VisitsRepository {
         if (dateTo != null) 'date_to': formatOdooUtc(dateTo),
       },
     );
-    if (result is! Map) return VisitTrack(visitId: visitId);
-    return VisitTrack.fromApi(Map<String, dynamic>.from(result));
+    final body = odooMap(result);
+    return body == null
+        ? VisitTrack(visitId: visitId)
+        : VisitTrack.fromApi(body);
   }
 
   /// Appends a single fix to the trail.
@@ -370,9 +421,8 @@ class VisitsRepository {
         if (deviceId != null) 'device_id': deviceId,
       },
     );
-    final log = (result is Map ? result['log'] : null);
-    if (log is! Map) return null;
-    return VisitLocationLog.tryFromApi(Map<String, dynamic>.from(log));
+    final log = odooMap(odooMap(result)?['log']);
+    return log == null ? null : VisitLocationLog.tryFromApi(log);
   }
 
   /// Flushes a buffer of fixes in one round trip.
@@ -390,13 +440,13 @@ class VisitsRepository {
       Endpoints.visitLogLocations,
       params: {
         'visit_id': visitId,
-        'points': [
-          for (final p in points) p.toApi(formatUtc: formatOdooUtc),
-        ],
+        'points': [for (final p in points) p.toApi(formatUtc: formatOdooUtc)],
       },
     );
-    if (result is! Map) return const TrailFlushResult();
-    return TrailFlushResult.fromApi(Map<String, dynamic>.from(result));
+    final body = odooMap(result);
+    return body == null
+        ? const TrailFlushResult()
+        : TrailFlushResult.fromApi(body);
   }
 
   /// Uploads a base64-encoded attachment to a visit. Returns the attachment id.
@@ -407,13 +457,9 @@ class VisitsRepository {
   }) async {
     final result = await api.jsonRpc(
       Endpoints.visitUploadAttachment,
-      params: {
-        'visit_id': visitId,
-        'filename': filename,
-        'data_b64': dataB64,
-      },
+      params: {'visit_id': visitId, 'filename': filename, 'data_b64': dataB64},
     );
-    return (result is Map ? (result['attachment_id'] as num?)?.toInt() : null);
+    return odooInt(odooMap(result)?['attachment_id']);
   }
 
   Future<String?> _stateAction(
@@ -425,7 +471,7 @@ class VisitsRepository {
       path,
       params: {'visit_id': visitId, ...extra},
     );
-    return (result is Map ? result['state']?.toString() : null);
+    return odooString(odooMap(result)?['state']);
   }
 
   // ---------------------------------------------------------------------------
@@ -436,7 +482,7 @@ class VisitsRepository {
   /// hierarchy; [scope] narrows further by state.
   Future<List<Visit>> managerList(
     VisitManagerScope scope, {
-    int limit = 200,
+    int limit = AppConstants.visitsPageLimit,
   }) async {
     final domain = <dynamic>[];
     switch (scope) {
@@ -444,15 +490,7 @@ class VisitsRepository {
         domain.add([
           'state',
           'in',
-          [
-            // The current backend uses `submitted` as the single
-            // pending-approval state; the `waiting_*` states are kept for
-            // forward-compatibility.
-            'submitted',
-            'waiting_participant_manager_approval',
-            'waiting_direct_manager_approval',
-            'reschedule_requested',
-          ],
+          [for (final state in _pendingStates) visitStateToWire(state)],
         ]);
         break;
       case VisitManagerScope.escalated:
@@ -471,22 +509,25 @@ class VisitsRepository {
       limit: limit,
       order: 'scheduled_datetime desc, id desc',
     );
-    return rows.map((r) => Visit.fromOdooRow(r)).toList();
+    return parseRows(
+      rows,
+      (row) => Visit.fromOdooRow(row),
+      label: 'VisitsRepository.managerList',
+    );
   }
 
   /// Full detail read (rich fields + participant lines).
   Future<Visit?> readVisitFull(int visitId) async {
-    final rows = await api.readRecords(
-      AppConstants.visitModel,
-      [visitId],
-      Visit.odooReadFields,
-    );
+    final rows = await api.readRecords(AppConstants.visitModel, [
+      visitId,
+    ], Visit.odooReadFields);
     if (rows.isEmpty) return null;
     final participants = await readParticipants(visitId);
-    return Visit.fromOdooRow(
-      rows.first,
-      participants: participants,
-    );
+    try {
+      return Visit.fromOdooRow(rows.first, participants: participants);
+    } on FormatException catch (e) {
+      throw ApiException(code: ApiErrorCode.invalidResponse, details: e);
+    }
   }
 
   /// Whether a mock-location verdict was ever recorded against this visit.
@@ -502,7 +543,7 @@ class VisitsRepository {
   Future<bool> hasMockLocationFlag(int visitId) async {
     try {
       final rows = await api.searchRead(
-        'mail.message',
+        _mailMessageModel,
         domain: [
           ['model', '=', AppConstants.visitModel],
           ['res_id', '=', visitId],
@@ -532,7 +573,11 @@ class VisitsRepository {
         'reject_reason',
       ],
     );
-    return rows.map((r) => VisitParticipant.fromOdooRow(r)).toList();
+    return parseRows(
+      rows,
+      VisitParticipant.fromOdooRow,
+      label: 'VisitsRepository.readParticipants',
+    );
   }
 
   /// Participant-manager approves one attendee line (approval track 2).
@@ -542,12 +587,11 @@ class VisitsRepository {
   /// returns the visit's resulting state. Falls back to `action_approve` over
   /// `call_kw` — the path this app used before the module exposed the route —
   /// so a company still on an older `dh_visit_management` keeps working.
-  Future<void> approveParticipant(int participantId) =>
-      _attendeeDecision(
-        Endpoints.visitAttendeeApprove,
-        'action_approve',
-        participantId,
-      );
+  Future<void> approveParticipant(int participantId) => _attendeeDecision(
+    Endpoints.visitAttendeeApprove,
+    _actionApprove,
+    participantId,
+  );
 
   /// Participant-manager rejects one attendee line. The reason travels with the
   /// call; on the `call_kw` fallback it has to be written to the line first
@@ -559,7 +603,7 @@ class VisitsRepository {
   Future<void> rejectParticipant(int participantId, String reason) =>
       _attendeeDecision(
         Endpoints.visitAttendeeReject,
-        'action_reject',
+        _actionReject,
         participantId,
         extra: {'reason': reason},
         beforeFallback: () async {
@@ -599,8 +643,10 @@ class VisitsRepository {
       return;
     } on ApiException catch (e) {
       if (e.code != ApiErrorCode.notSupported) rethrow;
-      appLog('[VisitsRepository] $path not deployed; '
-          'falling back to $fallbackMethod');
+      appLog(
+        '[VisitsRepository] $path not deployed; '
+        'falling back to $fallbackMethod',
+      );
     }
     await beforeFallback?.call();
     await _participantAction(fallbackMethod, participantId);
@@ -617,7 +663,7 @@ class VisitsRepository {
   }
 
   /// Owner/manager cancels a visit (`action_cancel`; not in the REST API).
-  Future<void> cancel(int visitId) => _visitAction('action_cancel', visitId);
+  Future<void> cancel(int visitId) => _visitAction(_actionCancel, visitId);
 
   Future<void> _visitAction(String method, int visitId) async {
     await api.callMethod(
@@ -643,7 +689,11 @@ class VisitsRepository {
       fields: const ['id', 'name', 'mimetype', 'file_size'],
       order: 'create_date desc',
     );
-    return rows.map((r) => VisitAttachment.fromJson(r)).toList();
+    return parseRows(
+      rows,
+      VisitAttachment.fromJson,
+      label: 'VisitsRepository.readAttachments',
+    );
   }
 
   /// Returns the base64-encoded bytes of an attachment (`ir.attachment.datas`).
@@ -654,23 +704,17 @@ class VisitsRepository {
       const ['datas'],
     );
     if (rows.isEmpty) return null;
-    final datas = rows.first['datas'];
-    return (datas == null || datas == false) ? null : datas.toString();
+    return odooString(rows.first['datas']);
   }
 
   // ---------------------------------------------------------------------------
   // In-app notifications (mail.activity assigned to the current user)
   // ---------------------------------------------------------------------------
 
-  Future<int?> _currentUid() async {
-    final u = await session.getUser();
-    return (u?['uid'] as num?)?.toInt();
-  }
-
   /// The current user's pending activities on visits (approve / escalated /
   /// participant approvals) — the in-app notification feed.
   Future<List<VisitActivity>> myActivities() async {
-    final uid = await _currentUid();
+    final uid = await session.readUid();
     if (uid == null) return const [];
     final rows = await api.searchRead(
       AppConstants.mailActivityModel,
@@ -690,11 +734,15 @@ class VisitsRepository {
       limit: AppConstants.visitRelatedLimit,
       order: 'date_deadline asc',
     );
-    return rows.map((r) => VisitActivity.fromJson(r)).toList();
+    return parseRows(
+      rows,
+      VisitActivity.fromJson,
+      label: 'VisitsRepository.myActivities',
+    );
   }
 
   Future<int> myActivityCount() async {
-    final uid = await _currentUid();
+    final uid = await session.readUid();
     if (uid == null) return 0;
     return api.searchCount(
       AppConstants.mailActivityModel,
@@ -719,32 +767,26 @@ class VisitsRepository {
       final rows = await api.readRecords(
         AppConstants.partnerModel,
         [partnerId],
-        const ['partner_latitude', 'partner_longitude', 'contact_address', 'phone'],
+        const [
+          'partner_latitude',
+          'partner_longitude',
+          'contact_address',
+          'phone',
+        ],
       );
       if (rows.isEmpty) return null;
       final row = rows.first;
-      double? coord(dynamic raw) {
-        if (raw is! num) return null;
-        final v = raw.toDouble();
-        return v == 0.0 ? null : v;
-      }
-
-      String? str(dynamic raw) {
-        if (raw == null || raw == false) return null;
-        final s = raw.toString().trim();
-        return s.isEmpty ? null : s;
-      }
-
-      final lat = coord(row['partner_latitude']);
-      final lng = coord(row['partner_longitude']);
-      if (lat == null || lng == null) return null;
+      final lat = odooCoord(row['partner_latitude']);
+      final lng = odooCoord(row['partner_longitude']);
+      if (lat == null || lng == null || !isValidLatLng(lat, lng)) return null;
       return PartnerLocation(
         latitude: lat,
         longitude: lng,
-        address: str(row['contact_address']),
-        phone: str(row['phone']),
+        address: odooString(row['contact_address']),
+        phone: odooString(row['phone']),
       );
-    } catch (_) {
+    } catch (e) {
+      appLog('[VisitsRepository] partner location unavailable: $e');
       return null;
     }
   }
@@ -753,44 +795,42 @@ class VisitsRepository {
   // Pickers for the create form
   // ---------------------------------------------------------------------------
 
-  /// Projects (with their customer) for the project-visit picker.
-  Future<List<LinkedRecord>> listProjects() =>
-      _listLinked(AppConstants.projectModel, const []);
+  /// Projects (with their customer) for the project-visit picker, matching
+  /// [search] on the server.
+  Future<List<LinkedRecord>> listProjects({String? search}) =>
+      _listLinked(AppConstants.projectModel, const [], search);
 
-  /// Opportunities (with their customer) for the opportunity-visit picker.
-  Future<List<LinkedRecord>> listOpportunities() => _listLinked(
-        AppConstants.crmLeadModel,
-        const [
-          ['type', '=', 'opportunity'],
-        ],
-      );
+  /// Opportunities (with their customer) for the opportunity-visit picker,
+  /// matching [search] on the server.
+  Future<List<LinkedRecord>> listOpportunities({String? search}) =>
+      _listLinked(AppConstants.crmLeadModel, const [
+        ['type', '=', _opportunityType],
+      ], search);
 
+  /// Searches on the server rather than filtering one fetched page on the
+  /// device: a company with more records than a page holds could otherwise
+  /// never find the ones past it.
   Future<List<LinkedRecord>> _listLinked(
     String model,
     List<dynamic> domain,
+    String? search,
   ) async {
+    final query = search?.trim() ?? '';
     final rows = await api.searchRead(
       model,
-      domain: domain,
+      domain: [
+        ...domain,
+        if (query.isNotEmpty) ['name', 'ilike', query],
+      ],
       fields: const ['id', 'name', 'partner_id'],
-      limit: AppConstants.visitsAnalyticsLimit,
+      limit: VisitConstants.pickerLimit,
       order: 'name asc',
     );
-    return rows.map((row) {
-      int? pid;
-      String? pname;
-      final p = row['partner_id'];
-      if (p is List && p.length >= 2) {
-        pid = (p[0] as num?)?.toInt();
-        pname = p[1]?.toString();
-      }
-      return LinkedRecord(
-        id: (row['id'] as num).toInt(),
-        name: row['name']?.toString() ?? '',
-        partnerId: pid,
-        partnerName: pname,
-      );
-    }).toList();
+    return parseRows(
+      rows,
+      LinkedRecord.fromOdooRow,
+      label: 'VisitsRepository.$model',
+    );
   }
 }
 
@@ -808,6 +848,19 @@ class LinkedRecord {
     this.partnerId,
     this.partnerName,
   });
+
+  /// Throws [FormatException] for a row without an id, so `parseRows` skips it.
+  factory LinkedRecord.fromOdooRow(Map<String, dynamic> row) {
+    final partner = odooMany2one(row['partner_id']);
+    return LinkedRecord(
+      id:
+          odooInt(row['id']) ??
+          (throw const FormatException('linked record without an id')),
+      name: odooString(row['name']) ?? '',
+      partnerId: partner.id,
+      partnerName: partner.name,
+    );
+  }
 }
 
 /// The customer office coordinates (+ address / phone) read from `res.partner`

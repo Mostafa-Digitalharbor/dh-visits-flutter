@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../app/design/app_dimens.dart';
+import '../../app/design/responsive.dart';
+import '../../core/api/api_error_messages.dart';
+import '../../core/api/api_exceptions.dart';
+import '../../core/constants.dart';
+import '../extensions/context_extensions.dart';
 import 'animated_list_item.dart';
 import 'app_refresh_indicator.dart';
 import 'empty_view.dart';
@@ -24,8 +29,14 @@ class AsyncListView<T> extends StatelessWidget {
   final bool isLoading;
   final bool hasError;
 
-  /// Already localized. Falls back to a generic message when null.
+  /// Already localized. When null the message comes from [error], or the
+  /// generic "something went wrong" sentence — never an empty screen.
   final String? errorMessage;
+
+  /// The failure behind [hasError], when the caller has it: supplies the
+  /// message when [errorMessage] is null, and the support reference printed
+  /// under it.
+  final ApiException? error;
 
   final Future<void> Function() onRefresh;
   final Widget Function(BuildContext context, T item, int index) itemBuilder;
@@ -34,10 +45,12 @@ class AsyncListView<T> extends StatelessWidget {
   final IconData emptyIcon;
 
   final int skeletonCount;
+
+  /// Design-space padding around the list; scaled with the device.
   final EdgeInsetsGeometry padding;
 
-  /// Gap between rows. The visits list draws its own card margins, so it
-  /// passes zero.
+  /// Gap between rows, in design-space dp. The visits list draws its own card
+  /// margins, so it passes zero.
   final double separatorHeight;
 
   const AsyncListView({
@@ -49,11 +62,20 @@ class AsyncListView<T> extends StatelessWidget {
     required this.onRefresh,
     required this.itemBuilder,
     required this.emptyMessage,
+    this.error,
     this.emptyIcon = Icons.inbox_outlined,
-    this.skeletonCount = 8,
-    this.padding = const EdgeInsets.fromLTRB(12, 4, 12, 16),
-    this.separatorHeight = 8,
+    this.skeletonCount = defaultSkeletonCount,
+    this.padding = const EdgeInsetsDirectional.fromSTEB(
+      Insets.x3,
+      Insets.x1,
+      Insets.x3,
+      Insets.x4,
+    ),
+    this.separatorHeight = Insets.x2,
   });
+
+  /// Placeholder rows while the first page loads — about a phone screen's worth.
+  static const int defaultSkeletonCount = 8;
 
   @override
   Widget build(BuildContext context) {
@@ -61,26 +83,39 @@ class AsyncListView<T> extends StatelessWidget {
     // fails over existing rows keeps them — the caller reports that case with a
     // snackbar rather than throwing away data the user is reading.
     if (hasError && items.isEmpty) {
-      return ErrorView(message: errorMessage ?? '', onRetry: onRefresh);
+      return ErrorView(
+        message: errorMessage ??
+            error?.messageFor(context.s) ??
+            context.s.errUnknown,
+        reference: error?.supportReference,
+        onRetry: onRefresh,
+      );
     }
 
     final Widget body;
     if (isLoading && items.isEmpty) {
       body = SkeletonList(
-        key: const ValueKey('skeleton'),
+        key: WidgetKeys.listSkeleton,
         itemCount: skeletonCount,
       );
     } else if (items.isEmpty) {
       body = ScaleFadeIn(
-        key: const ValueKey('empty'),
+        key: WidgetKeys.listEmpty,
         child: EmptyView(icon: emptyIcon, message: emptyMessage),
       );
     } else {
+      final direction = Directionality.of(context);
+      final resolved = padding.resolve(direction);
       body = ListView.separated(
-        key: const ValueKey('list'),
-        padding: padding,
+        key: WidgetKeys.listContent,
+        padding: EdgeInsets.fromLTRB(
+          context.r(resolved.left),
+          context.rh(resolved.top),
+          context.r(resolved.right),
+          context.rh(resolved.bottom),
+        ),
         itemCount: items.length,
-        separatorBuilder: (_, __) => SizedBox(height: separatorHeight),
+        separatorBuilder: (_, __) => context.gapH(separatorHeight),
         itemBuilder: (context, i) => AnimatedListItem(
           index: i,
           child: itemBuilder(context, items[i], i),

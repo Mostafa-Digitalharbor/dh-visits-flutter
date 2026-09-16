@@ -4,11 +4,15 @@
 // Each of these is a place where the refactor could silently change behaviour:
 // a filter that stops matching, a tab that builds eagerly after all, or an
 // audit note that loses the marker managers search on.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:location_gps/core/api/api_exceptions.dart';
 import 'package:location_gps/features/visits/bloc/visits_list_bloc.dart';
 import 'package:location_gps/features/visits/data/mock_location_note.dart';
 import 'package:location_gps/features/visits/data/models/visit.dart';
+import 'package:location_gps/shared/bloc/searchable_list_bloc.dart';
 import 'package:location_gps/shared/widgets/lazy_indexed_stack.dart';
 
 Visit _v(int id, {String? partner, String? name, String? purpose, VisitState? state}) =>
@@ -19,6 +23,29 @@ Visit _v(int id, {String? partner, String? name, String? purpose, VisitState? st
       purpose: purpose,
       state: state ?? VisitState.approved,
     );
+
+class _ListState extends SearchableListState<String> {
+  const _ListState({super.status, super.items, super.search, super.error});
+
+  @override
+  _ListState copyWithBase({
+    ListStatus? status,
+    List<String>? items,
+    String? search,
+    ApiException? error,
+  }) =>
+      _ListState(
+        status: status ?? this.status,
+        items: items ?? this.items,
+        search: search ?? this.search,
+        error: error,
+      );
+}
+
+class _ListBloc extends SearchableListBloc<String, _ListState> {
+  _ListBloc(Future<List<String>> Function({String? search}) loader)
+      : super(loader: loader, initialState: const _ListState());
+}
 
 void main() {
   group('VisitsListState.visible', () {
@@ -174,6 +201,49 @@ void main() {
     test('the location line is omitted entirely when there is none', () {
       final note = MockLocationNote.build(phase: SpoofPhase.start);
       expect(note.html, isNot(contains('Reported location')));
+    });
+  });
+
+  group('SearchableListBloc', () {
+    test('a slow answer for an old query never replaces the newer one',
+        () async {
+      final pending = <String?, Completer<List<String>>>{};
+      final bloc = _ListBloc(({String? search}) {
+        final c = Completer<List<String>>();
+        pending[search] = c;
+        return c.future;
+      });
+
+      bloc.add(const ListSearchChanged('a'));
+      await Future<void>.delayed(Duration.zero);
+      bloc.add(const ListSearchChanged('ab'));
+      await Future<void>.delayed(Duration.zero);
+
+      pending['ab']!.complete(['ab result']);
+      await Future<void>.delayed(Duration.zero);
+      pending['a']!.complete(['stale a result']);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(bloc.state.items, ['ab result']);
+      await bloc.close();
+    });
+
+    test('a reset during a load is not refilled by that load', () async {
+      // The leak Reset exists to prevent: the previous user's rows landing in
+      // the next user's session.
+      final gate = Completer<List<String>>();
+      final bloc = _ListBloc(({String? search}) => gate.future);
+
+      bloc.add(const ListLoadRequested());
+      await Future<void>.delayed(Duration.zero);
+      bloc.add(const ListReset());
+      await Future<void>.delayed(Duration.zero);
+      gate.complete(['previous user']);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(bloc.state.items, isEmpty);
+      expect(bloc.state.status, ListStatus.initial);
+      await bloc.close();
     });
   });
 }

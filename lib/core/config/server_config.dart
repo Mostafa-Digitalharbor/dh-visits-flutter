@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 
 /// The per-company backend coordinates the app talks to.
 ///
@@ -18,11 +19,25 @@ class ServerConfig extends Equatable {
 
   static const empty = ServerConfig(baseUrl: '');
 
+  static const secureScheme = 'https';
+  static const insecureScheme = 'http';
+
+  /// Whether a plain `http://` address may be saved.
+  ///
+  /// Release builds refuse it: the sign-in request carries the password, and
+  /// `dart:io` sockets are not covered by the platform cleartext policies
+  /// (`usesCleartextTraffic`, App Transport Security), so nothing else would
+  /// stop it travelling unencrypted. Debug builds allow it for a local Odoo.
+  static const allowsInsecureHttp = kDebugMode;
+
   /// True once both a server URL and a database are known — Odoo needs both to
   /// authenticate, so an incomplete setup (URL but no resolved database) keeps
   /// the user on the setup screen instead of a login that can't possibly work.
   bool get isConfigured =>
       baseUrl.isNotEmpty && (database?.isNotEmpty ?? false);
+
+  /// The host part of [baseUrl], for messages and the profile's server row.
+  String get host => hostOf(baseUrl);
 
   /// Normalises raw user input into a canonical *origin* URL:
   /// - trims whitespace
@@ -36,8 +51,9 @@ class ServerConfig extends Equatable {
   static String normalizeUrl(String input) {
     var s = input.trim();
     if (s.isEmpty) return '';
-    if (!s.startsWith('http://') && !s.startsWith('https://')) {
-      s = 'https://$s';
+    if (!s.startsWith('$insecureScheme://') &&
+        !s.startsWith('$secureScheme://')) {
+      s = '$secureScheme://$s';
     }
     final uri = Uri.tryParse(s);
     if (uri == null || uri.host.isEmpty) {
@@ -60,9 +76,21 @@ class ServerConfig extends Equatable {
     final uri = Uri.tryParse(normalized);
     return uri != null &&
         uri.hasScheme &&
-        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        (uri.scheme == insecureScheme || uri.scheme == secureScheme) &&
         uri.host.isNotEmpty &&
         uri.host.contains('.');
+  }
+
+  /// Whether [input] explicitly asks for an unencrypted `http://` connection.
+  /// A bare host is not insecure: [normalizeUrl] gives it `https://`.
+  static bool isInsecure(String input) =>
+      Uri.tryParse(normalizeUrl(input))?.scheme == insecureScheme;
+
+  /// The host of [url] (`co.odoo.com`), or [url] itself when it can't be
+  /// parsed — messages still need something to name.
+  static String hostOf(String url) {
+    final host = Uri.tryParse(normalizeUrl(url))?.host ?? '';
+    return host.isEmpty ? url.trim() : host;
   }
 
   @override

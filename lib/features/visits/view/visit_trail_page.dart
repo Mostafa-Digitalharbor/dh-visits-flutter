@@ -12,6 +12,7 @@ import '../../../core/di/service_locator.dart';
 import '../../../core/map_matching/route_geometry.dart';
 import '../../../core/map_matching/route_matcher.dart';
 import '../../../core/utils/app_date.dart';
+import '../../../core/utils/app_number.dart';
 import '../../../core/utils/communications.dart';
 import '../../../core/utils/duration_format.dart';
 import '../../../core/utils/user_time.dart';
@@ -23,6 +24,7 @@ import '../data/models/visit_location_log.dart';
 import '../data/visit_trail_tracker.dart';
 import '../data/visits_repository.dart';
 import 'visit_trail_layers.dart';
+import 'visit_trail_section.dart';
 
 /// The whole route of one visit, full screen: the thread drawn across the map
 /// with every logged position under it in a sheet.
@@ -57,28 +59,34 @@ class _VisitTrailView extends StatefulWidget {
 }
 
 class _VisitTrailViewState extends State<_VisitTrailView> {
+  /// Drives the "fit route" button. The first framing needs no call: the map
+  /// is only built once there are points, and it opens fitted to them. Later
+  /// polls (every 30s on a running visit) leave the camera where the user put
+  /// it.
   final MapController _map = MapController();
-
-  /// Set once the map has framed a trail, so later polls (which arrive every
-  /// 30s on a running visit) don't yank the camera back while the user is
-  /// reading some other part of the route.
-  bool _fitted = false;
 
   RouteLineMode _lineMode = RouteLineMode.roads;
 
+  @override
+  void dispose() {
+    _map.dispose();
+    super.dispose();
+  }
+
+  CameraFit? _fitFor(List<LatLng> points) => AppMap.fitOrNull(
+    points,
+    padding: context.padAll(Insets.x16),
+    maxZoom: AppConstants.mapZoomVisitFitMax,
+  );
+
   void _fit(List<LatLng> points) {
-    if (points.isEmpty) return;
-    if (points.length == 1) {
+    if (!mounted || points.isEmpty) return;
+    final fit = _fitFor(points);
+    if (fit == null) {
       _map.move(points.first, AppConstants.mapZoomVisitDetail);
-      return;
+    } else {
+      _map.fitCamera(fit);
     }
-    _map.fitCamera(
-      CameraFit.coordinates(
-        coordinates: points,
-        padding: const EdgeInsets.all(56),
-        maxZoom: AppConstants.mapZoomVisitFitMax,
-      ),
-    );
   }
 
   @override
@@ -96,27 +104,17 @@ class _VisitTrailViewState extends State<_VisitTrailView> {
               if (state.pendingUploads == 0) return const SizedBox.shrink();
               return IconButton(
                 icon: Badge(
-                  label: Text('${state.pendingUploads}'),
+                  label: Text(AppNumber.whole(state.pendingUploads)),
                   child: const Icon(Symbols.cloud_upload),
                 ),
                 tooltip: s.trailPendingUploads(state.pendingUploads),
-                onPressed: () =>
-                    context.read<VisitTrailCubit>().flushAndReload(),
+                onPressed: () => uploadPendingTrail(context),
               );
             },
           ),
         ],
       ),
-      body: BlocConsumer<VisitTrailCubit, VisitTrailState>(
-        listenWhen: (p, c) => p.track.logs.length != c.track.logs.length,
-        listener: (context, state) {
-          // Frame the route the first time points arrive, and only then.
-          if (!_fitted && state.track.logs.isNotEmpty) {
-            _fitted = true;
-            WidgetsBinding.instance.addPostFrameCallback(
-                (_) => _fit(TrailLayers.points(state.track)));
-          }
-        },
+      body: BlocBuilder<VisitTrailCubit, VisitTrailState>(
         builder: (context, state) {
           if (state.status == VisitTrailStatus.loading && state.track.isEmpty) {
             return const Center(child: CircularProgressIndicator());
@@ -135,35 +133,51 @@ class _VisitTrailViewState extends State<_VisitTrailView> {
                   : s.trailEmptyFinished,
             );
           }
+          final map = _TrailMap(
+            map: _map,
+            track: state.track,
+            live: visit.isTrackingLive,
+            initialFit: _fitFor(TrailLayers.points(state.track)),
+            onFit: () => _fit(TrailLayers.points(state.track)),
+            lineMode: _lineMode,
+            onLineMode: (m) => setState(() => _lineMode = m),
+          );
+          final stats = _TrailStats(track: state.track);
+          // Side by side where the screen is wide: stacked, a landscape phone
+          // left the stats and the list a sliver too short to use.
+          if (context.isLandscape) {
+            return SafeArea(
+              top: false,
+              bottom: false,
+              child: Row(
+                children: [
+                  Expanded(flex: _mapFlex, child: map),
+                  Expanded(flex: _listFlex, child: stats),
+                ],
+              ),
+            );
+          }
           return Column(
             children: [
-              Expanded(
-                flex: 3,
-                child: _TrailMap(
-                  map: _map,
-                  track: state.track,
-                  live: visit.isTrackingLive,
-                  onFit: () => _fit(TrailLayers.points(state.track)),
-                  lineMode: _lineMode,
-                  onLineMode: (m) => setState(() => _lineMode = m),
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: _TrailStats(track: state.track, visit: visit),
-              ),
+              Expanded(flex: _mapFlex, child: map),
+              Expanded(flex: _listFlex, child: stats),
             ],
           );
         },
       ),
     );
   }
+
+  /// The map's and the stats panel's shares of the screen.
+  static const int _mapFlex = 3;
+  static const int _listFlex = 2;
 }
 
 class _TrailMap extends StatelessWidget {
   final MapController map;
   final VisitTrack track;
   final bool live;
+  final CameraFit? initialFit;
   final VoidCallback onFit;
   final RouteLineMode lineMode;
   final ValueChanged<RouteLineMode> onLineMode;
@@ -172,10 +186,14 @@ class _TrailMap extends StatelessWidget {
     required this.map,
     required this.track,
     required this.live,
+    required this.initialFit,
     required this.onFit,
     required this.lineMode,
     required this.onLineMode,
   });
+
+  /// Tiles kept loaded beyond the viewport while the user pans the route.
+  static const int _tilePanBuffer = 2;
 
   @override
   Widget build(BuildContext context) {
@@ -187,53 +205,36 @@ class _TrailMap extends StatelessWidget {
   }
 
   Widget _build(BuildContext context, RouteGeometry geometry) {
-    final isDark = context.isDark;
     final points = TrailLayers.points(track);
     final matching = RouteLineToggle.stateOf([geometry]);
+    final inset = context.r(Insets.x3);
 
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: Container(color: AppColors.mapBackground(isDark)),
+    return AppMap(
+      controller: map,
+      initialCenter: points.first,
+      initialZoom: AppConstants.mapZoomVisitDetail,
+      initialCameraFit: initialFit,
+      panBuffer: _tilePanBuffer,
+      // Start-side: the fit button owns the end-side corner.
+      attributionAlignment: context.isRtl
+          ? Alignment.bottomRight
+          : Alignment.bottomLeft,
+      layers: [
+        TrailLayers.polyline(
+          context,
+          track,
+          width: TrailLayers.strokeWidthFull,
+          path: lineMode == RouteLineMode.roads ? geometry.path() : null,
         ),
-        FlutterMap(
-          mapController: map,
-          options: MapOptions(
-            initialCenter: points.first,
-            initialZoom: AppConstants.mapZoomVisitDetail,
-            minZoom: AppConstants.mapMinZoom,
-            maxZoom: AppConstants.mapMaxZoom,
-            initialCameraFit: points.length > 1
-                ? CameraFit.coordinates(
-                    coordinates: points,
-                    padding: const EdgeInsets.all(56),
-                    maxZoom: AppConstants.mapZoomVisitFitMax,
-                  )
-                : null,
-          ),
-          children: [
-            const AppMapTileLayer(
-                maxZoom: AppConstants.mapMaxZoom, panBuffer: 2),
-            TrailLayers.polyline(
-              context,
-              track,
-              strokeWidth: 5,
-              path: lineMode == RouteLineMode.roads ? geometry.path() : null,
-            ),
-            // The recorded fixes themselves, in both modes: where the device
-            // actually reported the employee.
-            TrailLayers.vertexDots(context, track),
-            TrailLayers.endpoints(context, track, live: live),
-            const AppMapAttribution(alignment: Alignment.bottomLeft),
-          ],
-        ),
-        if (isDark)
-          IgnorePointer(
-            child: Container(color: Colors.black.withValues(alpha: 0.22)),
-          ),
-        Positioned(
-          right: 12,
-          bottom: 12,
+        // The recorded fixes themselves, in both modes: where the device
+        // actually reported the employee.
+        TrailLayers.vertexDots(context, track),
+        TrailLayers.endpoints(context, track, live: live),
+      ],
+      overlays: [
+        PositionedDirectional(
+          end: inset,
+          bottom: inset,
           child: MapFab.rounded(
             icon: Symbols.fit_screen,
             onTap: onFit,
@@ -241,9 +242,9 @@ class _TrailMap extends StatelessWidget {
           ),
         ),
         if ((slMaybe<RouteMatcher>()?.enabled ?? false) && points.length > 1)
-          Positioned(
-            top: 12,
-            right: 12,
+          PositionedDirectional(
+            top: inset,
+            end: inset,
             child: RouteLineToggle(
               mode: lineMode,
               onChanged: onLineMode,
@@ -259,59 +260,68 @@ class _TrailMap extends StatelessWidget {
 /// Distance / speed / duration summary above the list of individual fixes.
 class _TrailStats extends StatelessWidget {
   final VisitTrack track;
-  final Visit visit;
-  const _TrailStats({required this.track, required this.visit});
+  const _TrailStats({required this.track});
 
   @override
   Widget build(BuildContext context) {
     final s = context.s;
-    final cs = context.colors;
+    final span = track.span;
+    final speed = track.averageSpeedKmh;
+    final stats = [
+      _Stat(
+        icon: Symbols.straighten,
+        label: s.trailDistance,
+        value: AppNumber.km(s, track.trackedDistanceKm, precise: true),
+      ),
+      _Stat(
+        icon: Symbols.timeline,
+        label: s.trailPointsList,
+        value: AppNumber.whole(track.locationLogCount),
+      ),
+      if (span != null)
+        _Stat(
+          icon: Symbols.timer,
+          label: s.wfDurationLabel,
+          value: span.localized(context),
+        ),
+      if (speed != null)
+        _Stat(
+          icon: Symbols.speed,
+          label: s.trailAvgSpeed,
+          value: AppNumber.speedKmh(s, speed),
+        ),
+    ];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-              Insets.x3h, Insets.x3, Insets.x3h, Insets.x2),
-          child: Row(
-            children: [
-              _Stat(
-                icon: Symbols.straighten,
-                label: s.trailDistance,
-                value: s.trailDistanceKm(
-                    track.trackedDistanceKm.toStringAsFixed(2)),
-              ),
-              _Stat(
-                icon: Symbols.timeline,
-                label: s.trailMapTitle,
-                value: '${track.locationLogCount}',
-              ),
-              if (track.span != null)
-                _Stat(
-                  icon: Symbols.timer,
-                  label: s.wfDurationLabel,
-                  value: track.span!.localized(context),
-                ),
-              if (track.averageSpeedKmh != null)
-                _Stat(
-                  icon: Symbols.speed,
-                  label: s.trailAvgSpeed,
-                  value: s.trailSpeedKmh(
-                      track.averageSpeedKmh!.toStringAsFixed(0)),
-                ),
-            ],
+    // The stats scroll away with the list rather than sitting above it: on a
+    // short screen at a large font a fixed header left the list no room.
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsetsDirectional.fromSTEB(
+            context.r(Insets.x3h),
+            context.r(Insets.x3),
+            context.r(Insets.x3h),
+            context.r(Insets.x2),
+          ),
+          sliver: SliverToBoxAdapter(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [for (final stat in stats) Expanded(child: stat)],
+            ),
           ),
         ),
-        Divider(
-            height: 1,
-            color: cs.outlineVariant.withValues(alpha: Alphas.subdued)),
-        Expanded(
-          child: _PointList(track: track),
-        ),
+        SliverToBoxAdapter(child: _divider(context)),
+        _PointList(track: track),
       ],
     );
   }
 }
+
+Divider _divider(BuildContext context, {double indent = 0}) => Divider(
+  height: 1,
+  indent: indent,
+  color: context.colors.outlineVariant.withValues(alpha: Alphas.subdued),
+);
 
 class _Stat extends StatelessWidget {
   final IconData icon;
@@ -322,28 +332,25 @@ class _Stat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = context.colors;
-    return Expanded(
-      child: Column(
-        children: [
-          Icon(icon, size: 18, color: cs.primary),
-          context.gapH(Insets.x1),
-          Text(
-            value,
-            style: context.text.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w800),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            label,
-            style: context.text.labelSmall
-                ?.copyWith(color: cs.onSurfaceVariant),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+    return Column(
+      children: [
+        Icon(icon, size: context.r(IconSz.label), color: cs.primary),
+        context.gapH(Insets.x1),
+        Text(
+          value,
+          style: context.text.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+        ),
+        Text(
+          label,
+          style: context.text.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 }
@@ -370,66 +377,57 @@ class _PointList extends StatelessWidget {
     }
   }
 
-  Color _sourceColor(BuildContext context, VisitLocationLog log) {
-    switch (log.source) {
-      case TrailSource.start:
-        return Colors.green.shade600;
-      case TrailSource.end:
-        return Colors.deepOrangeAccent.shade200;
-      default:
-        return context.colors.primary;
-    }
-  }
+  Color _sourceColor(BuildContext context, VisitLocationLog log) =>
+      switch (log.source) {
+        TrailSource.start => AppColors.routeStart,
+        TrailSource.end => AppColors.routeEnd,
+        _ => context.colors.primary,
+      };
 
   @override
   Widget build(BuildContext context) {
     final s = context.s;
     final tf = AppDate.timeWithSecondsFormat(context);
     final logs = track.logs.reversed.toList();
+    // Lines up the separators with the text, past the leading glyph.
+    final indent = context.r(Insets.x16) - context.r(Insets.x2);
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: Insets.x1),
+    return SliverList.separated(
       itemCount: logs.length,
-      separatorBuilder: (_, __) => Divider(
-        height: 1,
-        indent: 56,
-        color: context.colors.outlineVariant
-            .withValues(alpha: Alphas.subdued),
-      ),
+      separatorBuilder: (_, __) => _divider(context, indent: indent),
       itemBuilder: (context, i) {
         final log = logs[i];
-        final tone = _sourceColor(context, log);
-        final details = <String>[
-          if (log.accuracy != null && log.accuracy! > 0)
-            s.trailAccuracy(log.accuracy!.toStringAsFixed(0)),
-          if (log.speedKmh != null && log.speedKmh! > 0)
-            s.trailSpeedKmh(log.speedKmh!.toStringAsFixed(0)),
-        ];
+        final accuracy = log.accuracy;
+        final speed = log.speedKmh;
+        final endpoint = log.isStart || log.isEnd;
         return ListTile(
           dense: true,
           leading: Icon(
             log.isStart
                 ? Symbols.trip_origin
                 : (log.isEnd ? Symbols.flag : Symbols.circle),
-            color: tone,
-            size: log.isStart || log.isEnd ? 22 : 12,
+            color: _sourceColor(context, log),
+            size: context.r(endpoint ? IconSz.tile : IconSz.xs),
           ),
           title: Text(
             tf.format(context.toUserTime(log.loggedAt)),
-            style: context.text.bodyMedium
-                ?.copyWith(fontWeight: FontWeight.w700),
+            style: context.text.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
           subtitle: Text(
-            [
+            context.joinFacts([
               _sourceLabel(context, log),
-              if (log.location != null) log.location!,
-              ...details,
-            ].join(' · '),
+              log.location,
+              if (accuracy != null && accuracy > 0)
+                s.trailAccuracy(AppNumber.whole(accuracy)),
+              if (speed != null && speed > 0) AppNumber.speedKmh(s, speed),
+            ]),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
           trailing: IconButton(
-            icon: const Icon(Symbols.open_in_new, size: 18),
+            icon: Icon(Symbols.open_in_new, size: context.r(IconSz.label)),
             tooltip: s.wfOpenInMaps,
             onPressed: () => context.openExternal(
               () => Communications.openInMaps(log.latitude, log.longitude),

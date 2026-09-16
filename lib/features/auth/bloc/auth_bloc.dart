@@ -1,11 +1,12 @@
 import 'package:bloc/bloc.dart';
+import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/api/api_exceptions.dart';
+import '../../../core/utils/app_log.dart';
 import '../data/auth_repository.dart';
 import '../data/models/user.dart';
-import '../../../core/utils/app_log.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -21,9 +22,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   AuthBloc({required this.repository, this.onBeforeLogout})
       : super(const AuthState.unknown()) {
     on<AuthStarted>(_onStarted);
-    on<AuthLoginRequested>(_onLoginRequested);
-    on<AuthLogoutRequested>(_onLogoutRequested);
+    // Dropped while one is running: the keyboard's "done" key and the button
+    // can both fire, and two concurrent sign-ins race on the session cookie.
+    on<AuthLoginRequested>(_onLoginRequested, transformer: droppable());
+    on<AuthLogoutRequested>(_onLogoutRequested, transformer: droppable());
     on<AuthServerChanged>(_onServerChanged);
+    on<AuthNoticeShown>((_, emit) {
+      if (state.hasNotice) emit(state.withoutNotice());
+    });
   }
 
   /// Minimum time the splash screen stays visible so its zoom animation can
@@ -79,6 +85,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             'canEditVisits=${user.canEditVisits}');
       }
       emit(AuthState.authenticated(user));
+    } on LoginRejectedException catch (e) {
+      appLog('[AuthBloc] sign-in refused: ${e.reason.name}');
+      emit(AuthState.unauthenticated(rejection: e.reason));
     } on ApiException catch (e) {
       if (kDebugMode) {
         appLog(
@@ -87,23 +96,26 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(AuthState.unauthenticated(error: e));
     } catch (e, st) {
       appLog('[debug] AuthBloc: unexpected error: $e\n$st');
-      emit(AuthState.unauthenticated(
-          error: ApiException.unexpected(e)));
+      emit(AuthState.unauthenticated(error: ApiException.unexpected(e)));
     }
   }
 
+  /// Always ends signed out, whatever fails on the way: a sign-out button
+  /// that silently does nothing is worse than a server session left to expire.
   Future<void> _onLogoutRequested(
     AuthLogoutRequested event,
     Emitter<AuthState> emit,
   ) async {
-    if (onBeforeLogout != null) {
-      try {
-        await onBeforeLogout!();
-      } catch (e) {
-        appLog('[debug] AuthBloc: onBeforeLogout failed: $e');
-      }
+    try {
+      await onBeforeLogout?.call();
+    } catch (e) {
+      appLog('[AuthBloc] onBeforeLogout failed: $e');
     }
-    await repository.logout();
+    try {
+      await repository.logout();
+    } catch (e) {
+      appLog('[AuthBloc] logout cleanup failed: $e');
+    }
     emit(AuthState.unauthenticated(error: event.reason));
   }
 
@@ -111,7 +123,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthServerChanged event,
     Emitter<AuthState> emit,
   ) async {
-    await repository.clearLocalSession();
+    try {
+      await repository.clearLocalSession();
+    } catch (e) {
+      appLog('[AuthBloc] clearing the old server session failed: $e');
+    }
     emit(const AuthState.unauthenticated());
   }
 }

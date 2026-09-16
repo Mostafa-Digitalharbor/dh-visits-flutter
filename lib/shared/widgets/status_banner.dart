@@ -29,27 +29,31 @@ class StatusBanner extends StatelessWidget {
     this.action,
   });
 
+  /// A hairline under the strip — half the usual, so stacked banners read as
+  /// one status area rather than separate boxes.
+  static const double _borderWidth = CompSz.hairline / 2;
+
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: color.withValues(alpha: 0.12),
+      color: color.withValues(alpha: Alphas.tint),
       child: SafeArea(
         top: false,
         bottom: false,
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: context.padSym(h: Insets.x3, v: Insets.x2),
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
-                color: color.withValues(alpha: 0.30),
-                width: 0.5,
+                color: color.withValues(alpha: Alphas.border),
+                width: _borderWidth,
               ),
             ),
           ),
           child: Row(
             children: [
-              Icon(icon, size: 16, color: color),
+              Icon(icon, size: context.r(IconSz.xs), color: color),
               context.gapW(Insets.x2),
               // Expanded, not bare: these messages are localized sentences that
               // grow in Arabic and at large text scales.

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-
-import '../../../app/design/app_dimens.dart';
-import '../../../app/design/responsive.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/design/app_colors.dart';
+import '../../../app/design/app_dimens.dart';
+import '../../../app/design/responsive.dart';
 import '../../../app/routes.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../shared/extensions/context_extensions.dart';
@@ -18,10 +17,12 @@ import '../bloc/visits_list_bloc.dart';
 import '../data/models/visit.dart';
 import '../data/visit_trail_tracker.dart';
 import '../data/visits_repository.dart';
+import '../domain/visit_action.dart';
 import 'visit_action_bar.dart';
 import 'visit_attachments_section.dart';
 import 'visit_detail_sections.dart';
 import 'visit_hero_header.dart';
+import 'visit_labels.dart';
 import 'visit_map_card.dart';
 import 'visit_trail_section.dart';
 
@@ -41,10 +42,8 @@ class VisitDetailPage extends StatelessWidget {
           )..load(),
         ),
         BlocProvider(
-          // `live` is seeded from whatever the caller already knows. A visit
-          // opened from the list as `approved` and started from this very page
-          // is handled by the reload below, which recreates nothing but does
-          // refetch the trail after every action.
+          // `live` is seeded from whatever the caller already knows; the body
+          // corrects it once the visit has loaded.
           create: (_) => VisitTrailCubit(
             repository: sl<VisitsRepository>(),
             tracker: slMaybe<VisitTrailTracker>(),
@@ -62,36 +61,63 @@ class _VisitDetailView extends StatelessWidget {
   final Visit? initial;
   const _VisitDetailView({this.initial});
 
-  String _successMessage(BuildContext context, String action) {
+  static String _successMessage(BuildContext context, VisitActionOutcome o) {
     final s = context.s;
+    if (o.queued) return s.wfQueuedOffline;
+    return switch (o.action) {
+      VisitAction.submit => s.wfSubmitted,
+      VisitAction.approve => s.wfApproved,
+      VisitAction.reject => s.wfRejected,
+      VisitAction.cancel => s.wfCancelled,
+      VisitAction.reschedule => s.wfRescheduled,
+      VisitAction.start => s.wfStarted,
+      VisitAction.end => s.wfEnded,
+      VisitAction.attachment => s.wfAttachmentAdded,
+      VisitAction.addParticipants => s.wfParticipantsAdded,
+      VisitAction.participantApprove => s.wfParticipantApproved,
+      VisitAction.participantReject => s.wfParticipantRejected,
+    };
+  }
+
+  void _onOutcome(
+    BuildContext context,
+    VisitActionOutcome outcome,
+    Visit? visit,
+  ) {
+    context.showSnack(
+      _successMessage(context, outcome),
+      kind: SnackKind.success,
+    );
+    final action = outcome.action;
+
+    // Every workflow action changes the visit's state, so the list this page
+    // sits on top of is now stale. It is app-scoped and caches its rows, so
+    // without this it keeps serving the pre-action state. Attachment uploads
+    // don't alter the list's rendering, so they're the one action that
+    // doesn't need it.
+    if (action != VisitAction.attachment) {
+      context.read<VisitsListBloc>().add(const VisitsListLoadRequested());
+    }
+
+    // Start and End each write a point onto the trail server-side (the first
+    // and the last), so the drawn path is stale the moment either lands.
+    if (action.isQueueable) {
+      context.read<VisitTrailCubit>().load(silent: true);
+    }
+
+    // Keep the persistent bar in sync with Start/End — including when the
+    // action only reached the offline queue: the rep is on the visit either
+    // way, and asking the server would fail offline.
     switch (action) {
-      case 'submit':
-        return s.wfSubmitted;
-      case 'approve':
-        return s.wfApproved;
-      case 'reject':
-        return s.wfRejected;
-      case 'start':
-        return s.wfStarted;
-      case 'end':
-        return s.wfEnded;
-      case 'reschedule':
-        return s.wfRescheduled;
-      case 'cancel':
-        return s.wfCancelled;
-      case 'attachment':
-        return s.wfAttachmentAdded;
-      case 'participant_approve':
-        return s.wfParticipantApproved;
-      case 'participant_reject':
-        return s.wfParticipantRejected;
-      case 'add_participants':
-        return s.wfActionAddParticipant;
-      case 'start_queued':
-      case 'end_queued':
-        return s.wfQueuedOffline;
+      case VisitAction.start:
+        if (visit != null) context.read<VisitBloc>().add(VisitStarted(visit));
+      case VisitAction.end:
+        context.read<VisitBloc>().add(const VisitCleared());
+        Navigator.of(context).maybePop();
+      case VisitAction.cancel:
+        Navigator.of(context).maybePop();
       default:
-        return s.commonSave;
+        break;
     }
   }
 
@@ -100,55 +126,22 @@ class _VisitDetailView extends StatelessWidget {
     return BlocConsumer<VisitDetailCubit, VisitDetailState>(
       listenWhen: (p, c) => c.lastAction != null || c.error != null,
       listener: (context, state) {
-        if (state.error != null) {
-          context.showSnack(state.error!.localize(context),
-              kind: SnackKind.error);
+        final error = state.error;
+        if (error != null) {
+          context.showSnack(error.localize(context), kind: SnackKind.error);
           return;
         }
-        final action = state.lastAction;
-        if (action == null) return;
-        context.showSnack(_successMessage(context, action),
-            kind: SnackKind.success);
-
-        // Every workflow action changes the visit's state, so the list this
-        // page sits on top of is now stale. It is app-scoped and caches its
-        // rows, so without this it keeps serving the pre-action state — after
-        // ending a visit the user was popped straight back onto a list still
-        // labelling it "Approved", with pull-to-refresh not helping because the
-        // terminal actions never asked for a reload at all.
-        //
-        // Attachment uploads don't alter the list's rendering, so they're the
-        // one action that doesn't need it. (This compared against
-        // `'upload_attachment'`, which the cubit never emits — the action is
-        // named `'attachment'` — so every upload refetched the whole list.)
-        if (action != 'attachment') {
-          context.read<VisitsListBloc>().add(const VisitsListLoadRequested());
-        }
-
-        // Start and End each write a point onto the trail server-side (the
-        // first and the last), so the drawn path is stale the moment either
-        // lands. Everything else leaves it untouched.
-        if (action == 'start' ||
-            action == 'end' ||
-            action == 'start_queued' ||
-            action == 'end_queued') {
-          context.read<VisitTrailCubit>().load(silent: true);
-        }
-
-        // Keep the persistent bar in sync with Start/End.
-        if (action == 'start') {
-          context.read<VisitBloc>().add(const VisitResumeRequested());
-        } else if (action == 'end') {
-          context.read<VisitBloc>().add(const VisitCleared());
-          Navigator.of(context).maybePop();
-        } else if (action == 'cancel') {
-          Navigator.of(context).maybePop();
-        }
+        final outcome = state.lastAction;
+        if (outcome != null) _onOutcome(context, outcome, state.visit);
       },
       builder: (context, state) {
         final visit = state.visit ?? initial;
         return Scaffold(
-          appBar: AppBar(title: Text(visit?.name ?? context.s.wfDetailTitle)),
+          appBar: AppBar(
+            title: Text(
+              visit?.displayReference(context) ?? context.s.wfDetailTitle,
+            ),
+          ),
           body: _body(context, state, visit),
         );
       },
@@ -184,8 +177,29 @@ class _VisitDetailBody extends StatefulWidget {
 class _VisitDetailBodyState extends State<_VisitDetailBody> {
   double _barHeight = 0;
 
+  /// Below this change a re-measured bar is the same bar (sub-pixel layout
+  /// noise), and rebuilding the list for it would loop.
+  static const double _heightTolerance = 0.5;
+
+  // The trail polls only while the visit runs. The page seeds that from what
+  // the caller knew, which is nothing for a visit opened from a notification,
+  // and a visit can start or end while it is open.
+  @override
+  void initState() {
+    super.initState();
+    context.read<VisitTrailCubit>().setLive(widget.visit.isTrackingLive);
+  }
+
+  @override
+  void didUpdateWidget(_VisitDetailBody old) {
+    super.didUpdateWidget(old);
+    if (old.visit.isTrackingLive != widget.visit.isTrackingLive) {
+      context.read<VisitTrailCubit>().setLive(widget.visit.isTrackingLive);
+    }
+  }
+
   void _onBarHeight(double h) {
-    if ((h - _barHeight).abs() < 0.5) return;
+    if ((h - _barHeight).abs() < _heightTolerance) return;
     // Defer to avoid mutating state during the layout/paint phase.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() => _barHeight = h);
@@ -195,7 +209,10 @@ class _VisitDetailBodyState extends State<_VisitDetailBody> {
   @override
   Widget build(BuildContext context) {
     final visit = widget.visit;
-    final busy = widget.state.status == VisitDetailStatus.acting;
+    final state = widget.state;
+    final busy = state.status == VisitDetailStatus.acting;
+    final gap = context.gapH(Insets.x3h);
+    final edge = context.r(Insets.screen);
     return Stack(
       children: [
         AppRefreshIndicator(
@@ -203,17 +220,19 @@ class _VisitDetailBodyState extends State<_VisitDetailBody> {
           child: ListView(
             // Extra breathing room below the last card so it can scroll fully
             // clear of the pinned action bar.
-            padding: EdgeInsets.fromLTRB(16, 16, 16, _barHeight + 24),
+            padding: EdgeInsetsDirectional.fromSTEB(
+              edge,
+              edge,
+              edge,
+              _barHeight + context.r(Insets.x6),
+            ),
             children: [
               VisitHeroHeader(visit: visit),
               // Above everything else on purpose: a manager deciding whether to
               // approve must meet this before the map makes the visit look
               // legitimate.
-              if (widget.state.mockFlagged) ...[
-                context.gapH(Insets.x3h),
-                const VisitMockLocationBanner(),
-              ],
-              context.gapH(Insets.x3h),
+              if (state.mockFlagged) ...[gap, const VisitMockLocationBanner()],
+              gap,
               BlocBuilder<VisitTrailCubit, VisitTrailState>(
                 builder: (context, trail) => VisitMapCard(
                   visit: visit,
@@ -221,31 +240,36 @@ class _VisitDetailBodyState extends State<_VisitDetailBody> {
                   onOpenTrail: () => _openTrail(context, visit),
                 ),
               ),
-              context.gapH(Insets.x3h),
+              gap,
               VisitInfoSection(visit: visit),
-              context.gapH(Insets.x3h),
+              gap,
               VisitApprovalSection(visit: visit),
               if (visit.startDatetime != null) ...[
-                context.gapH(Insets.x3h),
+                gap,
                 VisitExecutionSection(visit: visit),
-                context.gapH(Insets.x3h),
+                gap,
                 VisitTrailSection(
                   visit: visit,
                   onOpenTrail: () => _openTrail(context, visit),
                 ),
               ],
               if (visit.participants.isNotEmpty) ...[
-                context.gapH(Insets.x3h),
+                gap,
                 VisitParticipantsSection(visit: visit),
               ],
-              if (visit.attachmentCount > 0) ...[
-                context.gapH(Insets.x3h),
+              // Shown whenever there is something to say: the count comes from
+              // the rich read only, so a visit loaded through the slim REST
+              // fallback reports 0 even when its files loaded fine.
+              if (visit.attachmentCount > 0 ||
+                  state.attachments.isNotEmpty ||
+                  state.attachmentsError != null) ...[
+                gap,
                 VisitAttachmentsSection(
-                  attachments: widget.state.attachments,
-                  error: widget.state.attachmentsError,
+                  attachments: state.attachments,
+                  error: state.attachmentsError,
                 ),
               ],
-              context.gapH(Insets.x3h),
+              gap,
               VisitHistorySection(visit: visit),
             ],
           ),
@@ -257,9 +281,9 @@ class _VisitDetailBodyState extends State<_VisitDetailBody> {
               child: Center(child: CircularProgressIndicator()),
             ),
           ),
-        Positioned(
-          left: 0,
-          right: 0,
+        PositionedDirectional(
+          start: 0,
+          end: 0,
           bottom: 0,
           // The bar sits ABOVE the busy scrim in the stack, so the scrim alone
           // does not stop taps reaching it. Without this guard a double-tap on
@@ -296,6 +320,7 @@ class _MeasureHeight extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, _) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!context.mounted) return;
           final box = context.findRenderObject() as RenderBox?;
           if (box != null && box.hasSize) onChange(box.size.height);
         });
@@ -304,4 +329,3 @@ class _MeasureHeight extends StatelessWidget {
     );
   }
 }
-

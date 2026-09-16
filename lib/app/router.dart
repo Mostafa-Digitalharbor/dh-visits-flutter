@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/config/server_config_cubit.dart';
-import '../l10n/generated/app_localizations.dart';
+import '../shared/extensions/context_extensions.dart';
 import '../shared/widgets/widgets.dart';
 import '../features/auth/bloc/auth_bloc.dart';
 import '../features/auth/view/login_page.dart';
@@ -14,7 +14,6 @@ import '../features/customers/view/customer_detail_page.dart';
 import '../features/customers/view/customers_list_page.dart';
 import '../features/employees/data/models/employee.dart';
 import '../features/home/view/home_shell.dart';
-import '../features/nearby/view/nearby_map_page.dart';
 import '../features/notifications/view/notifications_page.dart';
 import '../features/review/view/review_page.dart';
 import '../features/server_config/view/server_setup_page.dart';
@@ -27,8 +26,11 @@ import 'transitions.dart';
 
 GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: AppRoutes.splash,
     refreshListenable: _RouterRefresh([authBloc.stream, serverConfigCubit.stream]),
+    // An unknown path (a stale or mistyped link): a localized page with a way
+    // home, instead of go_router's English debug screen.
+    errorPageBuilder: (_, state) => fadeTransition(state, const _NotFoundPage()),
     redirect: (context, state) {
       final status = authBloc.state.status;
       final loc = state.matchedLocation;
@@ -101,8 +103,8 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
           Builder(
             builder: (context) => Scaffold(
               appBar: CvSubAppBar(
-                title: AppLocalizations.of(context).customersTitle,
-                eyebrow: AppLocalizations.of(context).roleManagerTitle,
+                title: context.s.customersTitle,
+                eyebrow: context.s.roleManagerTitle,
                 topInset: MediaQuery.paddingOf(context).top,
               ),
               body: const CustomersListPage(),
@@ -112,25 +114,13 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
       ),
       GoRoute(
         path: AppRoutes.customerDetailPath,
-        pageBuilder: (_, state) {
-          final id = int.parse(state.pathParameters['id']!);
+        pageBuilder: (_, state) => _withId(state, (id) {
           final fallback = state.extra is Customer ? state.extra as Customer : null;
           return slideTransition(
             state,
             CustomerDetailPage(customerId: id, fallback: fallback),
           );
-        },
-      ),
-      GoRoute(
-        path: AppRoutes.customerNearbyPath,
-        pageBuilder: (_, state) {
-          final id = int.parse(state.pathParameters['id']!);
-          final customer = state.extra is Customer ? state.extra as Customer : null;
-          return slideTransition(
-            state,
-            NearbyMapPage(customerId: id, customer: customer),
-          );
-        },
+        }),
       ),
       GoRoute(
         path: AppRoutes.createVisit,
@@ -147,18 +137,17 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
       ),
       GoRoute(
         path: AppRoutes.visitDetailPath,
-        pageBuilder: (_, state) {
-          final id = int.parse(state.pathParameters['id']!);
+        pageBuilder: (_, state) => _withId(state, (id) {
           final initial = state.extra is Visit ? state.extra as Visit : null;
           return slideTransition(
             state,
             VisitDetailPage(visitId: id, initial: initial),
           );
-        },
+        }),
       ),
       GoRoute(
         path: AppRoutes.visitTrailPath,
-        pageBuilder: (_, state) {
+        pageBuilder: (_, state) => _withId(state, (id) {
           // The visit travels as `extra`: the trail page needs its state (is it
           // still running?) to decide whether to poll, and re-reading the
           // record here just to learn that would put a spinner in front of a
@@ -167,14 +156,48 @@ GoRouter buildRouter(AuthBloc authBloc, ServerConfigCubit serverConfigCubit) {
           // knows how to load the visit and offers the trail from there.
           final visit = state.extra is Visit ? state.extra as Visit : null;
           if (visit == null) {
-            final id = int.parse(state.pathParameters['id']!);
             return slideTransition(state, VisitDetailPage(visitId: id));
           }
           return slideTransition(state, VisitTrailPage(visit: visit));
-        },
+        }),
       ),
     ],
   );
+}
+
+/// The route's `:id`, handed to [build] — or the not-found page when the path
+/// carries something that isn't a record id (`/visits/abc`), which used to
+/// throw a FormatException out of the page builder.
+Page<void> _withId(GoRouterState state, Page<void> Function(int id) build) {
+  final id = int.tryParse(state.pathParameters[_idParam] ?? '');
+  if (id == null || id <= 0) {
+    return fadeTransition(state, const _NotFoundPage());
+  }
+  return build(id);
+}
+
+const _idParam = 'id';
+
+class _NotFoundPage extends StatelessWidget {
+  const _NotFoundPage();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    return Scaffold(
+      appBar: CvSubAppBar(
+        title: s.commonPageNotFoundTitle,
+        topInset: MediaQuery.paddingOf(context).top,
+      ),
+      body: ErrorView(
+        icon: Icons.link_off_rounded,
+        message: s.commonPageNotFoundMessage,
+        actionLabel: s.commonGoHome,
+        actionIcon: Icons.home_outlined,
+        onRetry: () => context.go(AppRoutes.home),
+      ),
+    );
+  }
 }
 
 /// Re-runs the router redirect whenever any of the given streams emit

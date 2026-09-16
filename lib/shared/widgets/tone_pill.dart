@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../app/design/app_dimens.dart';
+import '../../app/design/app_typography.dart';
+import '../../app/design/responsive.dart';
 
 /// A small tinted pill carrying a short label, optionally preceded by an icon —
 /// visit state badges, role chips, category tags, "short visit" hints.
@@ -54,10 +56,13 @@ class TonePill extends StatelessWidget {
     required this.label,
     required this.color,
     this.icon,
-    this.fontSize = 12.5,
-    this.iconSize = 15,
-    this.padding = const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-    this.tintAlpha = 0.14,
+    this.fontSize = FontSz.sm,
+    this.iconSize = IconSz.pill,
+    this.padding = const EdgeInsets.symmetric(
+      horizontal: Insets.x2h,
+      vertical: Insets.x1,
+    ),
+    this.tintAlpha = Alphas.tint,
     this.borderAlpha,
     this.foreground,
     this.fontWeight = FontWeight.w700,
@@ -89,7 +94,7 @@ class TonePill extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(icon, fill: 1, size: iconSize, color: fg),
-                SizedBox(width: iconSize <= 10 ? 4 : 5),
+                context.gapW(Insets.x1),
                 if (flexibleLabel) Flexible(child: text) else text,
               ],
             ),

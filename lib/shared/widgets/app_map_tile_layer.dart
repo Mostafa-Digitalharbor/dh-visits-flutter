@@ -5,10 +5,10 @@ import '../../core/constants.dart';
 
 /// Shared OpenStreetMap tile layer.
 ///
-/// Every map in the app (dashboard, nearby, route, visit detail) renders the
-/// same tiles, so the URL / user-agent / max-native-zoom live in one place
+/// Every map in the app (dashboard, route, visit detail, visit trail) renders
+/// the same tiles, so the URL / user-agent / max-native-zoom live in one place
 /// ([AppConstants]) and are wrapped here. Use this instead of building a raw
-/// [TileLayer] so the four call-sites can never drift apart.
+/// [TileLayer] so the call-sites can never drift apart.
 class AppMapTileLayer extends StatelessWidget {
   /// Upper bound the map will display. Defaults to [TileLayer]'s own
   /// (effectively unbounded) behavior; pass e.g. `22` for interactive maps

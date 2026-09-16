@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../core/api/odoo_parse.dart';
+
 /// Approval state of a single additional participant on a visit. Each
 /// participant's own manager must approve their participation before the main
 /// (direct-manager) approval proceeds.
@@ -44,19 +46,6 @@ class VisitParticipant extends Equatable {
     this.rejectReason,
   });
 
-  /// Parses an Odoo many2one, serialised as `[id, "Name"]` or `false`.
-  static (int?, String?) _m2o(dynamic raw) {
-    if (raw is List && raw.length >= 2) {
-      return ((raw[0] as num?)?.toInt(), raw[1]?.toString());
-    }
-    return (null, null);
-  }
-
-  /// Reads a numeric Odoo scalar. Odoo serialises an unset field as `false`
-  /// (a bool), not null — so a bare `as num?` cast throws a TypeError on it.
-  /// [_m2o] already guards the many2one shape; this covers the scalar one.
-  static int? _nz(dynamic raw) => raw is num ? raw.toInt() : null;
-
   /// From the slim REST `add_participants` payload
   /// (`{id, employee_id, approval_state}`).
   factory VisitParticipant.fromApi(Map<String, dynamic> json) {
@@ -66,29 +55,42 @@ class VisitParticipant extends Equatable {
       // inside CreateVisitBloc._onSubmit *after* the visit had been created —
       // the form reported failure, the user retried, and a duplicate visit was
       // filed against the customer.
-      id: _nz(json['id']) ?? 0,
-      employeeId: _nz(json['employee_id']),
-      approvalState: participantStateFromWire(json['approval_state']?.toString()),
+      id: odooInt(json['id']) ?? 0,
+      employeeId: odooInt(json['employee_id']),
+      approvalState: participantStateFromWire(
+        odooString(json['approval_state']),
+      ),
     );
   }
 
-  /// From a full `call_kw` read on `dh.visit.participant`.
+  /// From a full `call_kw` read on `dh.visit.participant`. Throws
+  /// [FormatException] for a row without an id, so `parseRows` skips it.
   factory VisitParticipant.fromOdooRow(Map<String, dynamic> row) {
-    final emp = _m2o(row['employee_id']);
-    final mgr = _m2o(row['manager_id']);
+    final emp = odooMany2one(row['employee_id']);
+    final mgr = odooMany2one(row['manager_id']);
     return VisitParticipant(
-      id: (row['id'] as num).toInt(),
-      employeeId: emp.$1,
-      employeeName: emp.$2,
-      managerId: mgr.$1,
-      managerName: mgr.$2,
-      approvalState: participantStateFromWire(row['approval_state']?.toString()),
-      rejectReason: (row['reject_reason'] == false)
-          ? null
-          : row['reject_reason']?.toString(),
+      id:
+          odooInt(row['id']) ??
+          (throw const FormatException('participant row without an id')),
+      employeeId: emp.id,
+      employeeName: emp.name,
+      managerId: mgr.id,
+      managerName: mgr.name,
+      approvalState: participantStateFromWire(
+        odooString(row['approval_state']),
+      ),
+      rejectReason: odooString(row['reject_reason']),
     );
   }
 
   @override
-  List<Object?> get props => [id, employeeId, approvalState];
+  List<Object?> get props => [
+    id,
+    employeeId,
+    employeeName,
+    managerId,
+    managerName,
+    approvalState,
+    rejectReason,
+  ];
 }

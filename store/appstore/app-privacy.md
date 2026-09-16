@@ -7,9 +7,17 @@ whenever a new SDK is added or a new permission is requested.
 
 **Yes, we collect data from this app.**
 
-The app sends location, identity, and visit content to the employer's Odoo server,
-and crash/performance events to Sentry. All of that is "collect" under Apple's
-definition.
+The app sends visit locations, identity, and visit content to the employer's Odoo
+server, and crash/performance events to Sentry. All of that is "collect" under
+Apple's definition. Location is collected **only for customer visits** (Start
+Visit, End Visit, and the trail while the visit is in progress); the work-day
+route, live location sharing and the nearby-employees radar were removed on
+2026-09-16 and must not be described anywhere in App Store Connect.
+
+Other recipients: Firebase Cloud Messaging (push delivery), OpenStreetMap tile
+servers (map tiles for the visible area only — no user position), and, when
+configured, the company-controlled OSRM road-matching server (only the recorded
+points of the visit being displayed, without identifiers).
 
 ---
 
@@ -26,12 +34,12 @@ advertising. There are no ad SDKs. This means no ATT prompt is required.
 
 | Data type | Purpose | Linked to identity | Tracking | Why |
 |---|---|---|---|---|
-| **Precise Location** | App Functionality | **Yes** | No | GPS captured at check-in/out, visit routes, and the work-day route (also in the background between Start and End work day), tied to the employee record |
-| **Coarse Location** | App Functionality | **Yes** | No | `ACCESS_COARSE_LOCATION` is requested alongside fine |
+| **Precise Location** | App Functionality | **Yes** | No | Customer visits only: one fix at Start Visit, one at End Visit, and the GPS trail while a visit the employee started is in progress (continuing in the background during that visit only), tied to the visit and the employee record |
+| **Coarse Location** | App Functionality | **Yes** | No | Approximate location is part of the same while-in-use grant (and `ACCESS_COARSE_LOCATION` on Android) |
 | **Name** | App Functionality | **Yes** | No | Employee name shown in profile and manager views |
 | **Email Address** | App Functionality | **Yes** | No | Sign-in identifier |
 | **User ID** | App Functionality | **Yes** | No | Odoo user / employee ID on every request |
-| **Device ID** | App Functionality | **Yes** | No | FCM push token, stored server-side against the user |
+| **Device ID** | App Functionality | **Yes** | No | FCM push token and a random per-install device id, stored server-side against the user (the device id is also sent with each visit trail point) |
 | **Photos or Videos** | App Functionality | **Yes** | No | Proof-of-visit photos ([visit_action_bar.dart:112](../../lib/features/visits/view/visit_action_bar.dart#L112)) |
 | **Other User Content** | App Functionality | **Yes** | No | Visit notes and file attachments |
 | **Crash Data** | App Functionality | **No** | No | Sentry, `sendDefaultPii = false`, no `setUser` call |
@@ -56,8 +64,9 @@ disabled without it. It must be a public, reachable URL (not a Google Doc, not a
 login-gated page), and it must actually describe the location collection above.
 
 Use `https://digitalharbor.com.sa/ar/visit-app` — **after** replacing its content with
-docs/PRIVACY_POLICY.md. As checked on 2026-09-14 the page still says "No background
-tracking", which contradicts the work-day build (see privacy-policy-fixes.md § 0).
+docs/PRIVACY_POLICY.md (last updated 16 September 2026). As checked on 2026-09-14 the
+page still says "No background tracking", which contradicts the background visit
+trail recording (see privacy-policy-fixes.md § 0).
 
 ---
 
@@ -67,9 +76,10 @@ tracking", which contradicts the work-day build (see privacy-policy-fixes.md § 
 
 - `NSPrivacyTracking = false`, no tracking domains.
 - Required-reason API used by the app's own code: `UserDefaults`, reason `CA92.1`
-  (`WorkdayLocation.swift` stores the open work day's capture state in the app's own
-  defaults). No other required-reason API (file timestamps, boot time, disk space,
-  active keyboards) is called from `ios/Runner`.
+  (the native visit capture, `VisitLocation.swift`, keeps the active visit's capture
+  state in the app's own defaults; the former work-day capture file is being
+  removed). No other required-reason API (file
+  timestamps, boot time, disk space, active keyboards) is called from `ios/Runner`.
 - `NSPrivacyCollectedDataTypes` = the table above, same linked/tracking/purpose values.
 
 Plugins declare their own usage: geolocator_apple, permission_handler_apple,

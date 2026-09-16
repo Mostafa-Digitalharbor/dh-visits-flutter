@@ -1,17 +1,24 @@
 # Production map matching (OSRM) — deployment requirements
 
-For the backend / DevOps team. The app is ready; **the server does not exist
-yet**. Until it does, release builds draw routes as recorded GPS (no road
-matching, nothing sent anywhere for it).
+For the backend / DevOps team. **Optional.** The app is ready; **the server
+does not exist yet**. Until it does, release builds draw visit trails as
+recorded GPS (no road matching, nothing sent anywhere for it).
+
+> **2026-09-16:** the work-day route ("Today's Route") was removed from the
+> app. Road matching is now used **only for individual visit trails** — the
+> points recorded while one visit was in progress. There is no full-day
+> matching.
 
 ## 1. What it is for
 
 ```
-recorded GPS (server, unchanged) → app → HTTPS → company OSRM /match → line drawn on the map
+recorded visit trail (server, unchanged) → app → HTTPS → company OSRM /match → line drawn on the map
 ```
 
-Today's Route and the visit route screens can draw a recorded route along the
-roads instead of straight lines between fixes (**Roads / Raw GPS** switch).
+The visit trail screens (visit detail map card and the visit trail page) can
+draw the trail of **one visit** along the roads instead of straight lines
+between fixes (**Roads / Raw GPS** switch). Only the recorded points of the
+visit being displayed are sent.
 Road matching only produces a line to draw: the recorded points, distances and
 markers always come from the raw GPS. If the service is down, slow, rate
 limited or disabled, the app draws the raw GPS line — a failure never breaks a
@@ -38,9 +45,10 @@ User-Agent: com.digitalharbor.location_gps
   chunk (not the date or time of day).
 - **No** user, employee or device identifier, no cookie, no Odoo session, no
   authorization header.
-- Requests are serialised ≥ 1.1 s apart per device, cached on the device
-  (30 days) so a route is matched once, and backed off for 1 minute after 429,
-  5xx or a network error.
+- Only the points of the one visit trail on screen; a long trail is split
+  into chunks. Requests are serialised ≥ 1.1 s apart per device, cached on
+  the device (30 days, deleted on logout) so a trail is matched once, and
+  backed off for 1 minute after 429, 5xx or a network error.
 - The app expects the OSRM v5 `/match` response (`code`, `tracepoints`,
   `matchings[].legs[].steps[].geometry`). Any OSRM 5.x/6.x `osrm-routed` works.
 
@@ -86,11 +94,11 @@ Map refresh: `./prepare.sh && docker compose restart osrm`.
 2. `release.yml` passes both as `--dart-define` to the Android and iOS builds,
    and refuses a public demo URL. Local builds: export the same variables before
    `scripts/build_release.sh` / `build_release.ps1`.
-3. Verify on a release build: Today's Route → **Roads** matches the streets;
-   switch to **Raw GPS** to compare.
+3. Verify on a release build: open a completed visit's trail → **Roads**
+   matches the streets; switch to **Raw GPS** to compare.
 
 Without `MAP_MATCHING_URL` a release build hides the Roads switch and draws
-recorded GPS.
+the recorded visit trail.
 
 ## 6. Optional: no public endpoint
 
@@ -106,5 +114,5 @@ backend it already uses. That needs a small backend route and a change to
 |---|---|
 | App configuration (release never uses public OSRM; URL from build config; raw GPS fallback; cache; switch) | Done, unit-tested |
 | Deployment kit (compose, nginx, prepare, smoke test) | Written; smoke test verified against the public demo server with 10 points only |
-| Company OSRM server | **Not deployed** — needs infrastructure |
+| Company OSRM server | **Not deployed** — optional; needs infrastructure |
 | Production endpoint tested | **No** |

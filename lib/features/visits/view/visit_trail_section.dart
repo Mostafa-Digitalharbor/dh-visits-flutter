@@ -3,14 +3,17 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../app/design/app_dimens.dart';
-import '../../../app/design/responsive.dart';
+import '../../../app/design/app_typography.dart';
 import '../../../core/utils/app_date.dart';
+import '../../../core/utils/app_number.dart';
 import '../../../core/utils/duration_format.dart';
 import '../../../core/utils/user_time.dart';
 import '../../../shared/extensions/context_extensions.dart';
+import '../../../shared/widgets/widgets.dart';
 import '../bloc/visit_trail_cubit.dart';
 import '../data/models/visit.dart';
 import 'visit_detail_row.dart';
+import 'visit_labels.dart';
 import 'visit_section.dart';
 
 /// The numbers behind the thread drawn on the map: how many positions were
@@ -39,62 +42,81 @@ class VisitTrailSection extends StatelessWidget {
         final track = state.track;
         final running = visit.isTrackingLive;
 
-        if (track.isEmpty && state.status != VisitTrailStatus.ready) {
-          // Still loading (or failed): say nothing rather than flash "0 points"
-          // and then correct itself a moment later.
+        if (track.isEmpty && state.status == VisitTrailStatus.loading) {
+          // Say nothing rather than flash "0 points" and then correct itself
+          // a moment later.
           return const SizedBox.shrink();
         }
 
+        final failed = track.isEmpty && state.status == VisitTrailStatus.error;
+        final span = track.span;
+        final speed = track.averageSpeedKmh;
+        final lastFix = track.lastFixAt;
         final rows = <Widget>[
-          VisitDetailRow(
-            icon: Symbols.linked_services,
-            label: s.trailMapTitle,
-            value: s.trailPoints(track.locationLogCount),
-            iconColor: running ? Colors.green.shade600 : null,
-            trailing: running
-                ? _RecordingChip(pending: state.pendingUploads)
-                : null,
-          ),
-          if (track.trackedDistanceKm > 0)
+          if (failed)
+            // The map card still shows the check-in/out pins; this row says
+            // why the route is missing and offers the way back.
             VisitDetailRow(
-              icon: Symbols.straighten,
-              label: s.trailDistance,
-              value: s.trailDistanceKm(
-                  track.trackedDistanceKm.toStringAsFixed(2)),
-            ),
-          if (track.averageSpeedKmh != null)
-            VisitDetailRow(
-              icon: Symbols.speed,
-              label: s.trailAvgSpeed,
-              value:
-                  s.trailSpeedKmh(track.averageSpeedKmh!.toStringAsFixed(0)),
-            ),
-          if (track.span != null)
-            VisitDetailRow(
-              icon: Symbols.timer,
-              label: s.wfDurationLabel,
-              value: track.span!.localized(context),
-            ),
-          if (track.lastFixAt != null)
-            VisitDetailRow(
-              icon: Symbols.my_location,
-              label: s.trailLastFix,
-              value: AppDate.dateTimeFormat(context)
-                  .format(context.toUserTime(track.lastFixAt!)),
-            ),
-          if (track.isEmpty)
-            VisitDetailRow(
-              icon: Symbols.info,
+              icon: Symbols.error,
+              iconColor: context.colors.error,
               label: s.trailMapTitle,
-              value: running ? s.trailEmptyRunning : s.trailEmptyFinished,
-            ),
-          if (track.hasPath && onOpenTrail != null)
+              value: state.error?.localize(context) ?? s.errUnknown,
+              trailing: IconButton(
+                icon: const Icon(Icons.refresh),
+                tooltip: s.commonRetry,
+                onPressed: () => context.read<VisitTrailCubit>().load(),
+              ),
+            )
+          else ...[
             VisitDetailRow(
-              icon: Symbols.timeline,
-              label: s.trailSectionTitle,
-              value: s.trailOpenFull,
-              onTap: onOpenTrail,
+              icon: Symbols.linked_services,
+              label: s.trailMapTitle,
+              value: s.trailPoints(track.locationLogCount),
+              iconColor: running ? context.visitSuccess : null,
+              trailing: running
+                  ? _RecordingChip(pending: state.pendingUploads)
+                  : null,
             ),
+            if (track.trackedDistanceKm > 0)
+              VisitDetailRow(
+                icon: Symbols.straighten,
+                label: s.trailDistance,
+                value: AppNumber.km(s, track.trackedDistanceKm, precise: true),
+              ),
+            if (speed != null)
+              VisitDetailRow(
+                icon: Symbols.speed,
+                label: s.trailAvgSpeed,
+                value: AppNumber.speedKmh(s, speed),
+              ),
+            if (span != null)
+              VisitDetailRow(
+                icon: Symbols.timer,
+                label: s.wfDurationLabel,
+                value: span.localized(context),
+              ),
+            if (lastFix != null)
+              VisitDetailRow(
+                icon: Symbols.my_location,
+                label: s.trailLastFix,
+                value: AppDate.dateTimeFormat(
+                  context,
+                ).format(context.toUserTime(lastFix)),
+              ),
+            if (track.isEmpty)
+              VisitDetailRow(
+                icon: Symbols.info,
+                label: s.trailMapTitle,
+                value: running ? s.trailEmptyRunning : s.trailEmptyFinished,
+              ),
+            if (track.hasPath && onOpenTrail != null)
+              VisitDetailRow(
+                icon: Symbols.timeline,
+                label: s.trailSectionTitle,
+                value: s.trailOpenFull,
+                onTap: onOpenTrail,
+              ),
+          ],
         ];
 
         return VisitSection(
@@ -104,6 +126,21 @@ class VisitTrailSection extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// Pushes the device's buffered fixes now and says how it went.
+///
+/// The flush never throws — offline it simply sends nothing — so the answer
+/// is read off what is still waiting afterwards.
+Future<void> uploadPendingTrail(BuildContext context) async {
+  final s = context.s;
+  final left = await context.read<VisitTrailCubit>().flushAndReload();
+  if (!context.mounted) return;
+  if (left == 0) {
+    context.showSnack(s.trailUploadDone, kind: SnackKind.success);
+  } else {
+    context.showSnack(s.trailUploadStillPending(left), kind: SnackKind.error);
   }
 }
 
@@ -120,42 +157,22 @@ class _RecordingChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.s;
-    final cs = context.colors;
     final waiting = pending > 0;
-    final tone = waiting ? cs.tertiary : Colors.green.shade600;
-
-    final chip = Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: Insets.x2, vertical: Insets.x1),
-      decoration: BoxDecoration(
-        color: tone.withValues(alpha: Alphas.tint),
-        borderRadius: BorderRadius.circular(Radii.pill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            waiting ? Symbols.cloud_upload : Symbols.fiber_manual_record,
-            size: 14,
-            color: tone,
-          ),
-          context.gapW(Insets.x1),
-          Text(
-            waiting ? '$pending' : s.trailLive,
-            style: context.text.labelSmall
-                ?.copyWith(color: tone, fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
+    final pill = TonePill(
+      label: waiting ? AppNumber.whole(pending) : s.trailLive,
+      color: waiting ? context.colors.tertiary : context.visitSuccess,
+      icon: waiting ? Symbols.cloud_upload : Symbols.fiber_manual_record,
+      iconSize: IconSz.inline,
+      fontSize: FontSz.xs,
+      tintAlpha: Alphas.tint,
     );
-
-    if (!waiting) return chip;
+    if (!waiting) return pill;
     return Tooltip(
       message: s.trailPendingUploads(pending),
       child: InkWell(
         borderRadius: BorderRadius.circular(Radii.pill),
-        onTap: () => context.read<VisitTrailCubit>().flushAndReload(),
-        child: chip,
+        onTap: () => uploadPendingTrail(context),
+        child: pill,
       ),
     );
   }

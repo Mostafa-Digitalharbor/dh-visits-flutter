@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../app/design/app_dimens.dart';
 import '../../app/design/responsive.dart';
-
 import '../../core/utils/app_date.dart';
+import '../../core/utils/user_time.dart';
 import '../../features/visits/data/models/visit.dart';
 import '../../features/visits/view/visit_labels.dart';
 import '../extensions/context_extensions.dart';
@@ -13,33 +13,38 @@ import '../extensions/context_extensions.dart';
 class VisitCard extends StatelessWidget {
   final Visit visit;
   final VoidCallback? onTap;
-  final bool compact;
-  final String? highlight;
   final bool showEmployee;
 
   const VisitCard({
     super.key,
     required this.visit,
     this.onTap,
-    this.compact = false,
-    this.highlight,
     this.showEmployee = false,
   });
+
+  /// The widest the state badge may get, as a share of the screen. A long
+  /// Arabic state ("بانتظار اعتماد مدير المشروع") at a large text size would
+  /// otherwise squeeze the customer name down to nothing.
+  static const double _badgeMaxShare = 0.45;
+
+  /// Lines of purpose shown under the facts.
+  static const int _purposeLines = 2;
 
   @override
   Widget build(BuildContext context) {
     final cs = context.colors;
-    final title = visit.partnerName ?? visit.name ?? '#${visit.id}';
-    final linked = visit.linkedRecordName;
     final schedule = visit.scheduledDatetime;
+    // The reference is its own line only when the title is the customer —
+    // otherwise the title already *is* the reference.
+    final reference = visit.partnerName != null ? visit.name : null;
 
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 5),
+      margin: EdgeInsets.symmetric(vertical: context.rh(Insets.x1)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: context.padAll(Insets.x3h),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -51,16 +56,18 @@ class VisitCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          title,
+                          visit.displayTitle(context),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: context.text.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
-                        if (visit.name != null) ...[
+                        if (reference != null) ...[
                           context.gapH(Insets.hair),
                           Text(
-                            visit.name!,
+                            reference,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: context.text.bodySmall
                                 ?.copyWith(color: cs.outline),
                           ),
@@ -69,13 +76,18 @@ class VisitCard extends StatelessWidget {
                     ),
                   ),
                   context.gapW(Insets.x2),
-                  VisitStateBadge(visit.state),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: context.screenW * _badgeMaxShare,
+                    ),
+                    child: VisitStateBadge(visit.state),
+                  ),
                 ],
               ),
               context.gapH(Insets.x2h),
               Wrap(
-                spacing: 12,
-                runSpacing: 4,
+                spacing: context.r(Insets.x3),
+                runSpacing: context.rh(Insets.x1),
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   _meta(
@@ -83,14 +95,18 @@ class VisitCard extends StatelessWidget {
                     icon: visit.isOpportunity
                         ? Icons.emoji_events_outlined
                         : Icons.folder_open_outlined,
-                    text: visitTypeLabel(context, visit.visitType) +
-                        (linked != null ? ' · $linked' : ''),
+                    text: context.joinFacts([
+                      visitTypeLabel(context, visit.visitType),
+                      visit.linkedRecordName,
+                    ]),
                   ),
                   if (schedule != null)
                     _meta(
                       context,
                       icon: Icons.schedule,
-                      text: AppDate.dateTime(context, schedule.toLocal()),
+                      // The Odoo user's timezone, like every other visit time.
+                      text: AppDate.dateTime(
+                          context, context.toUserTime(schedule)),
                     ),
                   if (showEmployee && visit.employeeName != null)
                     _meta(
@@ -107,11 +123,11 @@ class VisitCard extends StatelessWidget {
                     ),
                 ],
               ),
-              if (!compact && visit.purpose != null) ...[
+              if (visit.purpose != null) ...[
                 context.gapH(Insets.x2),
                 Text(
                   visit.purpose!,
-                  maxLines: 2,
+                  maxLines: _purposeLines,
                   overflow: TextOverflow.ellipsis,
                   style: context.text.bodySmall
                       ?.copyWith(color: cs.onSurfaceVariant),
@@ -134,7 +150,7 @@ class VisitCard extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 15, color: c),
+        Icon(icon, size: context.r(IconSz.pill), color: c),
         context.gapW(Insets.x1),
         // Flexible, not a bare Text: the enclosing Wrap hands the Row its full
         // maxWidth, so an unbounded Text takes its intrinsic width and blows

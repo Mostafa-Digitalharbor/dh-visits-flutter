@@ -72,9 +72,17 @@ bool _isExpectedApiCode(ApiErrorCode code) {
     case ApiErrorCode.sessionRestoreFailed:
     case ApiErrorCode.insecureConnection:
     case ApiErrorCode.conflict:
+    // An outage, throttling or a mistyped database: the server's state or the
+    // user's input, which the localized message already explains.
+    case ApiErrorCode.serverUnavailable:
+    case ApiErrorCode.rateLimited:
+    case ApiErrorCode.payloadTooLarge:
+    case ApiErrorCode.databaseNotFound:
       return true;
     case ApiErrorCode.server:
-    case ApiErrorCode.customerLoadFailed:
+    // A body the app cannot parse is either a proxy in the way or a contract
+    // drift on the server — the second is exactly what Sentry is for.
+    case ApiErrorCode.invalidResponse:
     case ApiErrorCode.unknown:
       return false;
   }

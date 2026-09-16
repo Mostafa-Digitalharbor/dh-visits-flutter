@@ -3,6 +3,7 @@ import 'dart:io' show HttpDate;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/app_log.dart';
+import '../constants/storage_keys.dart';
 
 /// The difference between this device's wall clock and the Odoo server's.
 ///
@@ -23,16 +24,28 @@ import '../utils/app_log.dart';
 /// offline right after a cold start is still corrected. Resolution is one
 /// second (the header's), which is far inside anything the server validates.
 class ServerClock {
-  ServerClock({this.prefs})
-      : _offset = Duration(milliseconds: prefs?.getInt(_prefsKey) ?? 0);
+  ServerClock({this.prefs}) : _offset = _readOffset(prefs);
+
+  /// The persisted offset, or zero. Tolerates a value of another type under
+  /// the key: this runs during app start-up, where a throw means no app.
+  static Duration _readOffset(SharedPreferences? prefs) {
+    try {
+      return Duration(milliseconds: prefs?.getInt(_prefsKey) ?? 0);
+    } catch (_) {
+      return Duration.zero;
+    }
+  }
 
   final SharedPreferences? prefs;
 
-  static const String _prefsKey = 'server_clock_offset_ms_v1';
+  static const String _prefsKey = StorageKeys.serverClockOffset;
 
   /// Changes smaller than this are jitter (latency plus the header's one-second
   /// truncation) and are ignored, so the offset does not wobble between calls.
   static const Duration _jitter = Duration(milliseconds: 1500);
+
+  /// Half of the `Date` header's one-second resolution (see [observeHttpDate]).
+  static const Duration _headerMidpoint = Duration(milliseconds: 500);
 
   Duration _offset;
 
@@ -47,6 +60,11 @@ class ServerClock {
   /// ruler it is measured with changes.
   DateTime toServer(DateTime deviceTime) => deviceTime.toUtc().add(_offset);
 
+  /// The inverse of [toServer]: an instant the server stamped (a visit's
+  /// `start_datetime`) expressed on the device clock, comparable with GPS fix
+  /// timestamps.
+  DateTime toDevice(DateTime serverTime) => serverTime.toUtc().subtract(_offset);
+
   /// Feeds one response's `Date` header in. [receivedAt] is the device time the
   /// response arrived.
   void observeHttpDate(String? header, {DateTime? receivedAt}) {
@@ -60,8 +78,7 @@ class ServerClock {
     final arrived = (receivedAt ?? DateTime.now()).toUtc();
     // The header truncates to the whole second, so the true server time lies
     // somewhere inside the next 1000 ms: centre the estimate on it.
-    final candidate =
-        serverTime.add(const Duration(milliseconds: 500)).difference(arrived);
+    final candidate = serverTime.add(_headerMidpoint).difference(arrived);
     if ((candidate - _offset).abs() < _jitter) return;
     _offset = candidate;
     appLog('[ServerClock] device clock offset now ${candidate.inMilliseconds} ms');

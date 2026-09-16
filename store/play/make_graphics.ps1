@@ -72,7 +72,7 @@ $cyan  = New-Object System.Drawing.SolidBrush ([System.Drawing.ColorTranslator]:
 $textBox = New-Object System.Drawing.RectangleF 70, 178, 560, 90
 $g.DrawString('الزيارات الميدانية', $titleFont, $white, $textBox, $rtl)
 $subBox = New-Object System.Drawing.RectangleF 70, 268, 560, 60
-$g.DrawString('حضور وانصراف موثّق بالموقع الجغرافي', $subFont, $cyan, $subBox, $rtl)
+$g.DrawString('زيارات العملاء موثّقة بالموقع الجغرافي', $subFont, $cyan, $subBox, $rtl)
 
 $white.Dispose(); $cyan.Dispose(); $titleFont.Dispose(); $subFont.Dispose()
 $g.Dispose()

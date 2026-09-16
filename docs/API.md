@@ -91,7 +91,7 @@ discriminator — a `UserError` comes back as `0` while a session expiry is `100
   "params": {
     "db": "shawkialaddin-visits-dh-live-37916914",
     "login": "admin",
-    "password": "2005"
+    "password": "<password>"
   } }
 ```
 
@@ -712,7 +712,7 @@ DB=shawkialaddin-visits-dh-live-37916914
 curl -s -c cj.txt -X POST $BASE/web/session/authenticate \
   -H 'Content-Type: application/json' \
   -d "{\"jsonrpc\":\"2.0\",\"method\":\"call\",\"params\":
-       {\"db\":\"$DB\",\"login\":\"admin\",\"password\":\"2005\"}}"
+       {\"db\":\"$DB\",\"login\":\"$LOGIN\",\"password\":\"$PASSWORD\"}}"
 
 # 2. create → submit → approve
 curl -s -b cj.txt -X POST $BASE/api/visit/create \

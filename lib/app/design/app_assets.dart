@@ -35,4 +35,8 @@ class AppAssets {
   /// (see [PushNotificationService]) and via the manifest's
   /// `default_notification_color` accent.
   static const String androidNotificationIcon = '@drawable/ic_notification';
+
+  /// Android launcher icon, used as a foreground notification's full-colour
+  /// large icon. Resolves against `android/app/src/main/res/mipmap-*`.
+  static const String androidLauncherIcon = '@mipmap/ic_launcher';
 }

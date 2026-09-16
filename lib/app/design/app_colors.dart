@@ -37,6 +37,35 @@ class AppColors {
   static const medalSilver = Color(0xFF9AA0B4);
   static const medalBronze = Color(0xFFB87333);
 
+  // ---- map drawing ----
+  // Map tiles look the same in both themes, so the marks drawn on them use
+  // fixed colours rather than theme roles. Previously each map picked its own
+  // Material shade for the same meaning.
+
+  /// Where a recorded visit trail begins (the visit's start).
+  static const routeStart = Color(0xFF43A047);
+
+  /// Where a recorded visit trail ends (the visit's end).
+  static const routeEnd = Color(0xFFFF9E80);
+
+  /// One colour per visit on a day's map, so several visits read as separate
+  /// stretches rather than one tangle. Index with [routePaletteAt].
+  static const routePalette = [
+    Color(0xFF1E88E5),
+    Color(0xFF8E24AA),
+    Color(0xFFF4511E),
+    Color(0xFF00897B),
+    Color(0xFFC0CA33),
+    Color(0xFF6D4C41),
+  ];
+
+  static Color routePaletteAt(int index) =>
+      routePalette[index % routePalette.length];
+
+  /// Text and chrome drawn directly on map tiles or on a brand-coloured chip.
+  static const onMap = Color(0xFFFFFFFF);
+  static const onMapLight = Color(0xDD000000);
+
   // ---- shadows: black at fixed alphas, so elevation reads the same in both
   // themes without every widget hand-rolling its own Color(0x..000000) ----
   static const shadowSoft = Color(0x11000000);

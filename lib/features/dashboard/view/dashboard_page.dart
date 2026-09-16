@@ -2,17 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-
-import '../../../app/routes.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../../../app/routes.dart';
 import '../../../app/theme.dart';
+import '../../../core/utils/app_number.dart';
+import '../../../shared/extensions/bloc_extensions.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../visits/bloc/visits_list_bloc.dart';
 import '../../visits/domain/visit_metrics.dart';
 import 'dashboard_active_map_card.dart';
+import 'visits_list_feedback.dart';
 
 /// Admin-only landing screen. Aggregates the existing `VisitsListBloc`
 /// items into a quick-glance overview: actionable counts (overdue +
@@ -24,72 +26,82 @@ import 'dashboard_active_map_card.dart';
 /// surface. That keeps Odoo as the single source of truth and avoids
 /// duplicate write paths.
 class DashboardPage extends StatelessWidget {
-  const DashboardPage({super.key});
+  /// Opens the Visits tab narrowed to [VisitsListFocus]. Supplied by the
+  /// manager shell, which owns the tabs; without it the count tiles are not
+  /// tappable (the review tile still is — it is a route of its own).
+  final ValueChanged<VisitsListFocus>? onOpenVisits;
+
+  const DashboardPage({super.key, this.onOpenVisits});
+
+  /// The spinner lasts as long as the reload does.
+  static Future<void> _refresh(BuildContext context) {
+    final bloc = context.read<VisitsListBloc>()
+      ..add(const VisitsListLoadRequested(scope: VisitListScope.team));
+    return bloc.untilSettled((s) => s.status == VisitsListStatus.loading);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<VisitsListBloc, VisitsListState>(
-      builder: (context, state) {
-        if (state.status == VisitsListStatus.loading && state.items.isEmpty) {
-          return const _DashboardSkeleton();
-        }
-        // A failed fetch must not render as "Overdue 0 · Pending 0 · Today 0":
-        // the manager would read that as an authoritative "nothing outstanding"
-        // and close the app. Only fall back to the error view when we have no
-        // data at all — a failed refresh over a populated dashboard keeps the
-        // last good numbers and reports itself through the refresh indicator.
-        if (state.status == VisitsListStatus.failure && state.items.isEmpty) {
-          return ErrorView(
-            message: state.error?.localize(context) ?? context.s.errUnknown,
-            onRetry: () => context
-                .read<VisitsListBloc>()
-                .add(const VisitsListLoadRequested()),
+    return VisitsRefreshFailureListener(
+      child: BlocBuilder<VisitsListBloc, VisitsListState>(
+        builder: (context, state) {
+          // `initial` too: the first frame comes before the shell's load event
+          // is handled, and would otherwise flash a row of zeros.
+          if (state.items.isEmpty &&
+              (state.status == VisitsListStatus.loading ||
+                  state.status == VisitsListStatus.initial)) {
+            return const _DashboardSkeleton();
+          }
+          // A failed fetch must not render as "Overdue 0 · Pending 0 · Today
+          // 0": the manager would read that as an authoritative "nothing
+          // outstanding" and close the app. Only fall back to the error view
+          // when there is no data at all — a failed refresh over a populated
+          // dashboard keeps the last good numbers and says so in a snackbar
+          // ([VisitsRefreshFailureListener]).
+          if (state.status == VisitsListStatus.failure && state.items.isEmpty) {
+            return ErrorView(
+              message: state.error?.localize(context) ?? context.s.errUnknown,
+              onRetry: () => _refresh(context),
+            );
+          }
+          final visits = state.items;
+          // One sweep for the whole screen. Every tile below reads a field
+          // off this instead of running its own pass on each rebuild — see
+          // [DashboardSummary].
+          final summary = DashboardSummary.from(visits);
+          return AppRefreshIndicator(
+            onRefresh: () => _refresh(context),
+            child: ListView(
+              padding: _pagePadding(context),
+              children: [
+                _DashboardGreeting(summary: summary),
+                context.gapH(Insets.cardGap),
+                _KpiGrid(summary: summary, onOpenVisits: onOpenVisits),
+                context.gapH(Insets.cardGap),
+                // The map is the only child that paints continuously (tile
+                // fades, marker layers). Without a boundary its raster is
+                // discarded whenever a sibling KPI number animates.
+                RepaintBoundary(child: DashboardActiveMapCard(visits: visits)),
+                context.gapH(Insets.cardGap),
+                _LeaderboardCard(
+                  entries: summary.topCustomers,
+                  title: context.s.dashboardTopCustomers,
+                  icon: Icons.business_rounded,
+                  color: context.colors.primary,
+                ),
+                context.gapH(Insets.cardGap),
+                _LeaderboardCard(
+                  entries: summary.topEmployees,
+                  title: context.s.dashboardTopEmployees,
+                  icon: Icons.emoji_events_rounded,
+                  rowIcon: Icons.person_rounded,
+                  color: context.colors.tertiary,
+                ),
+              ],
+            ),
           );
-        }
-        final visits = state.items;
-        // One sweep for the whole screen. Every tile below reads a field off
-        // this instead of running its own `visits.where(...)` pass on each
-        // rebuild — see [DashboardSummary].
-        final summary = DashboardSummary.from(visits);
-        return AppRefreshIndicator(
-          onRefresh: () async {
-            final isAdmin =
-                context.read<AuthBloc>().state.user?.canEditVisits ?? false;
-            context.read<VisitsListBloc>().add(VisitsListLoadRequested(
-                  scope:
-                      isAdmin ? VisitListScope.team : VisitListScope.mine,
-                ));
-          },
-          child: ListView(
-            padding: _pagePadding(context),
-            children: [
-              _DashboardGreeting(summary: summary),
-              context.gapH(Insets.cardGap),
-              _KpiGrid(summary: summary),
-              context.gapH(Insets.cardGap),
-              // The map is the only child that paints continuously (tile
-              // fades, marker layers). Without a boundary its raster is
-              // discarded whenever a sibling KPI number animates.
-              RepaintBoundary(child: DashboardActiveMapCard(visits: visits)),
-              context.gapH(Insets.cardGap),
-              _LeaderboardCard(
-                entries: summary.topCustomers,
-                title: context.s.dashboardTopCustomers,
-                icon: Icons.business_rounded,
-                color: (c) => c.colors.primary,
-              ),
-              context.gapH(Insets.cardGap),
-              _LeaderboardCard(
-                entries: summary.topEmployees,
-                title: context.s.dashboardTopEmployees,
-                icon: Icons.emoji_events_rounded,
-                rowIcon: Icons.person_rounded,
-                color: (c) => c.colors.tertiary,
-              ),
-            ],
-          ),
-        );
-      },
+        },
+      ),
     );
   }
 }
@@ -101,86 +113,98 @@ class _DashboardGreeting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = context.read<AuthBloc>().state.user;
+    final s = context.s;
+    // `select`, not `read`: the name follows a profile refresh.
+    final name = context.select((AuthBloc b) => b.state.user?.displayName);
     return GreetingHeader(
-      name: user?.displayName ?? context.s.appTitle,
-      roleLabel: context.s.roleManager,
+      name: name ?? s.appTitle,
+      roleLabel: s.roleManager,
       roleIcon: Symbols.shield_person,
       done: summary.todayDone,
       total: summary.todayTotal,
       stats: [
         GreetingStat(
           icon: Symbols.event_available,
-          value: '${summary.today}',
-          label: context.s.dashboardKpiToday,
+          value: AppNumber.whole(summary.today),
+          label: s.dashboardKpiToday,
         ),
         GreetingStat(
           icon: Symbols.schedule,
-          value: '${summary.fieldHoursLabel} ${context.s.wfHoursShort}',
-          label: context.s.dashboardFieldTime,
+          value: s.dashboardFieldHoursValue(AppNumber.decimal(
+              summary.fieldMinutes / Duration.minutesPerHour)),
+          label: s.dashboardFieldTime,
         ),
       ],
     );
   }
 }
 
-/// 2x2 grid of headline numbers. Each tile is tappable and routes the
-/// admin straight into the Visits list with the matching filter
-/// pre-applied — so "Overdue: 3" → tap → Visits screen filtered to
-/// past-due. Removes the friction of explaining filters to the admin.
+/// Grid of headline counts. Each count tile opens the Visits tab narrowed to
+/// what it counts — "Overdue: 3" → tap → exactly those three — so the manager
+/// never has to find the matching filter.
 class _KpiGrid extends StatelessWidget {
   final DashboardSummary summary;
-  const _KpiGrid({required this.summary});
+  final ValueChanged<VisitsListFocus>? onOpenVisits;
+  const _KpiGrid({required this.summary, required this.onOpenVisits});
+
+  /// A tile's width : height at the design scale.
+  static const double _designAspect = 1.45;
+
+  /// How far the aspect may bend: taller for large fonts (the count and a
+  /// two-line label must not clip), never so tall a tile looks empty.
+  static const double _minAspect = 1.05;
+  static const double _maxAspect = 1.5;
+
+  static const int _phoneColumns = 2;
+  static const int _tabletColumns = 4;
+
+  /// A tap that opens [focus] — only when the shell can switch tabs and there
+  /// is something to show.
+  VoidCallback? _opener(VisitsListFocus focus, {required bool hasItems}) {
+    final open = onOpenVisits;
+    if (open == null || !hasItems) return null;
+    return () {
+      HapticFeedback.selectionClick();
+      open(focus);
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
-    final overdue = summary.overdue;
-    final pendingReview = summary.pendingReview;
-    final todayCount = summary.today;
-    final activeNow = summary.activeNow;
+    final s = context.s;
     // Four across on a tablet, two on a phone.
     //
     // Not cosmetic: `childAspectRatio` sets height as a fraction of the column
-    // width, so two columns on a ~1070dp tablet gave each tile a ~520dp width
-    // and, at this ratio, a ~360dp height — a mostly empty card with the count
-    // stranded in the middle of it. Nothing overflowed, which is why only
-    // looking at the device caught this. Splitting into four keeps each tile
-    // near its designed phone proportions and uses the extra width for what it
-    // is worth: seeing all four numbers in one glance.
-    final columns = context.isTablet ? 4 : 2;
+    // width, so two columns on a ~1070dp tablet gave each tile a ~360dp
+    // height — a mostly empty card with the count stranded in the middle.
+    final columns = context.isTablet ? _tabletColumns : _phoneColumns;
     // Tiles get taller as the OS font scale grows so the count + 2-line label
     // never clip; wider/narrower phones tweak it slightly via the width scale.
-    final aspect = (1.45 / (context.textScale.clamp(1.0, 1.25) * context.widthScale))
-        .clamp(1.05, 1.5);
+    final textGrowth = context.textScale.clamp(1.0, Responsive.maxTextScale);
+    final aspect = (_designAspect / (textGrowth * context.widthScale))
+        .clamp(_minAspect, _maxAspect);
+    final spacing = context.r(Insets.x3);
     return GridView.count(
       crossAxisCount: columns,
-      mainAxisSpacing: context.r(12),
-      crossAxisSpacing: context.r(12),
+      mainAxisSpacing: spacing,
+      crossAxisSpacing: spacing,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       childAspectRatio: aspect,
       children: [
         _KpiTile(
-          label: context.s.dashboardKpiOverdue,
-          value: overdue,
-          color: Colors.red.shade600,
+          label: s.dashboardKpiOverdue,
+          value: summary.overdue,
+          color: context.colors.error,
           icon: Icons.warning_amber_rounded,
-          onTap: overdue > 0
-              ? () {
-                  HapticFeedback.selectionClick();
-                  context
-                      .read<VisitsListBloc>()
-                      .add(const VisitsListScopeChanged(VisitListScope.team));
-                  context.go(AppRoutes.splash);
-                }
-              : null,
+          onTap: _opener(VisitsListFocus.overdue, hasItems: summary.overdue > 0),
         ),
         _KpiTile(
-          label: context.s.dashboardKpiPending,
-          value: pendingReview,
+          label: s.dashboardKpiPending,
+          value: summary.pendingReview,
           color: context.x.warning,
           icon: Symbols.pending,
-          onTap: pendingReview > 0
+          onTap: summary.pendingReview > 0
               ? () {
                   HapticFeedback.selectionClick();
                   context.push(AppRoutes.review);
@@ -188,32 +212,21 @@ class _KpiGrid extends StatelessWidget {
               : null,
         ),
         _KpiTile(
-          label: context.s.dashboardKpiToday,
-          value: todayCount,
+          label: s.dashboardKpiToday,
+          value: summary.today,
           color: context.colors.primary,
           icon: Icons.today_rounded,
-          onTap: () {
-            HapticFeedback.selectionClick();
-            context
-                .read<VisitsListBloc>()
-                .add(const VisitsListScopeChanged(VisitListScope.team));
-            context.go(AppRoutes.splash);
-          },
+          // Open even at zero: the list then says there is nothing today,
+          // which is the answer the manager tapped for.
+          onTap: _opener(VisitsListFocus.today, hasItems: true),
         ),
         _KpiTile(
-          label: context.s.dashboardKpiActive,
-          value: activeNow,
-          color: Colors.green.shade600,
+          label: s.dashboardKpiActive,
+          value: summary.activeNow,
+          color: context.x.success,
           icon: Icons.bolt_rounded,
-          onTap: activeNow > 0
-              ? () {
-                  HapticFeedback.selectionClick();
-                  context
-                      .read<VisitsListBloc>()
-                      .add(const VisitsListScopeChanged(VisitListScope.team));
-                  context.go(AppRoutes.splash);
-                }
-              : null,
+          onTap: _opener(VisitsListFocus.inProgress,
+              hasItems: summary.activeNow > 0),
         ),
       ],
     );
@@ -236,17 +249,19 @@ class _KpiTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(Radii.lg);
+    final glyph = context.r(IconSz.tile);
     return Material(
-      borderRadius: BorderRadius.circular(Radii.lg),
-      color: color.withValues(alpha: 0.12),
+      borderRadius: radius,
+      color: color.withValues(alpha: Alphas.tint),
       child: InkWell(
-        borderRadius: BorderRadius.circular(Radii.lg),
+        borderRadius: radius,
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: context.padAll(Insets.x4),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(Radii.lg),
-            border: Border.all(color: color.withValues(alpha: 0.30)),
+            borderRadius: radius,
+            border: Border.all(color: color.withValues(alpha: Alphas.border)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -255,12 +270,16 @@ class _KpiTile extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  // Symbols chevrons mirror themselves in RTL; picking the
+                  // left one for Arabic flipped it back the wrong way.
                   Icon(
-                    context.isRtl ? Symbols.chevron_left : Symbols.chevron_right,
-                    size: 22,
-                    color: onTap != null ? color.withValues(alpha: 0.7) : Colors.transparent,
+                    Symbols.chevron_right,
+                    size: glyph,
+                    color: onTap != null
+                        ? color.withValues(alpha: Alphas.subdued)
+                        : Colors.transparent,
                   ),
-                  Icon(icon, fill: 1, size: 22, color: color),
+                  Icon(icon, fill: 1, size: glyph, color: color),
                 ],
               ),
               Flexible(
@@ -292,18 +311,17 @@ class _KpiTile extends StatelessWidget {
   }
 }
 
-
 /// "Top N by visit count" card. The customers and employees leaderboards were
 /// two classes whose bodies differed only in which field they grouped by, which
 /// visits they counted, and the tint — so they are one widget, and the counting
-/// itself now happens once in [DashboardSummary] rather than per card.
+/// itself happens once in [DashboardSummary] rather than per card.
 class _LeaderboardCard extends StatelessWidget {
   /// Already ranked and truncated — see [DashboardSummary].
   final List<LeaderboardEntry> entries;
 
   final String title;
   final IconData icon;
-  final Color Function(BuildContext) color;
+  final Color color;
 
   /// Icon on each row; defaults to the card's own [icon].
   final IconData? rowIcon;
@@ -321,6 +339,7 @@ class _LeaderboardCard extends StatelessWidget {
     // Guard the divisor, not just the display: an empty board would otherwise
     // divide by zero when computing each row's bar fraction.
     final maxCount = entries.isEmpty ? 1 : entries.first.count;
+    final disc = context.r(CompSz.infoDot);
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -331,55 +350,28 @@ class _LeaderboardCard extends StatelessWidget {
             InlineEmptyRow(text: context.s.dashboardNoData)
           else
             for (final e in entries)
-              _LeaderboardRow(
+              LeaderboardRow(
+                // A tinted icon disc rather than an initial: these boards rank
+                // customers and employees alike, and a company has no
+                // meaningful initial.
+                leading: IconBadge(
+                  icon: rowIcon ?? icon,
+                  color: color,
+                  size: disc,
+                  iconSize: context.r(IconSz.inline),
+                  radius: disc / 2,
+                  tintAlpha: Alphas.tintStrong,
+                ),
                 name: e.name,
-                count: e.count,
-                fraction: e.count / maxCount,
-                color: color(context),
-                icon: rowIcon ?? icon,
+                figure: AppNumber.whole(e.count),
+                value: e.count / maxCount,
+                color: color,
               ),
         ],
       ),
     );
   }
 }
-
-class _LeaderboardRow extends StatelessWidget {
-  final String name;
-  final int count;
-  final double fraction;
-  final Color color;
-  final IconData icon;
-  const _LeaderboardRow({
-    required this.name,
-    required this.count,
-    required this.fraction,
-    required this.color,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final disc = context.r(CompSz.infoDot);
-    return LeaderboardRow(
-      // A tinted icon disc rather than an initial: these boards rank customers
-      // and employees alike, and a company has no meaningful initial.
-      leading: IconBadge(
-        icon: icon,
-        color: color,
-        size: disc,
-        iconSize: context.r(IconSz.inline),
-        radius: disc / 2,
-        tintAlpha: Alphas.tintStrong,
-      ),
-      name: name,
-      figure: '$count',
-      value: fraction,
-      color: color,
-    );
-  }
-}
-
 
 /// Shared by the page and its skeleton so the two cannot drift. The extra
 /// bottom inset clears the shell's nav bar.
@@ -399,6 +391,10 @@ const double _greetingHeight = 200.0;
 /// The 2×2 KPI grid.
 const double _kpiGridHeight = 280.0;
 
+/// The live-map card: its header, the [CompSz.mapCard] map and the rows under
+/// it.
+const double _mapCardHeight = 380.0;
+
 /// A leaderboard card: header plus five rows.
 const double _boardHeight = 220.0;
 
@@ -408,16 +404,19 @@ class _DashboardSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Greeting, KPI grid, map card, then the two leaderboards — the real
-    // page's rhythm, so nothing shifts when the data lands.
+    // page's rhythm, so nothing shifts when the data lands. Heights follow
+    // the text scale the way the real cards grow with it.
     final gap = context.gapH(Insets.cardGap);
-    final board = SkeletonCard(height: context.r(_boardHeight));
+    final board = SkeletonCard(height: context.fixedH(_boardHeight));
     return AppShimmer(
       child: ListView(
         padding: _pagePadding(context),
         children: [
-          SkeletonCard(height: context.r(_greetingHeight)),
+          SkeletonCard(height: context.fixedH(_greetingHeight)),
           gap,
-          SkeletonCard(height: context.r(_kpiGridHeight)),
+          SkeletonCard(height: context.fixedH(_kpiGridHeight)),
+          gap,
+          SkeletonCard(height: context.fixedH(_mapCardHeight)),
           gap,
           board,
           gap,

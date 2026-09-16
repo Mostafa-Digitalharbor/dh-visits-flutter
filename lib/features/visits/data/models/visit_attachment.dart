@@ -1,3 +1,5 @@
+import '../../../../core/api/odoo_parse.dart';
+import '../../../../core/utils/app_number.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 
 /// A file attached to a visit (`ir.attachment` linked via
@@ -15,11 +17,18 @@ class VisitAttachment {
     this.fileSize = 0,
   });
 
-  factory VisitAttachment.fromJson(Map<String, dynamic> json) => VisitAttachment(
-        id: (json['id'] as num).toInt(),
-        name: (json['name'] ?? '').toString(),
-        mimetype: (json['mimetype'] == false) ? null : json['mimetype']?.toString(),
-        fileSize: (json['file_size'] as num?)?.toInt() ?? 0,
+  static const int _bytesPerKb = 1024;
+  static const int _bytesPerMb = _bytesPerKb * _bytesPerKb;
+
+  /// Throws [FormatException] for a row without an id, so `parseRows` skips it.
+  factory VisitAttachment.fromJson(Map<String, dynamic> json) =>
+      VisitAttachment(
+        id:
+            odooInt(json['id']) ??
+            (throw const FormatException('attachment row without an id')),
+        name: odooString(json['name']) ?? '',
+        mimetype: odooString(json['mimetype']),
+        fileSize: odooInt(json['file_size']) ?? 0,
       );
 
   /// Human-readable size, e.g. "11 B", "4.2 KB", "1.3 MB" — localized, since
@@ -27,11 +36,15 @@ class VisitAttachment {
   ///
   /// Takes the localizations rather than a BuildContext so the model stays
   /// free of widget imports.
-  String readableSize(AppLocalizations s) {
-    const kb = 1024;
-    const mb = kb * 1024;
-    if (fileSize < kb) return s.unitBytes('$fileSize');
-    if (fileSize < mb) return s.unitKilobytes((fileSize / kb).toStringAsFixed(1));
-    return s.unitMegabytes((fileSize / mb).toStringAsFixed(1));
+  String readableSize(AppLocalizations s) => formatBytes(s, fileSize);
+
+  /// [bytes] in the largest unit that keeps the figure readable. Shared with
+  /// the upload size check, so the limit and the rejected file read alike.
+  static String formatBytes(AppLocalizations s, int bytes) {
+    if (bytes < _bytesPerKb) return s.unitBytes(AppNumber.whole(bytes));
+    if (bytes < _bytesPerMb) {
+      return s.unitKilobytes(AppNumber.decimal(bytes / _bytesPerKb));
+    }
+    return s.unitMegabytes(AppNumber.decimal(bytes / _bytesPerMb));
   }
 }

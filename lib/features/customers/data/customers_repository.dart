@@ -1,6 +1,9 @@
 import '../../../core/api/api_client.dart';
+import '../../../core/api/api_exceptions.dart';
+import '../../../core/api/odoo_parse.dart';
 import '../../../core/api/odoo_rpc.dart';
 import '../../../core/constants.dart';
+import '../../../core/utils/app_log.dart';
 import 'models/customer.dart';
 
 /// Reads customers straight from the standard `res.partner` model over
@@ -9,9 +12,9 @@ import 'models/customer.dart';
 /// Coordinates come from the `base_geolocalize` fields
 /// (`partner_latitude` / `partner_longitude`), which the customer's Odoo
 /// must have populated (Apps → install *Partner Geolocation*, then run
-/// "Geo Localize" on the contacts). Partners without coordinates are
-/// still appear in the directory. Map/nearby actions are disabled by the
-/// detail page until a customer has usable coordinates.
+/// "Geo Localize" on the contacts). Partners without coordinates still appear
+/// in the directory; map actions are disabled by the detail page until a
+/// customer has usable coordinates.
 class CustomersRepository {
   final ApiClient api;
   CustomersRepository({required this.api});
@@ -45,49 +48,31 @@ class CustomersRepository {
   Map<String, dynamic> _adaptPartner(
     Map<String, dynamic> row, {
     List<String> categories = const [],
-  }) {
-    double? num0(dynamic raw) {
-      if (raw is num) return raw.toDouble();
-      return null;
-    }
-
-    String? str0(dynamic raw) {
-      if (raw == null || raw == false) return null;
-      final s = raw.toString().trim();
-      return s.isEmpty ? null : s;
-    }
-
-    // Unwrap an Odoo many2one (`[id, "Name"]` or `false`) to its name.
-    String? m2oName(dynamic raw) {
-      if (raw is List && raw.length >= 2) return str0(raw[1]);
-      return null;
-    }
-
-    return <String, dynamic>{
-      'id': row['id'],
-      'name': str0(row['name']) ?? '',
-      'latitude': num0(row['partner_latitude']) ?? 0.0,
-      'longitude': num0(row['partner_longitude']) ?? 0.0,
-      'address': str0(row['contact_address']),
-      'phone': str0(row['phone']),
-      'is_company': row['is_company'] == true,
-      'email': str0(row['email']),
-      'job_position': str0(row['function']),
-      'street': str0(row['street']),
-      'city': str0(row['city']),
-      'zip': str0(row['zip']),
-      'state_name': m2oName(row['state_id']),
-      'country_name': m2oName(row['country_id']),
-      'parent_name': m2oName(row['parent_id']),
-      'website': str0(row['website']),
-      'vat': str0(row['vat']),
-      'categories': categories,
-    };
-  }
+  }) =>
+      <String, dynamic>{
+        'id': row['id'],
+        'name': row['name'],
+        'latitude': row['partner_latitude'],
+        'longitude': row['partner_longitude'],
+        'address': row['contact_address'],
+        'phone': row['phone'],
+        'is_company': row['is_company'],
+        'email': row['email'],
+        'job_position': row['function'],
+        'street': row['street'],
+        'city': row['city'],
+        'zip': row['zip'],
+        'state_name': odooMany2one(row['state_id']).name,
+        'country_name': odooMany2one(row['country_id']).name,
+        'parent_name': odooMany2one(row['parent_id']).name,
+        'website': row['website'],
+        'vat': row['vat'],
+        'categories': categories,
+      };
 
   Future<List<Customer>> list({
     String? search,
-    int limit = 50,
+    int limit = AppConstants.directoryPageLimit,
     int offset = 0,
   }) async {
     // The customer directory must not disappear just because geocoding has not
@@ -109,42 +94,92 @@ class CustomersRepository {
       offset: offset,
       order: 'name asc',
     );
-    return rows.map((e) => Customer.fromJson(_adaptPartner(e))).toList();
+    // One unreadable partner is skipped, not allowed to empty the directory.
+    final customers = parseRows(
+      rows,
+      (row) => Customer.fromJson(_adaptPartner(row)),
+      label: 'CustomersRepository',
+    );
+    final lastVisits = await _lastVisits([for (final c in customers) c.id]);
+    return [for (final c in customers) c.withLastVisit(lastVisits[c.id])];
   }
 
+  /// One customer, with its tags and last visit.
+  ///
+  /// Throws `ApiException(notFound)` when the partner no longer exists or the
+  /// user may no longer read it — Odoo's `read` then returns no row, and an
+  /// empty customer rendered as a blank page with no explanation.
   Future<Customer> getById(int id) async {
-    final rows = await api.readRecords(AppConstants.partnerModel, [
-      id,
-    ], _fields);
+    final rows = await api.readRecords(AppConstants.partnerModel, [id], _fields);
     if (rows.isEmpty) {
-      // Mirror the old "single record missing" behaviour with a typed error
-      // so callers (Nearby map) fall back to the cached customer object.
-      return Customer.fromJson(_adaptPartner({'id': id}));
+      throw ApiException(
+        code: ApiErrorCode.notFound,
+        details: '${AppConstants.partnerModel} $id is missing or not readable',
+      );
     }
     final row = rows.first;
-    // Resolve tag names: `category_id` comes back as bare ids from `read`.
-    final categories = await _resolveCategories(row['category_id']);
-    return Customer.fromJson(_adaptPartner(row, categories: categories));
+    // `category_id` comes back as bare ids from `read`; the names and the last
+    // visit are independent lookups, so they share one round-trip.
+    final (categories, lastVisits) = await (
+      _resolveCategories(row['category_id']),
+      _lastVisits([id]),
+    ).wait;
+    return Customer.fromJson(_adaptPartner(row, categories: categories))
+        .withLastVisit(lastVisits[id]);
   }
 
   /// Resolves `res.partner.category` ids to their display names (best-effort;
   /// an empty list on any failure so the detail page still renders).
   Future<List<String>> _resolveCategories(dynamic categoryIds) async {
-    if (categoryIds is! List) return const [];
-    final ids = categoryIds.whereType<num>().map((n) => n.toInt()).toList();
+    final ids = odooList(categoryIds).map(odooInt).whereType<int>().toList();
     if (ids.isEmpty) return const [];
     try {
       final rows = await api.readRecords(
         AppConstants.partnerCategoryModel,
         ids,
-        ['name'],
+        const ['name'],
       );
-      return rows
-          .map((c) => c['name']?.toString() ?? '')
-          .where((s) => s.isNotEmpty)
-          .toList();
-    } catch (_) {
+      return rows.map((c) => odooString(c['name'])).whereType<String>().toList();
+    } catch (e) {
+      appLog('[CustomersRepository] tag names unavailable: $e');
       return const [];
+    }
+  }
+
+  /// The most recently started visit of each customer in [partnerIds].
+  ///
+  /// One `search_read` over the visits module, newest first, keeping the first
+  /// row per customer. Bounded by [AppConstants.visitsAnalyticsLimit]: a
+  /// customer whose last visit is older than that many visits across the page
+  /// simply shows no badge. Best-effort — without the visits module, or
+  /// without read access to it, the directory still loads, just unbadged.
+  Future<Map<int, CustomerLastVisit>> _lastVisits(List<int> partnerIds) async {
+    if (partnerIds.isEmpty) return const {};
+    try {
+      final rows = await api.searchRead(
+        AppConstants.visitModel,
+        domain: [
+          [CustomerLastVisit.partnerField, 'in', partnerIds],
+          [CustomerLastVisit.startField, '!=', false],
+        ],
+        fields: CustomerLastVisit.visitFields,
+        order: '${CustomerLastVisit.startField} desc',
+        limit: AppConstants.visitsAnalyticsLimit,
+      );
+      final latest = <int, CustomerLastVisit>{};
+      for (final row in rows) {
+        final partnerId = odooMany2one(row[CustomerLastVisit.partnerField]).id;
+        if (partnerId == null || latest.containsKey(partnerId)) continue;
+        try {
+          latest[partnerId] = CustomerLastVisit.fromVisitRow(row);
+        } on FormatException catch (e) {
+          appLog('[CustomersRepository] skipped visit row: $e');
+        }
+      }
+      return latest;
+    } catch (e) {
+      appLog('[CustomersRepository] last visits unavailable: $e');
+      return const {};
     }
   }
 }

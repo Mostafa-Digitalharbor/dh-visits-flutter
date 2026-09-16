@@ -26,6 +26,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 
+import '../constants/app_locales.dart';
+
 /// A [DateFormat] bound to the app locale, whose output is digit-normalized.
 /// Reuse one across several values in a single `build`.
 class AppDateFormat {
@@ -109,7 +111,8 @@ class AppDate {
 
   /// "2026-07-15" — absolute date, reads the same in both languages and needs
   /// no locale (the >1 week fallback in [RelativeTime]).
-  static final DateFormat _iso = DateFormat('yyyy-MM-dd');
+  static final DateFormat _iso =
+      DateFormat('yyyy-MM-dd', AppLocales.wireFormatLocale);
 
   static String isoDate(DateTime when) => _iso.format(when);
 }

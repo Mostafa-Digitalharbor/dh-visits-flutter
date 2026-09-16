@@ -1,21 +1,20 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-
-import '../../../app/routes.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../app/design/app_decor.dart';
+import '../../../app/routes.dart';
 import '../../../app/theme.dart';
-import '../../../core/utils/app_date.dart';
+import '../../../core/utils/app_number.dart';
 import '../../../core/utils/relative_time.dart';
+import '../../../shared/bloc/searchable_list_bloc.dart';
+import '../../../shared/extensions/bloc_extensions.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../bloc/customers_bloc.dart';
 import '../data/models/customer.dart';
-import '../../../shared/bloc/searchable_list_bloc.dart';
+import 'customer_format.dart';
 
 class CustomersListPage extends StatefulWidget {
   const CustomersListPage({super.key});
@@ -31,8 +30,10 @@ class _CustomersListPageState extends State<CustomersListPage> {
     context.read<CustomersBloc>().add(const ListLoadRequested());
   }
 
-  Future<void> _refresh() async {
-    context.read<CustomersBloc>().add(const ListLoadRequested());
+  /// Lasts as long as the reload, so the pull-to-refresh spinner does too.
+  Future<void> _refresh() {
+    final bloc = context.read<CustomersBloc>()..add(const ListLoadRequested());
+    return bloc.untilSettled((s) => s.isLoading);
   }
 
   @override
@@ -41,19 +42,18 @@ class _CustomersListPageState extends State<CustomersListPage> {
       children: [
         BlocBuilder<CustomersBloc, CustomersState>(
           buildWhen: (p, n) => p.items != n.items,
-          builder: (context, state) {
-            final total = state.items.length;
-            final active = state.items
-                .where(
-                  (c) =>
-                      c.lastVisit != null && c.lastVisit!.checkOutTime == null,
-                )
-                .length;
-            return _CustomerStatsRow(total: total, active: active);
-          },
+          builder: (context, state) => _CustomerStatsRow(
+            total: state.items.length,
+            active: state.items.where((c) => c.hasActiveVisit).length,
+          ),
         ),
         DebouncedSearchField(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          padding: EdgeInsetsDirectional.fromSTEB(
+            context.r(Insets.x4),
+            context.rh(Insets.x1),
+            context.r(Insets.x4),
+            context.rh(Insets.x2),
+          ),
           hintText: context.s.customersSearchHint,
           onChanged: (q) =>
               context.read<CustomersBloc>().add(ListSearchChanged(q)),
@@ -68,17 +68,22 @@ class _CustomersListPageState extends State<CustomersListPage> {
                 prev.status != curr.status &&
                 curr.hasError &&
                 curr.items.isNotEmpty,
-            listener: (context, state) => context.showSnack(
-              state.error?.localize(context) ?? context.s.errUnknown,
-              kind: SnackKind.error,
-            ),
+            listener: (context, state) {
+              final s = context.s;
+              context.showSnack(
+                s.commonRefreshFailedStale(
+                    state.error?.localize(context) ?? s.errUnknown),
+                kind: SnackKind.error,
+              );
+            },
             builder: (context, state) => AsyncListView<Customer>(
               items: state.items,
               isLoading: state.isLoading,
               hasError: state.hasError,
-              errorMessage:
-                  state.error?.localize(context) ?? context.s.errUnknown,
+              errorMessage: state.error?.localize(context),
+              error: state.error,
               onRefresh: _refresh,
+              emptyIcon: Symbols.groups,
               emptyMessage: context.s.customersEmpty,
               itemBuilder: (_, customer, __) =>
                   _CustomerTile(customer: customer),
@@ -91,7 +96,7 @@ class _CustomersListPageState extends State<CustomersListPage> {
 }
 
 /// Two summary tiles above the customer list (design screen 08): total
-/// customers and active customers.
+/// customers and customers with a visit running now.
 class _CustomerStatsRow extends StatelessWidget {
   final int total;
   final int active;
@@ -101,7 +106,12 @@ class _CustomerStatsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final x = context.x;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: EdgeInsetsDirectional.fromSTEB(
+        context.r(Insets.x4),
+        context.rh(Insets.x3),
+        context.r(Insets.x4),
+        context.rh(Insets.x2),
+      ),
       child: Row(
         children: [
           Expanded(
@@ -143,11 +153,14 @@ class _StatTile extends StatelessWidget {
     required this.container,
   });
 
+  /// Tight line height so the figure and its label read as one block.
+  static const double _valueLineHeight = 1.1;
+
   @override
   Widget build(BuildContext context) {
     final cs = context.colors;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: context.padSym(h: Insets.x3h, v: Insets.x3),
       decoration: AppDecor.panel(context, shadow: false),
       child: Row(
         children: [
@@ -155,8 +168,8 @@ class _StatTile extends StatelessWidget {
             icon: icon,
             color: tone,
             background: container,
-            size: 38,
-            iconSize: 20,
+            size: context.r(CompSz.badgeLg),
+            iconSize: context.r(IconSz.sm),
             radius: Radii.sm,
             fill: 1,
           ),
@@ -167,8 +180,10 @@ class _StatTile extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '$value',
-                  style: AppType.number(22, cs.onSurface).copyWith(height: 1.1),
+                  AppNumber.whole(value),
+                  maxLines: 1,
+                  style: AppType.number(FontSz.greeting, cs.onSurface)
+                      .copyWith(height: _valueLineHeight),
                 ),
                 Text(
                   label,
@@ -189,6 +204,18 @@ class _StatTile extends StatelessWidget {
   }
 }
 
+/// 52 — the list avatar: a step up from [CompSz.avatar] so the initial stays
+/// legible next to a two-line name block.
+const double _tileAvatarSize = 52.0;
+
+/// The coloured strip on the card's leading edge.
+const double _accentStripWidth = 4.0;
+
+/// The avatar's soft brand shadow.
+const _avatarShadowAlpha = 0.25;
+const _avatarShadowBlur = 8.0;
+const _avatarShadowOffset = Offset(0, 3);
+
 class _CustomerTile extends StatelessWidget {
   final Customer customer;
   const _CustomerTile({required this.customer});
@@ -196,164 +223,127 @@ class _CustomerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final initial = InitialAvatar.initialOf(customer.name);
-    final isActive =
-        customer.lastVisit?.checkOutTime == null && customer.lastVisit != null;
-    final accent = isActive ? Colors.green.shade600 : colors.primary;
+    final lastVisit = customer.lastVisit;
+    final accent = customer.hasActiveVisit ? context.x.success : colors.primary;
     final hasFooter =
-        customer.phone != null ||
-        customer.mobile != null ||
-        customer.lastVisit != null;
-    final addressText =
-        customer.address ??
-        (customer.hasCoordinates
-            ? '${customer.latitude.toStringAsFixed(4)}, '
-                  '${customer.longitude.toStringAsFixed(4)}'
-            : '—');
+        customer.phone != null || customer.mobile != null || lastVisit != null;
+    final addressText = customer.address ??
+        CustomerFormat.coordinates(context, customer) ??
+        context.s.commonNoValue;
 
     return AppCard(
       padding: EdgeInsets.zero,
       onTap: () =>
           context.push(AppRoutes.customerDetail(customer.id), extra: customer),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Colored side strip — green only when there's a live visit.
-            Container(
-              width: 4,
-              decoration: BoxDecoration(
-                color: accent,
-                borderRadius: BorderRadius.horizontal(
-                  left: context.isRtl ? Radius.zero : const Radius.circular(12),
-                  right: context.isRtl
-                      ? const Radius.circular(12)
-                      : Radius.zero,
-                ),
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Top row: avatar + name/address + badge + chevron
-                    Row(
+      // A start-edge border rather than a strip widget beside the content: the
+      // card clips it to its own rounded shape, and it follows the content's
+      // height without an IntrinsicHeight pass per row. Green only while a
+      // visit is running.
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: BorderDirectional(
+            start: BorderSide(color: accent, width: _accentStripWidth),
+          ),
+        ),
+        child: Padding(
+          padding: EdgeInsetsDirectional.fromSTEB(
+            context.r(Insets.x3h),
+            context.r(Insets.x3h),
+            context.r(Insets.x3),
+            context.r(Insets.x3h),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top row: avatar + name/address + badge + chevron
+              Row(
+                children: [
+                  InitialAvatar(
+                    name: customer.name,
+                    size: context.r(_tileAvatarSize),
+                    shadow: [
+                      BoxShadow(
+                        color: colors.primary.withValues(alpha: _avatarShadowAlpha),
+                        blurRadius: _avatarShadowBlur,
+                        offset: _avatarShadowOffset,
+                      ),
+                    ],
+                  ),
+                  context.gapW(Insets.x3),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                colors.primary,
-                                Color.lerp(
-                                      colors.primary,
-                                      colors.tertiary,
-                                      0.6,
-                                    ) ??
-                                    colors.primary,
-                              ],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: colors.primary.withValues(alpha: 0.25),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            initial,
-                            style: TextStyle(
-                              color: colors.onPrimary,
-                              fontSize: FontSz.listInitial,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        Text(
+                          customer.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.text.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                        context.gapW(Insets.x3),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                customer.name,
+                        context.gapH(Insets.x1),
+                        Row(
+                          children: [
+                            Icon(
+                              Symbols.location_on,
+                              size: context.r(IconSz.meta),
+                              color: colors.onSurfaceVariant,
+                            ),
+                            context.gapW(Insets.x1),
+                            Expanded(
+                              child: Text(
+                                addressText,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: context.text.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
+                                style: context.text.bodySmall?.copyWith(
+                                  color: colors.onSurfaceVariant,
                                 ),
                               ),
-                              context.gapH(Insets.x1),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.place_outlined,
-                                    size: 13,
-                                    color: colors.onSurfaceVariant,
-                                  ),
-                                  context.gapW(Insets.x1),
-                                  Expanded(
-                                    child: Text(
-                                      addressText,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: context.text.bodySmall?.copyWith(
-                                        color: colors.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (customer.lastVisit != null) ...[
-                          context.gapW(Insets.x1h),
-                          // Flexible, not a bare child: at 320dp with the text
-                          // scale at its 1.25 ceiling the badge, the chevron
-                          // and the avatar together left the name/address
-                          // column about 14dp, which is narrower than the
-                          // address row's own icon — so that row overflowed by
-                          // 2px. Letting the badge give way instead ellipsises
-                          // a label that is already a rough "3h ago".
-                          Flexible(
-                            child: _LastVisitBadge(
-                                lastVisit: customer.lastVisit!),
-                          ),
-                        ],
-                        context.gapW(Insets.x1),
-                        Icon(
-                          context.isRtl
-                              ? Icons.chevron_left
-                              : Icons.chevron_right,
-                          color: colors.onSurfaceVariant,
-                          size: 22,
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                    if (hasFooter) ...[
-                      context.gapH(Insets.x3),
-                      Divider(height: 1, color: colors.outlineVariant),
-                      context.gapH(Insets.x2h),
-                      _MetaFooter(customer: customer),
-                    ],
+                  ),
+                  if (lastVisit != null) ...[
+                    context.gapW(Insets.x1h),
+                    // Flexible, not a bare child: at 320dp with the text
+                    // scale at its 1.25 ceiling the badge, the chevron
+                    // and the avatar together left the name/address
+                    // column about 14dp, which is narrower than the
+                    // address row's own icon — so that row overflowed by
+                    // 2px. Letting the badge give way instead ellipsises
+                    // a label that is already a rough "3h ago".
+                    Flexible(child: _LastVisitBadge(lastVisit: lastVisit)),
                   ],
-                ),
+                  context.gapW(Insets.x1),
+                  // `chevron_right` mirrors itself in Arabic
+                  // (`matchTextDirection`); choosing `chevron_left` for RTL
+                  // flipped it back to pointing the wrong way.
+                  Icon(
+                    Symbols.chevron_right,
+                    color: colors.onSurfaceVariant,
+                    size: context.r(IconSz.tile),
+                  ),
+                ],
               ),
-            ),
-          ],
+              if (hasFooter) ...[
+                context.gapH(Insets.x3),
+                Divider(height: 1, color: colors.outlineVariant),
+                context.gapH(Insets.x2h),
+                _MetaFooter(customer: customer),
+              ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
+
+/// The small dot between two footer facts.
+const double _footerDotSize = 3.0;
 
 class _MetaFooter extends StatelessWidget {
   final Customer customer;
@@ -364,19 +354,22 @@ class _MetaFooter extends StatelessWidget {
     final colors = context.colors;
     final phone = customer.phone ?? customer.mobile;
     final lastVisitTime = customer.lastVisit?.checkInTime;
-    final isActive =
-        customer.lastVisit?.checkOutTime == null && customer.lastVisit != null;
+    final isActive = customer.hasActiveVisit;
+    final activeColor = context.x.success;
+    final glyph = context.r(IconSz.inline);
 
     return Row(
       children: [
         if (phone != null) ...[
-          Icon(Icons.phone_outlined, size: 14, color: colors.onSurfaceVariant),
+          Icon(Symbols.call, size: glyph, color: colors.onSurfaceVariant),
           context.gapW(Insets.x1),
           Flexible(
+            // Phone numbers are left-to-right in both languages.
             child: Text(
               phone,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              textDirection: TextDirection.ltr,
               style: context.text.bodySmall?.copyWith(
                 color: colors.onSurface,
                 fontWeight: FontWeight.w500,
@@ -387,8 +380,8 @@ class _MetaFooter extends StatelessWidget {
         if (phone != null && lastVisitTime != null) ...[
           context.gapW(Insets.x2h),
           Container(
-            width: 3,
-            height: 3,
+            width: _footerDotSize,
+            height: _footerDotSize,
             decoration: BoxDecoration(
               color: colors.onSurfaceVariant,
               shape: BoxShape.circle,
@@ -398,9 +391,9 @@ class _MetaFooter extends StatelessWidget {
         ],
         if (lastVisitTime != null) ...[
           Icon(
-            isActive ? Icons.bolt_rounded : Icons.history_rounded,
-            size: 14,
-            color: isActive ? Colors.green.shade600 : colors.onSurfaceVariant,
+            isActive ? Symbols.bolt : Symbols.history,
+            size: glyph,
+            color: isActive ? activeColor : colors.onSurfaceVariant,
           ),
           context.gapW(Insets.x1),
           Flexible(
@@ -411,9 +404,7 @@ class _MetaFooter extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: context.text.bodySmall?.copyWith(
-                color: isActive
-                    ? Colors.green.shade700
-                    : colors.onSurfaceVariant,
+                color: isActive ? activeColor : colors.onSurfaceVariant,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -428,42 +419,37 @@ class _LastVisitBadge extends StatelessWidget {
   final CustomerLastVisit lastVisit;
   const _LastVisitBadge({required this.lastVisit});
 
+  /// A small pill: a dense dot and label, with a faint outline so it holds its
+  /// shape on the card surface.
+  static const double _dotSize = 9.0;
+  static const double _outlineAlpha = 0.35;
+
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    final isActive = lastVisit.checkOutTime == null;
-    final accent = isActive ? Colors.green.shade600 : colors.primary;
+    final isActive = lastVisit.isActive;
+    final accent = isActive ? context.x.success : context.colors.primary;
+    final checkIn = lastVisit.checkInTime;
+    // RelativeTime, not a hand-built "5d": it pluralises properly in Arabic
+    // and reads "now" for a check-in stamped slightly ahead of this device.
     final label = isActive
         ? context.s.visitsHistoryActiveBadge
-        : (lastVisit.checkInTime != null
-              ? _relativeShort(context, lastVisit.checkInTime!)
-              : context.s.visitsHistoryCompletedBadge);
+        : checkIn != null
+            ? RelativeTime.format(context, checkIn)
+            : context.s.visitsHistoryCompletedBadge;
 
     return TonePill(
       label: label,
-      icon: isActive ? Icons.circle : Icons.history_rounded,
+      icon: isActive ? Symbols.circle : Symbols.history,
       color: accent,
       // Safe here — the caller wraps this badge in a Flexible, so it is laid
       // out against a bounded width.
       flexibleLabel: true,
-      iconSize: 9,
+      iconSize: context.r(_dotSize),
       fontSize: FontSz.tiny,
       radius: Radii.sm,
-      tintAlpha: 0.12,
-      borderAlpha: 0.35,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      tintAlpha: Alphas.tint,
+      borderAlpha: _outlineAlpha,
+      padding: context.padSym(h: Insets.x2, v: Insets.x1),
     );
-  }
-
-  /// Compact "time since" for the badge — the full [RelativeTime] phrasing
-  /// ("5 minutes ago") doesn't fit at this size, so this keeps the number and
-  /// a localized unit suffix ("5m" / "٥د").
-  static String _relativeShort(BuildContext context, DateTime when) {
-    final diff = DateTime.now().difference(when);
-    final s = context.s;
-    if (diff.inMinutes < 60) return '${diff.inMinutes}${s.wfMinutesShort}';
-    if (diff.inHours < 24) return '${diff.inHours}${s.wfHoursShort}';
-    if (diff.inDays < 30) return '${diff.inDays}${s.wfDaysShort}';
-    return AppDate.isoDate(when);
   }
 }

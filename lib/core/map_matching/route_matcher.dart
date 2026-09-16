@@ -17,8 +17,8 @@ import 'route_match_cache.dart';
 ///
 /// **Cost.** A trace is cut into fixed chunks of [MapMatcher.maxPoints] fixes
 /// sharing their boundary fix. Each chunk is matched once and cached under a
-/// key computed from its fixes ([RouteMatchCache]); a growing work day
-/// therefore only ever re-sends its last, still-growing chunk. Requests are
+/// key computed from its fixes ([RouteMatchCache]); the trail of a visit in
+/// progress therefore only ever re-sends its last, still-growing chunk. Requests are
 /// serialised and spaced ([requestSpacing]), identical concurrent requests
 /// are shared, and after a transient failure (offline, rate limited) the
 /// service is left alone for [failureBackoff].
@@ -27,14 +27,22 @@ class RouteMatcher {
   final MapMatcher? matcher;
   final RouteMatchCache cache;
   final Duration requestSpacing;
+
+  /// Pause after a failure worth retrying soon (offline, rate limited).
   final Duration failureBackoff;
+
+  /// Pause after the service refused the request outright (a misconfigured
+  /// URL answering HTML, a 4xx). Without it every redraw of a growing trail
+  /// re-sent every chunk to a server that will never accept them.
+  final Duration rejectionBackoff;
   final DateTime Function() _now;
 
   RouteMatcher({
     required this.matcher,
     RouteMatchCache? cache,
-    this.requestSpacing = const Duration(milliseconds: 1100),
+    this.requestSpacing = OsrmMapMatcher.defaultRequestSpacing,
     this.failureBackoff = const Duration(minutes: 1),
+    this.rejectionBackoff = const Duration(minutes: 15),
     DateTime Function()? now,
   })  : cache = cache ?? RouteMatchCache(),
         _now = now ?? DateTime.now;
@@ -124,7 +132,8 @@ class RouteMatcher {
         await cache.write(key, edges);
         return edges;
       } on MapMatchingException catch (e) {
-        if (e.retryable) _blockedUntil = _now().add(failureBackoff);
+        _blockedUntil =
+            _now().add(e.retryable ? failureBackoff : rejectionBackoff);
         appLog('[RouteMatcher] road matching unavailable, drawing raw GPS: $e');
         return null;
       } catch (e) {

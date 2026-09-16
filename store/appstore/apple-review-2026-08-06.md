@@ -68,7 +68,10 @@ iPad Air 11″ — وشاشة الإعداد على الآيباد بيظهر ت
 - مؤشرات إيجابية في اللوحة (نسبة الالتزام، الزيارات المتأخرة) — أول انطباع
 - حسابين: موظف ميداني + مدير، وكل واحد عنده زيارات في حالات مختلفة
   (planned / in progress / done / submitted للموافقة)
-- زيارة واحدة على الأقل مكتملة بإحداثيات بداية ونهاية عشان الخريطة والنطاق يبانوا
+- زيارة واحدة على الأقل مكتملة بإحداثيات بداية ونهاية ومسار، عشان الخريطة والنطاق يبانوا
+- كذا زيارة في حالة **approved** مسندة لحساب المراجعة — المراجع لازم يبدأ زيارة عشان
+  يشوف تسجيل المسار في الخلفية، و"بدء الزيارة" بيخرجها من الحالة دي (وممكن يعيد
+  الاختبار أكتر من مرة)
 
 > **تحديث أمني 2026-09-14:** كلمة مرور `admin` لهذه النسخة كانت مكتوبة هنا ودخلت
 > تاريخ Git (commits `4a7b540` و`7412701`)، فهي تُعامَل كمكشوفة، واتشالت من الملف.
@@ -157,6 +160,13 @@ bash store/photo/tools/ios_shots.sh          # iPhone 16 Pro Max → 1290×2796
 
 ## 4. النصوص الجاهزة لـ App Store Connect
 
+> **تحديث 2026-09-16:** "يوم العمل" (Start/End Work Day ومسار اليوم كامل)، ومشاركة
+> الموقع اللحظي، ورادار "الموظفين القريبين"، وانعكاس الحضور على hr.attendance
+> **اتشالوا من التطبيق**. الموقع دلوقتي للزيارات بس: نقطة عند بدء الزيارة، ونقطة عند
+> إنهائها، ومسار الزيارة وهي جارية (بيكمل في الخلفية لحد "إنهاء الزيارة" أو تسجيل
+> الخروج). نص الـ Notes تحت اتحدّث على الأساس ده — أي نسخة قديمة فيها "work day"
+> ممنوع تتلصق. التفاصيل التقنية: [docs/VISIT_TRACKING.md](../../docs/VISIT_TRACKING.md).
+
 ### 4-أ) خانة `App Review Information → Sign-In Information`
 
 فعّل `Sign-In required` وحط:
@@ -168,7 +178,8 @@ bash store/photo/tools/ios_shots.sh          # iPhone 16 Pro Max → 1290×2796
 
 > الخانتين دول لوحدهم **مش كفاية** — البند 2.1 اترفض بالظبط عشان كده. عنوان
 > السيرفر واسم الـ database لازم يبقوا في الـ Notes تحت، لأن أول شاشة في التطبيق
-> بتطلب عنوان السيرفر قبل أي تسجيل دخول.
+> بتطلب عنوان السيرفر قبل أي تسجيل دخول. الحساب نفسه (اسم المستخدم وكلمة المرور)
+> مكانه الخانتين دول بس — الـ Notes والرد بيحيلوا عليهم ومفيهمش أي كلمة مرور.
 
 ### 4-ب) خانة `App Review Information → Notes`
 
@@ -200,13 +211,12 @@ HOW TO SIGN IN (please follow these exact steps)
 
 4. Tap "Continue". The sign-in screen opens.
 
-5. Sign in with:
+5. Sign in with the review account provided in the Sign-In Information fields of
+   this submission.
 
-       Email / Username: admin
-       Password:         ‹from the team password manager — never in Git›
-
-6. When the location permission prompt appears, please tap Allow. The app opens
-   without it, but a visit cannot be checked in, which is the core feature.
+6. When the location permission prompt appears, please choose "Allow While Using
+   App". Without it a visit's location and route cannot be recorded, which is the
+   core feature.
 
 WHAT TO REVIEW AFTER SIGNING IN
 
@@ -215,36 +225,45 @@ app are reachable from it.
 
 - "Visits" tab — the assigned visits, with filters (Pending, Team, My visits,
   Escalated). Open any visit to see the customer, project, schedule and map.
-- Open a visit and tap "Start visit" — the app requests When In Use location access,
-  records your coordinates and shows the distance to the customer's registered
-  location. "End visit" closes it, "Submit for approval" sends it to the manager.
+- Open an "Approved" visit and tap "Start visit" — the app records your coordinates
+  and shows the distance to the customer's registered location. "End visit" closes
+  it, "Submit for approval" sends a visit to the manager.
 - A visit in the "Submitted" state shows "Approve" / "Reject" for the manager.
-- "Dashboard" tab — team KPIs and a live map of the reps in the field.
+- "Dashboard" tab — team KPIs and a map of the visits currently in progress, at the
+  position where each was started.
 - "Analytics" tab — on-time rate, visits per day, and per-employee performance.
 - Settings → "Change server" — the same server screen from step 1, so you can see
   how a user switches between company servers.
 
 LOCATION USE
 
-Visit check-in/out and live sharing use When In Use location while the app is open.
+The app uses location only for customer visits: one position when the employee taps
+"Start visit" on an approved visit, one when they tap "End visit", and the GPS trail
+of the visit while it is in progress. No location is collected before a visit
+starts, between visits or after it ends, and there is no whole-day tracking.
 
-The app also declares the "location" background mode for one feature: the work-day
-route. When the employee taps "Start work day", the app records their route (about
-one position every 5 seconds while moving) until they tap "End work day" or sign out
-— including while the app is in the background or the screen is locked, with the
-system location indicator shown. The route, including travel between customer
-visits, is uploaded to the employer's own server for the work-day and visit reports.
-Nothing is recorded outside an active work day.
+The app declares the "location" background mode for that visit trail only.
+Recording starts from the foreground once the server confirms that the visit has
+started, and continues while the app is in the background or the device is locked,
+with the blue location indicator shown. It stops immediately when the employee taps
+"End visit" or signs out. "While Using the App" authorization is sufficient; the app
+never asks for "Always". The trail is uploaded to the employer's own server for the
+visit report. No location data is used for tracking or advertising.
 
-Before the first work day the app shows a disclosure screen explaining this and asks
-for agreement before any permission prompt. When In Use authorization is enough; the
-app then asks once whether to allow "Always", which only lets recording resume if iOS
-terminates the app during a work day. Declining keeps the feature working. No
-location data is used for tracking or advertising.
+Before the first "Start visit" the app shows a disclosure screen explaining what is
+collected, that it continues in the background during the visit, when it stops, and
+where the data goes.
 
-To test: sign in, tap "Start work day", agree, allow location, press Home or lock the
-device and move, then reopen the app — the "Today's Route" tab shows the recorded
-route. Tap "End work day" to stop recording.
+TO SEE BACKGROUND LOCATION IN ACTION
+
+1. Sign in with the review account (see above).
+2. Open a visit in the "Approved" state and tap "Start visit". Accept the
+   disclosure and allow location access "While Using the App".
+3. Press Home or lock the device (and, if possible, move a short distance). The
+   blue location indicator stays visible while the visit is in progress.
+4. Reopen the app and open the visit: its trail shows the recorded route.
+5. Tap "End visit" and enter an outcome. The location indicator disappears and
+   recording stops.
 
 The demo server above stays online until the review is complete, and we can reset its
 sample data on request.
@@ -277,12 +296,11 @@ Information notes, with step-by-step instructions. In short:
   Server address : https://thedigitalharbor-dh-visits-new.odoo.com
   Database       : thedigitalharbor-dh-visits-new-main-35787218
                    (the "Detect database" button fills this in automatically)
-  Email / Username: admin
-  Password        : ‹from the team password manager — never in Git›
+  Account        : in the Sign-In Information fields of this submission
 
-The account has manager rights, so every screen — visits, GPS check-in/out, the team
-dashboard, and analytics — is reachable from it. The demo server stays online until
-the review is complete.
+The account has manager rights, so every screen — visits, GPS-verified visit
+start/end and the visit trail, the team dashboard, and analytics — is reachable from
+it. The demo server stays online until the review is complete.
 
 Contact for any access issue: m.badr@digital-harbor.net
 
@@ -301,4 +319,6 @@ Digital Harbor
 - [ ] رقم النسخة في ASC متطابق مع `pubspec.yaml`
 - [ ] build 1.0.1 (5) مرفوع ومختار في صفحة النسخة
 - [ ] `App Review Information` متملية (Sign-In required + الحسابين + الـ Notes)
+- [ ] الـ Notes المتلصقة هي نسخة 2026-09-16 (موقع للزيارات بس — مفيش "work day" ولا "Always")
+- [ ] حساب المراجعة عنده زيارات approved يقدر يبدأها، وجرّبت عليه: بدء زيارة → Home/قفل → المؤشر الأزرق ظاهر → إنهاء الزيارة → المؤشر اختفى
 - [ ] الرد اللي فوق مبعوت في Resolution Center

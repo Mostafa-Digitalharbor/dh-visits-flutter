@@ -41,14 +41,16 @@
          post notifications; requested via firebase_messaging on first launch. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
-    <!-- Location.
-         While a visit is open, GPS is read with the app in use. Between "Start
-         work day" and "End work day" the route is also captured with the app in
-         the background or the screen locked, by WorkdayLocationService: a
-         foreground service of type `location` with an ongoing notification.
-         That service is always started from the foreground (the Start tap, or
-         the app being reopened), so the while-in-use grant covers it and
-         ACCESS_BACKGROUND_LOCATION is deliberately NOT requested.
+    <!-- Location — customer visits only.
+         A one-off fix is read when a visit is started or ended. Between a
+         server-confirmed Start Visit and End Visit the visit's GPS trail is
+         also recorded with the app in the background or the screen locked, by
+         VisitLocationService: a foreground service of type `location` with an
+         ongoing notification, running only while that visit is in progress.
+         Nothing is recorded before Start, between visits or after End.
+         The service is always started from the foreground (the Start tap, or
+         the app being reopened during a visit), so the while-in-use grant
+         covers it and ACCESS_BACKGROUND_LOCATION is deliberately NOT requested.
          FOREGROUND_SERVICE_LOCATION is required from Android 14 (API 34) for a
          service of that type; FOREGROUND_SERVICE from Android 9. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
@@ -96,10 +98,10 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <!-- Work-day route capture (see the location permissions above). Not
+        <!-- Visit trail capture (see the location permissions above). Not
              exported: only this app starts or stops it. -->
         <service
-            android:name=".workday.WorkdayLocationService"
+            android:name=".visittracking.VisitLocationService"
             android:exported="false"
             android:foregroundServiceType="location" />
 

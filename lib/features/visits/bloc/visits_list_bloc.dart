@@ -2,9 +2,9 @@ import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 
 import '../../../core/api/api_exceptions.dart';
+import '../../../core/constants.dart';
 import '../data/models/visit.dart';
 import '../data/visits_repository.dart';
-import '../../../core/constants.dart';
 
 part 'visits_list_event.dart';
 part 'visits_list_state.dart';
@@ -19,9 +19,22 @@ class VisitsListBloc extends Bloc<VisitsListEvent, VisitsListState> {
     on<VisitsListLoadRequested>(_onLoad);
     on<VisitsListScopeChanged>(_onScopeChanged);
     on<VisitsListSearchChanged>(
-        (e, emit) => emit(state.copyWith(searchQuery: e.query)));
-    on<VisitsListStateFilterChanged>((e, emit) => emit(state.copyWith(
-        stateFilter: e.state, clearStateFilter: e.state == null)));
+      (e, emit) => emit(state.copyWith(searchQuery: e.query)),
+    );
+    // Picking a state or a tab is the user choosing a new slice, so a
+    // dashboard preset that brought them here stops applying.
+    on<VisitsListStateFilterChanged>(
+      (e, emit) => emit(
+        state.copyWith(
+          stateFilter: e.state,
+          clearStateFilter: e.state == null,
+          focus: VisitsListFocus.all,
+        ),
+      ),
+    );
+    on<VisitsListFocusChanged>(
+      (e, emit) => emit(state.copyWith(focus: e.focus, clearStateFilter: true)),
+    );
     on<VisitsListReset>((_, emit) => emit(VisitsListState.initial));
   }
 
@@ -35,7 +48,13 @@ class VisitsListBloc extends Bloc<VisitsListEvent, VisitsListState> {
     Emitter<VisitsListState> emit,
   ) async {
     if (event.scope == state.scope) return;
-    emit(state.copyWith(scope: event.scope, clearStateFilter: true));
+    emit(
+      state.copyWith(
+        scope: event.scope,
+        clearStateFilter: true,
+        focus: VisitsListFocus.all,
+      ),
+    );
     await _fetch(event.scope, emit);
   }
 
@@ -62,27 +81,35 @@ class VisitsListBloc extends Bloc<VisitsListEvent, VisitsListState> {
     emit(state.copyWith(status: VisitsListStatus.loading, error: null));
     try {
       final items = switch (scope) {
-        VisitListScope.mine => await repository.myVisits(limit: AppConstants.visitsPageLimit),
-        VisitListScope.pending =>
-          await repository.managerList(VisitManagerScope.pending),
-        VisitListScope.team =>
-          await repository.managerList(VisitManagerScope.team),
-        VisitListScope.escalated =>
-          await repository.managerList(VisitManagerScope.escalated),
+        VisitListScope.mine => await repository.myVisits(
+          limit: AppConstants.visitsPageLimit,
+        ),
+        VisitListScope.pending => await repository.managerList(
+          VisitManagerScope.pending,
+        ),
+        VisitListScope.team => await repository.managerList(
+          VisitManagerScope.team,
+        ),
+        VisitListScope.escalated => await repository.managerList(
+          VisitManagerScope.escalated,
+        ),
       };
       await _ensureMinSkeleton(started, showsSkeleton);
+      // A tab switched while this was in flight has its own fetch running;
+      // these rows belong to the tab the user left.
+      if (state.scope != scope) return;
       emit(state.copyWith(status: VisitsListStatus.success, items: items));
-    } on ApiException catch (e) {
-      await _ensureMinSkeleton(started, showsSkeleton);
-      emit(state.copyWith(status: VisitsListStatus.failure, error: e));
     } catch (e) {
       // Never leave the UI stuck on the loading skeleton — surface any
-      // unexpected error (e.g. a response-parsing failure) as a failure state.
+      // failure, including a response-parsing one, as a failure state.
       await _ensureMinSkeleton(started, showsSkeleton);
-      emit(state.copyWith(
-        status: VisitsListStatus.failure,
-        error: ApiException.unexpected(e),
-      ));
+      if (state.scope != scope) return;
+      emit(
+        state.copyWith(
+          status: VisitsListStatus.failure,
+          error: e is ApiException ? e : ApiException.unexpected(e),
+        ),
+      );
     }
   }
 

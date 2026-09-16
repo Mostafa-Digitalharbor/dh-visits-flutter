@@ -19,7 +19,6 @@ class AppRoutes {
 
   // ---- Parameterized path templates (for GoRoute.path) ----
   static const String customerDetailPath = '/customers/:id';
-  static const String customerNearbyPath = '/customers/:id/nearby';
   static const String visitDetailPath = '/visits/:id';
 
   /// Full-screen GPS trail of one visit. Nested under the detail path so the
@@ -28,7 +27,6 @@ class AppRoutes {
 
   // ---- Path builders (for navigation call sites) ----
   static String customerDetail(int id) => '/customers/$id';
-  static String customerNearby(int id) => '/customers/$id/nearby';
   static String visitDetail(int id) => '/visits/$id';
   static String visitTrail(int id) => '/visits/$id/trail';
 }

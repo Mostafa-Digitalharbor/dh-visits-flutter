@@ -1,6 +1,9 @@
+import 'dart:io' show HttpHeaders;
+
 import 'package:dio/dio.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../config/app_environment.dart';
 import '../utils/distance.dart';
 import 'route_geometry.dart';
 
@@ -62,11 +65,11 @@ class OsrmMapMatcher implements MapMatcher {
 
   OsrmMapMatcher({
     required String baseUrl,
-    this.profile = 'driving',
+    this.profile = AppEnvironment.defaultMapMatchingProfile,
     Dio? dio,
     String? userAgent,
     int? maxPoints,
-    this.splitSpacing = const Duration(milliseconds: 1100),
+    this.splitSpacing = defaultRequestSpacing,
   })  : baseUrl = baseUrl.endsWith('/')
             ? baseUrl.substring(0, baseUrl.length - 1)
             : baseUrl,
@@ -76,10 +79,17 @@ class OsrmMapMatcher implements MapMatcher {
                 : chunkPoints),
         _dio = dio ??
             Dio(BaseOptions(
-              connectTimeout: const Duration(seconds: 10),
-              receiveTimeout: const Duration(seconds: 20),
-              headers: {if (userAgent != null) 'User-Agent': userAgent},
+              connectTimeout: _connectTimeout,
+              receiveTimeout: _receiveTimeout,
+              headers: {if (userAgent != null) HttpHeaders.userAgentHeader: userAgent},
             ));
+
+  /// The public server allows about one request per second; every request to
+  /// a matching service is spaced at least this far apart.
+  static const Duration defaultRequestSpacing = Duration(milliseconds: 1100);
+
+  static const Duration _connectTimeout = Duration(seconds: 10);
+  static const Duration _receiveTimeout = Duration(seconds: 20);
 
   /// Coordinates per request for a self-hosted server: under osrm-routed's
   /// default `--max-matching-size` of 100, and a GET URL of a few kilobytes.
@@ -87,7 +97,7 @@ class OsrmMapMatcher implements MapMatcher {
 
   /// The public demo server refuses a match of more than 10 coordinates
   /// ("TooBig: Too many trace coordinates").
-  static const String publicServerHost = 'router.project-osrm.org';
+  static const String publicServerHost = AppEnvironment.publicOsrmHost;
   static const int publicServerMaxPoints = 10;
 
   /// The public server refuses larger search radii ("TooBig").

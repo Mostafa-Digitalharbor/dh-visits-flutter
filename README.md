@@ -1,6 +1,8 @@
 # Customer Visits — location_gps
 
-تطبيق فلاتر لموظفي المبيعات الميدانيين عشان يعملوا **Check-in / Check-out** عند العملاء مع تتبّع الموقع لايف أثناء استخدام التطبيق، وللمديرين عشان يتابعوا فريقهم على الخريطة. الباك إند Odoo 19 (موديول `dh_customer_visits`).
+تطبيق فلاتر لموظفي المبيعات الميدانيين عشان يبدأوا وينهوا **زيارات العملاء** بالموقع (Start Visit / End Visit) ويتسجّل مسار الزيارة **أثناء تنفيذها بس**، وللمديرين عشان يراجعوا الزيارات ويعتمدوها. الباك إند Odoo 19 (موديول `dh_visit_management` — العقد في [docs/API.md](docs/API.md)).
+
+> **2026-09-16:** يوم العمل (Start/End Work Day ومسار اليوم كامل)، واللايف لوكيشن، ورادار الموظفين القريبين، وانعكاس الحضور على `hr.attendance` **اتشالوا**. الموقع بيتجمع للزيارات بس — التصميم في [docs/VISIT_TRACKING.md](docs/VISIT_TRACKING.md).
 
 - **اللغات:** عربي (افتراضي) + إنجليزي.
 - **الثيم:** Light / Dark / System.
@@ -38,16 +40,14 @@
 |---|---|
 | تسجيل الدخول | عبر Odoo session cookie (`/web/session/authenticate`) — مع زرّ تبديل اللغة والثيم في شاشة اللوجين. |
 | قائمة العملاء | بحث + بدّل بين الـ list والـ map، وفلترة العملاء اللي معاهم إحداثيات بس. |
-| Check-in / Check-out | يلتقط موقع GPS فعلي ويرسل للسيرفر ويتحقق من المسافة من مقر العميل. |
+| Start Visit / End Visit | يلتقط موقع GPS فعلي لحظة البدء ولحظة الإنهاء ويرسله مع `/api/visit/start` و`/api/visit/end` ويتحقق من المسافة من مقر العميل. |
 | Persistent Visit Bar | شريط ثابت أسفل الشاشة بيعرض الزيارة المفتوحة الحالية + الزمن الجاري. |
-| لايف لوكيشن (foreground-only) | إرسال موقع الموظف كل 30 ثانية أثناء استخدام التطبيق + heartbeat كل دقيقتين + فلتر مسافة 5م لتوفير البطارية. **يتوقّف تلقائياً لما التطبيق يدخل background**. |
-| مسار يوم العمل (background) | بين "بدء يوم العمل" و"إنهاء يوم العمل" بيتسجّل المسار كله حتى والتطبيق في الخلفية أو الشاشة مقفولة — Android: foreground service من نوع location بإشعار ظاهر، iOS: `UIBackgroundModes=location`. Offline queue + Today's Route (Roads / Raw GPS). التفاصيل في [docs/WORKDAY_TRACKING.md](docs/WORKDAY_TRACKING.md). |
-| Nearby Employees (للمديرين) | يجيب كل الموظفين على بُعد 10م من مقر عميل معيّن، يحدّث كل 10ث. |
+| مسار الزيارة (أثناء الزيارة بس) | التسجيل بيبدأ بعد ما السيرفر يأكّد `in_progress` ويقف فورًا مع End Visit أو تسجيل الخروج، وبيكمل في الخلفية والشاشة مقفولة أثناء الزيارة بس (Android: foreground service من نوع location بإشعار "Visit tracking active"، iOS: `UIBackgroundModes=location`). النقاط بتتخزن على الجهاز وتترفع دفعات على `/api/visit/log_locations`، والرسم على الطرق (OSRM) اختياري. التفاصيل في [docs/VISIT_TRACKING.md](docs/VISIT_TRACKING.md). |
 | سجل الزيارات | تاريخ زيارات الموظف + فلاتر بالتاريخ/الحالة. |
-| Dashboard (للمديرين) | KPIs عامة + خريطة فيها الموظفين النشطين دلوقتي. |
+| Dashboard (للمديرين) | KPIs عامة + خريطة بالزيارات الجارية عند نقطة بدء كل زيارة. |
 | الإعدادات | تبديل اللغة / الثيم + Logout. |
 | التحكم في الصلاحيات | يفرّق بين **User** (موظف عادي يشوف زياراته بس) و **Manager** (يشوف العملاء والموظفين كلهم). |
-| Offline queue | لو الـ check-in/out اتعمل بدون نت يتخزّن محلياً ويتبعت تلقائياً لما النت يرجع. |
+| Offline queue | لو Start/End اتعمل بدون نت يتخزّن محلياً ويتبعت تلقائياً لما النت يرجع (التتبع مابيبدأش غير لما السيرفر يقبل الـ Start). |
 
 ---
 
@@ -59,7 +59,7 @@
 - **DI:** [`get_it`](https://pub.dev/packages/get_it) — الـ service locator في [lib/core/di/service_locator.dart](lib/core/di/service_locator.dart)
 - **Routing:** [`go_router`](https://pub.dev/packages/go_router) — راوتر مركزي مع redirect على حسب حالة الـ auth
 - **Storage:** `shared_preferences` (للإعدادات) + `flutter_secure_storage` (للـ session) + `cookie_jar` persistent
-- **Location:** `geolocator` + `permission_handler` للزيارات واللايف لوكيشن (foreground). مسار يوم العمل native: `WorkdayLocationService.kt` (foreground service، بدون `ACCESS_BACKGROUND_LOCATION`) و`WorkdayLocation.swift` (`UIBackgroundModes=location`)
+- **Location:** `geolocator` + `permission_handler` لموقع Start/End والأذونات. مسار الزيارة native: `visittracking/VisitLocationService.kt` (foreground service، بدون `ACCESS_BACKGROUND_LOCATION`) و`VisitLocation.swift` (`UIBackgroundModes=location`)
 - **Maps:** `flutter_map` + `latlong2` (OpenStreetMap tiles، مش Google)
 - **i18n:** Flutter gen-l10n من `.arb` files
 - **UI:** Material 3 — Theme مبني على ألوان الشركة (Digital Harbor navy `#1E2A6E` + cyan `#3FBFD9`)
@@ -96,7 +96,7 @@
 - الـ `ApiClient` بيقبض على 401/`AUTH_REQUIRED` ويبثّ Stream، التطبيق يلتقطه في [lib/app/app.dart](lib/app/app.dart) ويعمل `AuthLogoutRequested` تلقائي.
 - الـ `GoRouter` بيراقب الـ `AuthBloc` ويعمل redirect: لو unauthenticated يروح `/login`، لو authenticated يروح `/home`.
 - شاشة الـ Home بتفرّع على حسب الدور: `_UserShell` للموظف، `_ManagerShell` (Tabs) للمدير.
-- الـ `LiveLocationBloc` بيستخدم `WidgetsBindingObserver` فيوقّف الـ ticker لما التطبيق يدخل background ويرجّع يشغّله لما يرجع للـ foreground — اللايف لوكيشن foreground-only. الاستثناء الوحيد للخلفية هو مسار يوم العمل (`WorkdayTracker`) وهو معلن في سياسة الخصوصية.
+- الموقع في الخلفية بيتجمع في حالة واحدة بس: زيارة جارية (`VisitTrailTracker` + الخدمة native). مفيش أي تتبّع قبل البدء أو بين الزيارات أو بعد الإنهاء، وإشعار الـ push عمره ما يبدأ تتبّع. ده معلن في سياسة الخصوصية.
 
 ---
 
@@ -142,12 +142,10 @@ location_gps/
 │   │   ├── auth/                    # AuthBloc + LoginPage + SplashPage
 │   │   ├── customers/               # CustomersBloc + list/detail/map
 │   │   ├── employees/               # EmployeesBloc (للمدير)
-│   │   ├── dashboard/               # KPIs + active-employees map
+│   │   ├── dashboard/               # KPIs + خريطة الزيارات الجارية
 │   │   ├── home/                    # _UserShell / _ManagerShell
-│   │   ├── live_location/           # ticker + lifecycle observer
-│   │   ├── nearby/                  # NearbyBloc polling 10ث
 │   │   ├── settings/                # ثيم/لغة/logout
-│   │   └── visits/                  # VisitBloc + create/list/detail + bar
+│   │   └── visits/                  # VisitBloc + create/list/detail + bar + VisitTrailTracker
 │   │
 │   ├── shared/                      # widgets/extensions reusable
 │   │   ├── extensions/
@@ -170,22 +168,27 @@ location_gps/
 │       └── visit-logo-ios.png       # أيقونة iOS (بدون شفافية)
 │
 ├── docs/
-│   ├── README.md                    # توثيق الـ Backend API كامل
+│   ├── API.md                       # عقد الـ Backend API الحالي (dh_visit_management)
+│   ├── VISIT_TRACKING.md            # تصميم تتبّع الموقع أثناء الزيارة فقط
+│   ├── README.md                    # مرجع قديم لـ API موديول dh_customer_visits (legacy)
 │   ├── BACKEND_OPEN_ASKS.md         # أسئلة معلّقة للباك إند
 │   ├── RELEASE.md                   # دليل البناء والنشر على Play / App Store
-│   ├── PRIVACY_POLICY.md            # سياسة الخصوصية (Markdown)
-│   └── PRIVACY_POLICY.docx          # نفس السياسة كملف Word جاهز للموقع
+│   ├── PRIVACY_POLICY.md            # سياسة الخصوصية (Markdown — المصدر)
+│   ├── PRIVACY_POLICY.html          # مولّدة من الـ md للصق في CMS الموقع
+│   └── PRIVACY_POLICY.docx          # نفس السياسة كملف Word
 │
 ├── scripts/
-│   └── build_privacy_policy_docx.ps1  # يبني الـ .docx من OOXML+ZIP مباشرة
+│   ├── build_privacy_policy_html.mjs  # يبني الـ .html من PRIVACY_POLICY.md
+│   └── build_privacy_policy_docx.ps1  # يبني الـ .docx من OOXML+ZIP مباشرة (نصه مكتوب جوّه السكربت)
 │
 ├── android/
 │   ├── app/
 │   │   ├── build.gradle.kts         # compileSdk 36 + signing + R8 + ProGuard
 │   │   ├── proguard-rules.pro       # R8 keep-rules لـ Flutter/secure_storage
 │   │   └── src/main/
-│   │       ├── AndroidManifest.xml  # permissions + foreground-only location
+│   │       ├── AndroidManifest.xml  # permissions + VisitLocationService (type location)
 │   │       ├── kotlin/net/digitalharbor/visits/MainActivity.kt
+│   │       ├── kotlin/net/digitalharbor/visits/visittracking/  # تسجيل مسار الزيارة
 │   │       └── res/
 │   │           ├── values/strings.xml        # app_name = "Customer Visits"
 │   │           ├── values-ar/strings.xml     # app_name = "زيارات العملاء"
@@ -195,7 +198,8 @@ location_gps/
 │
 ├── ios/
 │   └── Runner/
-│       ├── Info.plist               # WhenInUse location + HTTPS-only + no bg modes
+│       ├── Info.plist               # WhenInUse location + HTTPS-only + bg mode location (أثناء الزيارة)
+│       ├── VisitLocation.swift      # تسجيل مسار الزيارة
 │       ├── en.lproj/InfoPlist.strings  # permission strings — English
 │       └── ar.lproj/InfoPlist.strings  # permission strings — Arabic
 │
@@ -255,17 +259,18 @@ dart run flutter_native_splash:create
 
 ## الاتصال بالباك إند
 
-كل التفاصيل (endpoints, error envelope, data models, edge cases) موجودين في [docs/README.md](docs/README.md). الـ endpoints الرئيسية:
+العقد الحالي كامل في [docs/API.md](docs/API.md) ([docs/README.md](docs/README.md) مرجع قديم للـ API السابق). الـ endpoints الرئيسية:
 
 | الـ Endpoint | الوصف |
 |---|---|
 | `POST /web/session/authenticate` | تسجيل دخول Odoo |
-| `GET  /api/customers` | قائمة العملاء + بحث |
-| `GET  /api/customers/<id>` | تفاصيل العميل + آخر زيارة |
-| `GET  /api/customers/<id>/nearby-employees` | موظفين قريبين (للمدير) |
-| `POST /api/visits/check-in` · `check-out` | بداية ونهاية الزيارة |
-| `GET  /api/visits` | سجل الزيارات (مع فلاتر) |
-| `POST /api/employee/location` | تحديث موقع لايف |
+| `POST /api/visit/my` · `get` | سجل الزيارات وتفاصيل زيارة |
+| `POST /api/visit/create` · `submit` · `approve` · `reject` | إنشاء الزيارة ودورة الاعتماد |
+| `POST /api/visit/start` · `end` | بداية ونهاية الزيارة (مع الإحداثيات) |
+| `POST /api/visit/log_locations` | رفع نقاط مسار الزيارة دفعات |
+| `POST /api/visit/track` | قراءة مسار الزيارة |
+
+العملاء بيتقروا من `res.partner` عن طريق `call_kw` (شوف [docs/DATA_STORAGE_MAP.md](docs/DATA_STORAGE_MAP.md)).
 
 الـ `ApiClient` بيتعامل تلقائيًا مع:
 - إضافة الكوكي على كل request.
@@ -306,19 +311,20 @@ dart run flutter_native_splash:create
 
 | الصلاحية | Android | iOS | السبب |
 |---|---|---|---|
-| Precise location (while in use) | `ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION` | `NSLocationWhenInUseUsageDescription` | check-in/out + مسار الزيارة + لايف لوكيشن + مسار يوم العمل |
-| مسار يوم العمل في الخلفية | `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_LOCATION` (service type `location`) | `UIBackgroundModes=location` + `NSLocationAlwaysAndWhenInUseUsageDescription` (اختياري "Always") + `NSLocationTemporaryUsageDescriptionDictionary` | بين Start وEnd work day فقط |
-| Notifications | `POST_NOTIFICATIONS` | (push) | إشعارات الزيارات + إشعار تتبع يوم العمل على Android |
+| Precise location (while in use) | `ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION` | `NSLocationWhenInUseUsageDescription` | موقع Start/End Visit + مسار الزيارة الجارية |
+| مسار الزيارة في الخلفية | `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_LOCATION` (service type `location`) | `UIBackgroundModes=location` + `NSLocationTemporaryUsageDescriptionDictionary` + `NSLocationAlwaysAndWhenInUseUsageDescription` (مطلوب لفحص Apple لأن `geolocator_apple` بيربط Always API، وبيخلّي المستخدم يقدر يختار Always من الإعدادات — التطبيق مابيطلبوش) | أثناء زيارة جارية فقط (من تأكيد Start لحد End أو الخروج) |
+| Notifications | `POST_NOTIFICATIONS` | (push) | إشعارات الزيارات + إشعار "Visit tracking active" على Android |
 | Camera | (intent) | `NSCameraUsageDescription` | صور إثبات الزيارة |
 | Internet | `INTERNET` + `ACCESS_NETWORK_STATE` | (تلقائي) | API + كشف الـ offline |
 
 **التطبيق مش بيطلب:**
 - ❌ `ACCESS_BACKGROUND_LOCATION` — الـ foreground service بتبدأ دايمًا والتطبيق في المقدمة
+- ❌ إذن "Always" على iOS — "While Using" كفاية (لو المستخدم اختار Always بنفسه من الإعدادات، iOS ممكن يعيد فتح التطبيق عشان يكمّل زيارة لسه جارية)
 - ❌ Mic / Contacts / Calendar / SMS
 
-قبل أول "بدء يوم العمل" بيظهر إفصاح داخل التطبيق (`WorkdayDisclosureDialog`) قبل أي طلب إذن. إعلانات Play في [store/play/location-and-foreground-service-declarations.md](store/play/location-and-foreground-service-declarations.md).
+قبل أول "بدء الزيارة" بيظهر إفصاح داخل التطبيق (إيه اللي بيتجمع، إنه بيكمل في الخلفية أثناء الزيارة، إنه بيقف مع End Visit أو الخروج، وبيروح فين). إعلانات Play في [store/play/location-and-foreground-service-declarations.md](store/play/location-and-foreground-service-declarations.md).
 
-الـ Privacy Policy الكاملة في [docs/PRIVACY_POLICY.md](docs/PRIVACY_POLICY.md) (و نسخة Word في [docs/PRIVACY_POLICY.docx](docs/PRIVACY_POLICY.docx) جاهزة للرفع على موقع الشركة).
+الـ Privacy Policy الكاملة في [docs/PRIVACY_POLICY.md](docs/PRIVACY_POLICY.md) (ونسخة HTML في [docs/PRIVACY_POLICY.html](docs/PRIVACY_POLICY.html) للصق في CMS الموقع، ونسخة Word في [docs/PRIVACY_POLICY.docx](docs/PRIVACY_POLICY.docx)).
 
 ---
 
@@ -343,5 +349,5 @@ flutter build ipa --release \
 1. اعمل keystore لـ Android: `keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload`
 2. انسخ `android/key.properties.template` لـ `android/key.properties` وحط فيه القيم.
 3. انسخ `.env.example` لـ `.env.production` وحط فيه `API_BASE_URL` و `ODOO_DATABASE` الإنتاجية.
-4. ارفع `docs/PRIVACY_POLICY.docx` على موقع الشركة وحط الرابط في Play Console و App Store Connect.
+4. انشر `docs/PRIVACY_POLICY.html` (أو الـ `.docx`) على موقع الشركة وحط الرابط في Play Console و App Store Connect.
 5. اتبع الـ checklist في [docs/RELEASE.md](docs/RELEASE.md).

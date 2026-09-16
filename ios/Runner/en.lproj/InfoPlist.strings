@@ -1,8 +1,8 @@
 /* Localized versions of Info.plist keys - English */
 
 CFBundleDisplayName = "Visits";
-NSLocationWhenInUseUsageDescription = "Visits uses your location to record customer visit check-in and check-out, to share your position with your manager while you use the app, and — while your work day is active — to record your work-day route, including in the background and with the screen locked. Route recording stops when you end your work day.";
-NSLocationAlwaysAndWhenInUseUsageDescription = "While your work day is active, Visits records your work-day route in the background. Allowing location access \"Always\" lets recording resume if iOS closes the app during your work day. No route is recorded outside an active work day.";
-WorkdayRoute = "Precise location is needed to record your work-day route and visits on the correct streets.";
+NSLocationWhenInUseUsageDescription = "Visits uses your location when you start and end a customer visit, and records the route of a visit while it is in progress — including in the background and with the screen locked. Recording stops when you end the visit. No location is collected outside an active visit.";
+NSLocationAlwaysAndWhenInUseUsageDescription = "Visits records your route only while a customer visit is in progress. Allowing location access \"Always\" lets recording resume if iOS closes the app during an active visit. No location is collected outside an active visit.";
+VisitRoute = "Precise location is needed to record the route of your active visit on the correct streets.";
 NSCameraUsageDescription = "We use the camera so you can attach proof-of-visit photos to a customer visit.";
 NSPhotoLibraryUsageDescription = "We ask for photo library access so you can attach an existing photo or file to a customer visit as proof of the visit.";

@@ -194,28 +194,28 @@ SENTRY_TRACES_PERCENT=10
 طلباتهم في تبويب "Main store listing":
 
 - **App name**: Customer Visits
-- **Short description** (80 char): "Field employee customer visit check-in/out with live location sharing."
-- **Full description** (4000 char): اكتب وصف كامل. الـ template:
+- **Short description** (80 char): "Customer visits with GPS-verified start and end and the route of each visit."
+- **Full description** (4000 char): اكتب وصف كامل. الـ template (البطاقة العربية الجاهزة في [store/play/listing-ar.md](../store/play/listing-ar.md)):
 
   ```
   Customer Visits is a workforce management tool for field sales teams.
 
   KEY FEATURES:
-  • Check-in / check-out at customer sites with GPS verification
-  • Work-day route: Start work day / End work day records your route,
-    including travel between visits
-  • Live location sharing with your manager while using the app
+  • Start / end customer visits with GPS verification
+  • Visit route: recorded only while a visit you started is in progress
   • Customer database with map view
-  • Visit history and notes
+  • Visit history, notes and approvals
   • Works offline -- queues actions and syncs when back online
   • Arabic and English support
 
   PRIVACY AND LOCATION:
-  The app uses your precise location for visits and while you use it. While a
-  work day you started is active, it also records your route in the
-  background and with the screen locked, with a notification visible the whole
-  time; recording stops when you end the work day. No third-party analytics.
-  No advertising. Your data goes to your employer's own server.
+  The app uses your precise location only for customer visits: when you start
+  a visit, when you end it, and to record the route while the visit is in
+  progress -- also in the background and with the screen locked, with a
+  notification visible the whole time. Recording stops when you end the visit
+  or sign out; nothing is recorded before a visit, between visits or after it.
+  No third-party analytics. No advertising. Your data goes to your employer's
+  own server.
 
   REQUIREMENTS:
   • Active employee account on your company's Odoo instance
@@ -254,13 +254,13 @@ SENTRY_TRACES_PERCENT=10
   - Shared with third parties: **No** (الـ Odoo بتاع الشركة وسيرفر مطابقة الطرق التابع للشركة مش third party)
   - Required: **Yes**
   - Purpose: **App functionality**
-  - نموذج Data safety **مفيهوش سؤال عن الـ background**. التتبع في الخلفية أثناء يوم العمل بيتغطّى في Privacy Policy وفي إعلان Foreground service (3.6-ب) وفي الإفصاح داخل التطبيق.
+  - الموقع بيتجمع للزيارات بس (بدء الزيارة، إنهاؤها، ومسارها وهي جارية). نموذج Data safety **مفيهوش سؤال عن الـ background**. التتبع في الخلفية — أثناء زيارة جارية بس، عن طريق الـ foreground service وبإذن "أثناء الاستخدام" — بيتغطّى في Privacy Policy وفي إعلان Foreground service (3.6-ب) وفي الإفصاح داخل التطبيق.
 - ✅ **Personal info -> Name / Email address / User IDs**: Yes، Required، App functionality + Account management
 - ✅ **Photos and videos -> Photos**: Yes، **Optional** (صورة إثبات الزيارة من الكاميرا)
 - ✅ **Files and docs**: Yes، **Optional** (مرفق الزيارة)
 - ✅ **App activity -> Other user-generated content**: Yes (ملاحظات الزيارة)، Required، App functionality
 - ✅ **App info and performance -> Crash logs / Diagnostics**: Yes (Sentry بدون PII)
-- ✅ **Device or other IDs**: Yes (توكن FCM)
+- ✅ **Device or other IDs**: Yes (توكن FCM + معرّف عشوائي لكل تثبيت)
 - ❌ **Contacts / Financial info / Health & fitness / Messages / Calendar / Audio / Web browsing**: No
 
 **Data handling practices**:
@@ -269,11 +269,11 @@ SENTRY_TRACES_PERCENT=10
 
 ### 3.6-ب إعلان Foreground service (Location)
 
-تبويب "App content" -> **Foreground service permissions**. مطلوب لأن التطبيق (targetSdk 35) بيعلن `FOREGROUND_SERVICE_LOCATION` لخدمة `WorkdayLocationService`:
+تبويب "App content" -> **Foreground service permissions**. مطلوب لأن التطبيق (targetSdk 36) بيعلن `FOREGROUND_SERVICE_LOCATION` لخدمة `VisitLocationService`:
 
 1. اختار النوع **Location**.
-2. انسخ وصف المهمة وأثر المقاطعة من ملف الإعلانات.
-3. **فيديو** (رابط unlisted) على جهاز حقيقي: Start work day → الإفصاح → الإذن → الإشعار ظاهر → Home وقفل الشاشة والحركة → فتح Today's Route → End work day والإشعار يختفي.
+2. انسخ وصف المهمة وأثر المقاطعة من ملف الإعلانات (الخلاصة: "records the GPS trail of a customer visit the employee started, while the visit is in progress; stops when the visit ends").
+3. **فيديو demo** (رابط unlisted — لسه محتاج يتصوّر) على جهاز حقيقي: فتح زيارة معتمدة → Start Visit → الإفصاح → الإذن → إشعار "Visit tracking active" ظاهر → Home وقفل الشاشة والحركة → فتح مسار الزيارة → End Visit والإشعار يختفي.
 
 **مش محتاج** نموذج Location permissions (background location) لأن التطبيق مش بيطلب `ACCESS_BACKGROUND_LOCATION` — الخدمة بتبدأ دايمًا والتطبيق في المقدمة.
 
@@ -281,7 +281,7 @@ SENTRY_TRACES_PERCENT=10
 
 تبويب "App content" -> "Privacy Policy".
 
-- **URL**: `https://digitalharbor.com.sa/ar/visit-app` — الصفحة موجودة بس **لسه النسخة القديمة** ("No background tracking"، فُحصت 2026-09-14). استبدل محتواها بـ `PRIVACY_POLICY.md` / `.docx` الأول. (`digital-harbor.net/privacy/visits` بيرجع 404.)
+- **URL**: `https://digitalharbor.com.sa/ar/visit-app` — الصفحة موجودة بس **لسه النسخة القديمة** ("No background tracking"، فُحصت 2026-09-14). استبدل محتواها بـ `PRIVACY_POLICY.html` (المولّدة من `PRIVACY_POLICY.md`، آخر تحديث 16 سبتمبر 2026) الأول. (`digital-harbor.net/privacy/visits` بيرجع 404.)
 
 ### 3.8 ارفع الـ AAB
 
@@ -367,7 +367,7 @@ sentry-cli debug-files upload --org digital-harbor --project customer-visits-mob
   - Used to: App Functionality
   - Linked to user: Yes
   - Used for tracking: **No** (مهم جداً -- "tracking" عند Apple معناه استخدامها للإعلانات، مش للمدير)
-  - التطبيق بيعلن `UIBackgroundModes = location` (تسجيل مسار يوم العمل في الخلفية) — لازم يتشرح في **App Review Notes** (4.10).
+  - الموقع للزيارات بس. التطبيق بيعلن `UIBackgroundModes = location` (تسجيل مسار الزيارة الجارية في الخلفية، بإذن "While Using" ومن غير طلب "Always") — لازم يتشرح في **App Review Notes** (4.10).
 - ✅ **Contact Info -> Name + Email Address**:
   - Used to: App Functionality
   - Linked to user: Yes
@@ -397,7 +397,7 @@ sentry-cli debug-files upload --org digital-harbor --project customer-visits-mob
   - **iPhone 6.5"** (iPhone 11 Pro Max): مطلوب على الأقل 3 -- size 1242×2688
   - **iPad 12.9"** (لو هتدعم iPad): 2048×2732
 
-- **Promotional Text** (170 char): "Field employee check-in/out app with live location sharing."
+- **Promotional Text** (170 char): النص الجاهز في [store/appstore/listing-en.md](../store/appstore/listing-en.md) (زيارات بموقع بدء وإنهاء موثّق ومسار الزيارة — من غير أي مشاركة موقع لحظية).
 - **Description** (4000 char): نفس وصف Google Play
 - **Keywords** (100 char): "field, visits, employee, gps, check-in, sales, customer"
 - **Support URL**: https://digital-harbor.net/support
@@ -444,9 +444,9 @@ xcrun altool --upload-app -f build/ios/ipa/*.ipa \
 3. املأ:
    - **Description, Keywords** (لو لسه)
    - **Sign-In Information** (مهم جداً للـ Apple reviewer):
-     - Username: `reviewer@digital-harbor.net` (اعمل حساب test في الـ Odoo)
-     - Password: شيء قوي بس مش حقيقي
-     - Notes: عنوان السيرفر + الـ database + شرح استخدام الموقع في الخلفية أثناء يوم العمل — النص الجاهز في [store/appstore/listing-en.md](../store/appstore/listing-en.md) (قسم LOCATION USE).
+     - Username: `reviewer@digital-harbor.net` (اعمل حساب test في الـ Odoo، وعليه زيارات **approved** يقدر المراجع يبدأها)
+     - Password: كلمة مرور قوية مخصوصة للمراجعة — بتتكتب في الخانة دي بس (ومحفوظة في password manager)، عمرها ما تتكتب في الريبو ولا في الـ Notes
+     - Notes: عنوان السيرفر + الـ database + شرح إن الموقع في الخلفية بيشتغل **أثناء الزيارة الجارية بس** وإزاي المراجع يشوفه (Start Visit → Home/قفل → المؤشر الأزرق → End Visit) — النص الجاهز في [store/appstore/apple-review-2026-08-06.md § 4-ب](../store/appstore/apple-review-2026-08-06.md).
    - **Contact Information**: اسم وإيميل
 4. **Submit for Review**
 
@@ -468,7 +468,7 @@ sentry-cli debug-files upload --org digital-harbor --project customer-visits-mob
 ### 5.1 ارفع الـ document
 
 1. الملف جاهز في [PRIVACY_POLICY.docx](PRIVACY_POLICY.docx) (و [PRIVACY_POLICY.md](PRIVACY_POLICY.md))
-2. التواريخ مكتوبة `14 September 2026`. لو نشرت في يوم تاني، غيّر **Effective date** و**Last updated** للتاريخ الفعلي وأعد توليد الـ docx (`scripts/build_privacy_policy_docx.ps1`).
+2. التواريخ: **Effective date** `14 September 2026`، **Last updated** `16 September 2026`. لو نشرت في يوم تاني، عدّل التاريخين في الـ md وأعد توليد الـ HTML (`node scripts/build_privacy_policy_html.mjs`). ⚠️ `scripts/build_privacy_policy_docx.ps1` نصه مكتوب جوّه السكربت ولسه بالنسخة القديمة (يوم العمل) — لو شغّلته زي ما هو هيرجّع الـ docx القديم؛ لازم يتحدّث من الـ md الأول.
 3. استبدل محتوى الصفحة المنشورة `https://digitalharbor.com.sa/ar/visit-app` (لسه النسخة القديمة اللي بتنفي التتبع في الخلفية). خيارات تانية لو لزم:
    - HTML أو PDF على موقع الشركة (`digital-harbor.net` بيحوّل لـ `digitalharbor.com.sa`)
    - **بـ Markdown viewer**: استخدم Notion / GitBook ووفّر public link
@@ -492,7 +492,8 @@ sentry-cli debug-files upload --org digital-harbor --project customer-visits-mob
 - [ ] اختبرت الـ AAB فعلياً على جهاز Android حقيقي (مش emulator بس)
 - [ ] اختبرت الـ IPA فعلياً عبر TestFlight على iPhone حقيقي
 - [ ] جربت تسجيل الدخول والـ check-in/out بنجاح
-- [ ] جربت الـ live location يظهر صح في dashboard الـ Odoo
+- [ ] جربت مسار الزيارة: بيبدأ بعد تأكيد Start بس، بيكمل في الخلفية، ويقف مع End Visit، ونقاطه ظاهرة على الزيارة في Odoo
+- [ ] اتأكدت إن مفيش أي تتبّع قبل بدء الزيارة أو بين الزيارات أو بعد إنهائها
 - [ ] جربت اللغة العربية والإنجليزية والـ Light/Dark theme
 - [ ] جربت قطع النت ثم رجوعه (الـ offline queue يشتغل)
 - [ ] جربت crash متعمد وتأكدت إنه ظهر في Sentry
@@ -516,10 +517,10 @@ sentry-cli debug-files upload --org digital-harbor --project customer-visits-mob
 |---|---|
 | "Permission not declared in privacy policy" | ضيف الـ permission اللي في الـ manifest للـ Privacy Policy |
 | "Data Safety doesn't match app behavior" | راجع نموذج Data Safety -- أكيد فيه حاجة معلنة غلط |
-| "App targeting older API" | غيّر `targetSdk` في `build.gradle.kts` -- لازم >= 34 |
+| "App targeting older API" | غيّر `targetSdk` في `build.gradle.kts` -- من 31 أغسطس 2026 لازم >= 36 (التطبيق دلوقتي 36) |
 | "Missing privacy policy" | حط الـ URL في App content -> Privacy Policy |
 | "Foreground service permission declaration incomplete / video missing" | املأ App content -> Foreground service permissions بنوع Location + الفيديو (3.6-ب) |
-| "Prominent disclosure missing for location" | الإفصاح بيظهر قبل أول Start work day (`WorkdayDisclosureDialog`) — ورّيه في الفيديو |
+| "Prominent disclosure missing for location" | الإفصاح بيظهر قبل أول Start Visit — ورّيه في الفيديو |
 
 ### Apple
 
@@ -535,7 +536,7 @@ sentry-cli debug-files upload --org digital-harbor --project customer-visits-mob
 | "Guideline 2.1 - App Completeness" | فيه bug أو الـ login مش شغّال للـ reviewer -- وفّر credentials صحيحة |
 | "Guideline 4.0 - Design" | الـ UI مش متبع iOS HIG -- نادراً يحصل لتطبيق Flutter |
 | "Missing Demo Account" | لازم تحط user/pass في Sign-In Information |
-| "Guideline 2.5.4 / 5.1.5 - Background location" | التطبيق بيستخدم `UIBackgroundModes = location` لتسجيل مسار يوم العمل بين Start وEnd فقط — اشرحه في Review Notes وخلّي حساب الـ demo يقدر يبدأ ويُنهي يوم عمل |
+| "Guideline 2.5.4 / 5.1.5 - Background location" | التطبيق بيستخدم `UIBackgroundModes = location` لتسجيل مسار الزيارة الجارية بس (من تأكيد Start لحد End Visit) — اشرحه في Review Notes وخلّي حساب الـ demo عنده زيارات approved يقدر يبدأها وينهيها |
 
 ---
 
@@ -546,4 +547,4 @@ sentry-cli debug-files upload --org digital-harbor --project customer-visits-mob
 3. **الـ keystore تضيع = التطبيق يضيع**. اعمل backup في 3 أماكن مختلفة (vault + cloud + USB في الخزنة).
 4. **اعمل version bump بعد كل رفع**. الـ Play Console بيرفض أي AAB versionCode يساوي أو أصغر من المرفوع قبله.
 5. **خلي عينك على Sentry أول أسبوع بعد الإطلاق**. الـ crashes اللي ما تظهرش في الـ testing بتظهر في الـ wild.
-6. **الموقع في الخلفية موجود دلوقتي (يوم العمل)**. أي تغيير في طريقة التتبع لازم يتعكس في نفس الوقت في: Privacy Policy، إعلان Foreground service على Play، الإفصاح داخل التطبيق، App Review Notes، ونصوص `Info.plist`. أي تناقض بينهم = رفض.
+6. **الموقع في الخلفية موجود أثناء الزيارة الجارية بس** (يوم العمل واللايف لوكيشن ورادار القريبين اتشالوا 2026-09-16). أي تغيير في طريقة التتبع لازم يتعكس في نفس الوقت في: Privacy Policy، إعلان Foreground service على Play، الإفصاح داخل التطبيق، App Review Notes، ونصوص `Info.plist`. أي تناقض بينهم = رفض. المرجع التقني: [VISIT_TRACKING.md](VISIT_TRACKING.md).

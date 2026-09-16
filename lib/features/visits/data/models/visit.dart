@@ -1,6 +1,10 @@
 import 'package:equatable/equatable.dart';
 
 import 'visit_participant.dart';
+import '../../../../core/api/odoo_parse.dart';
+
+// Re-exported: models and trackers across the app import the parser from here.
+export '../../../../core/api/odoo_parse.dart' show parseOdooUtc;
 
 /// The kind of thing a visit is attached to. The customer (`partner_id`)
 /// auto-fills from the chosen project/opportunity server-side.
@@ -27,6 +31,19 @@ String? visitTypeToWire(VisitType t) {
       return null;
   }
 }
+
+/// Where one of a visit's two approval tracks stands (API.md §3):
+/// `visit_approval_state` (the visit itself) and `attendee_approval_state`
+/// (the roll-up of its attendees; `none` when it has none).
+enum ApprovalTrack { none, pending, approved, rejected, unknown }
+
+ApprovalTrack approvalTrackFromWire(String? raw) => switch (raw) {
+      'none' => ApprovalTrack.none,
+      'pending' => ApprovalTrack.pending,
+      'approved' => ApprovalTrack.approved,
+      'rejected' => ApprovalTrack.rejected,
+      _ => ApprovalTrack.unknown,
+    };
 
 /// The full `dh.visit` approval workflow (11 states). See docs/VISITS_API.md.
 enum VisitState {
@@ -62,38 +79,20 @@ const Map<String, VisitState> _stateFromWire = {
 VisitState visitStateFromWire(String? raw) =>
     _stateFromWire[raw] ?? VisitState.unknown;
 
-/// Parses an Odoo datetime string as **UTC**. Odoo stores/serialises datetimes
-/// as naive UTC (`"2026-07-01 09:00:00"`); the REST API returns ISO
-/// (`"2026-07-01T09:00:00"`). Either way there's no zone marker, so we append
-/// `Z`. A trailing `Z`/offset already present is respected.
-DateTime? parseOdooUtc(dynamic raw) {
-  if (raw == null || raw == false) return null;
-  final s = raw.toString().trim();
-  if (s.isEmpty || s == 'false') return null;
-  final hasMarker =
-      s.endsWith('Z') || s.contains('+') || (s.lastIndexOf('-') > 10);
-  final iso = hasMarker ? s : '${s.replaceFirst(' ', 'T')}Z';
-  return DateTime.tryParse(iso)?.toUtc();
-}
-
-/// A GPS coordinate, treating Odoo's unset-float default (0.0) as "absent".
-double? _coord(dynamic raw) {
-  if (raw is! num) return null;
-  final v = raw.toDouble();
-  return v == 0.0 ? null : v;
-}
-
-/// Parses an Odoo many2one (`[id, "Name"]` or `false`), or a bare int id.
-(int?, String?) _m2o(dynamic raw) {
-  if (raw is List && raw.length >= 2) {
-    return ((raw[0] as num?)?.toInt(), raw[1]?.toString());
+/// The `state` value Odoo stores for [state], or null for
+/// [VisitState.unknown]. Server-side domains are built from this so the wire
+/// spelling lives only in [_stateFromWire].
+String? visitStateToWire(VisitState state) {
+  for (final entry in _stateFromWire.entries) {
+    if (entry.value == state) return entry.key;
   }
-  if (raw is num) return (raw.toInt(), null);
-  return (null, null);
+  return null;
 }
 
-String? _str(dynamic raw) =>
-    (raw == null || raw == false) ? null : raw.toString();
+/// A visit's record id, which every payload must carry. Throwing here (rather
+/// than inventing an id) lets `parseRows` drop the one unreadable row.
+int _requiredId(dynamic raw) =>
+    odooInt(raw) ?? (throw const FormatException('visit row without an id'));
 
 class Visit extends Equatable {
   final int id;
@@ -128,6 +127,12 @@ class Visit extends Equatable {
   final String? outcome;
 
   final VisitState state;
+
+  /// The two approval tracks. Present on the REST payload; the full `call_kw`
+  /// read leaves them [ApprovalTrack.unknown] and [attendeesPending] falls
+  /// back to the participant lines it reads instead.
+  final ApprovalTrack visitApprovalState;
+  final ApprovalTrack attendeeApprovalState;
 
   /// Optional planned coordinates recorded on create.
   final double? latitude;
@@ -197,6 +202,8 @@ class Visit extends Equatable {
     this.location,
     this.outcome,
     this.state = VisitState.unknown,
+    this.visitApprovalState = ApprovalTrack.unknown,
+    this.attendeeApprovalState = ApprovalTrack.unknown,
     this.latitude,
     this.longitude,
     this.startDatetime,
@@ -224,6 +231,14 @@ class Visit extends Equatable {
 
   // --------------------------------------------------------------- derived
   bool get isProject => visitType == VisitType.project;
+
+  /// An attendee still waits for their manager: the server refuses to approve
+  /// the visit until none does (API.md §3, "attendees gate the approval").
+  bool get attendeesPending =>
+      attendeeApprovalState == ApprovalTrack.pending ||
+      participants.any(
+        (p) => p.approvalState == ParticipantApprovalState.pending,
+      );
   bool get isOpportunity => visitType == VisitType.opportunity;
 
   bool get isInProgress => state == VisitState.inProgress;
@@ -236,9 +251,12 @@ class Visit extends Equatable {
   /// A visit can be ended while it's running.
   bool get canEnd => state == VisitState.inProgress;
 
-  /// Draft or a returned-to-draft visit the owner can submit.
+  /// The states `/api/visit/submit` accepts (API.md §4.2): a draft, a
+  /// reschedule waiting to be sent, or a rejected visit sent back for approval.
   bool get canSubmit =>
-      state == VisitState.draft || state == VisitState.rescheduleRequested;
+      state == VisitState.draft ||
+      state == VisitState.rescheduleRequested ||
+      state == VisitState.rejected;
 
   /// States where a routed approver may approve/reject. The current backend
   /// routes a submitted visit straight to `submitted` (the single pending
@@ -262,18 +280,19 @@ class Visit extends Equatable {
   /// doesn't recognise — fell through and was offered a Cancel the backend may
   /// well refuse. An unrecognised state gets no destructive action.
   bool get canCancel => const {
-        VisitState.draft,
-        VisitState.submitted,
-        VisitState.waitingParticipantManagerApproval,
-        VisitState.waitingDirectManagerApproval,
-        VisitState.escalated,
-        VisitState.approved,
-        VisitState.rescheduleRequested,
-      }.contains(state);
+    VisitState.draft,
+    VisitState.submitted,
+    VisitState.waitingParticipantManagerApproval,
+    VisitState.waitingDirectManagerApproval,
+    VisitState.escalated,
+    VisitState.approved,
+    VisitState.rescheduleRequested,
+  }.contains(state);
 
   /// Best timestamp representing when the visit happened/will happen, for
   /// list grouping: end → start → scheduled.
-  DateTime? get effectiveDate => endDatetime ?? startDatetime ?? scheduledDatetime;
+  DateTime? get effectiveDate =>
+      endDatetime ?? startDatetime ?? scheduledDatetime;
 
   Duration? get executionDuration {
     if (startDatetime == null || endDatetime == null) return null;
@@ -329,6 +348,17 @@ class Visit extends Equatable {
       !(latitude == 0 && longitude == 0);
   String? get visitTypeName => linkedRecordName;
 
+  /// Whether the visit belongs to [day]'s calendar (local time), by its
+  /// [effectiveDate]. The dashboard's "today" tile and the list it opens both
+  /// ask this, so they can't disagree.
+  bool isOnDay(DateTime day) {
+    final date = effectiveDate?.toLocal();
+    return date != null &&
+        date.year == day.year &&
+        date.month == day.month &&
+        date.day == day.day;
+  }
+
   /// Scheduled day has passed and the visit isn't completed/running/closed.
   bool get isOverdue => isOverdueAt(DateTime.now());
 
@@ -342,15 +372,10 @@ class Visit extends Equatable {
   bool isOverdueAt(DateTime now) {
     final s = scheduledDatetime;
     if (s == null) return false;
-    if (isDone ||
-        isCancelled ||
-        isRejected ||
-        state == VisitState.inProgress) {
+    if (isDone || isCancelled || isRejected || state == VisitState.inProgress) {
       return false;
     }
-    final today = DateTime(now.year, now.month, now.day);
-    final sd = DateTime(s.year, s.month, s.day);
-    return sd.isBefore(today);
+    return _localDay(s).isBefore(_localDay(now));
   }
 
   /// Whole-day delta between scheduled day and when it actually ended.
@@ -358,10 +383,26 @@ class Visit extends Equatable {
     final s = scheduledDatetime;
     final e = endDatetime;
     if (s == null || e == null) return null;
-    final sd = DateTime(s.year, s.month, s.day);
-    final el = e.toLocal();
-    final ed = DateTime(el.year, el.month, el.day);
-    return ed.difference(sd).inDays;
+    // Calendar days, not 24h spans: `difference` across a DST change is 23 or
+    // 25 hours, which `inDays` would floor to the wrong count.
+    final sd = _localDay(s);
+    final ed = _localDay(e);
+    return DateTime.utc(
+      ed.year,
+      ed.month,
+      ed.day,
+    ).difference(DateTime.utc(sd.year, sd.month, sd.day)).inDays;
+  }
+
+  /// The calendar day [at] falls on for the user.
+  ///
+  /// The server's datetimes are UTC, so their `year/month/day` are the UTC
+  /// date. Reading those straight off put a visit booked for 01:00 in Cairo
+  /// (22:00 UTC the evening before) on the previous day: it showed as overdue
+  /// on its own day and counted as a late finish in the on-time rate.
+  static DateTime _localDay(DateTime at) {
+    final local = at.toLocal();
+    return DateTime(local.year, local.month, local.day);
   }
 
   /// The linked-record display name (project or opportunity).
@@ -372,38 +413,42 @@ class Visit extends Equatable {
 
   /// From the REST `_visit_to_dict` payload (slim shape used by
   /// `/api/visit/*`). many2one fields are bare ints + a `*_name` string.
+  ///
+  /// Throws [FormatException] only for a row without an id; every other field
+  /// degrades to "absent" (Odoo sends `false` for an unset value of any type).
   factory Visit.fromApi(Map<String, dynamic> json) {
-    // Odoo serialises an unset many2one as `false` (a bool), not null/0, so we
-    // must guard the cast — otherwise `false as num?` throws and breaks the
-    // whole list parse.
-    int? nz(dynamic v) {
-      if (v is! num) return null;
-      final n = v.toInt();
-      return n == 0 ? null : n;
-    }
-
     return Visit(
-      id: (json['id'] as num).toInt(),
-      name: _str(json['name']),
-      visitType: visitTypeFromWire(json['visit_type']?.toString()),
-      projectId: nz(json['project_id']),
-      opportunityId: nz(json['opportunity_id']),
-      partnerId: nz(json['partner_id']),
-      partnerName: _str(json['partner_name']),
-      employeeId: nz(json['employee_id']),
-      employeeName: _str(json['employee_name']),
+      id: _requiredId(json['id']),
+      name: odooString(json['name']),
+      visitType: visitTypeFromWire(odooString(json['visit_type'])),
+      projectId: _positiveId(json['project_id']),
+      opportunityId: _positiveId(json['opportunity_id']),
+      partnerId: _positiveId(json['partner_id']),
+      partnerName: odooString(json['partner_name']),
+      employeeId: _positiveId(json['employee_id']),
+      employeeName: odooString(json['employee_name']),
       scheduledDatetime: parseOdooUtc(json['scheduled_datetime']),
-      purpose: _str(json['purpose']),
-      location: _str(json['location']),
-      outcome: _str(json['outcome']),
-      state: visitStateFromWire(json['state']?.toString()),
+      purpose: odooString(json['purpose']),
+      location: odooString(json['location']),
+      outcome: odooString(json['outcome']),
+      state: visitStateFromWire(odooString(json['state'])),
+      visitApprovalState:
+          approvalTrackFromWire(odooString(json['visit_approval_state'])),
+      attendeeApprovalState:
+          approvalTrackFromWire(odooString(json['attendee_approval_state'])),
       startDatetime: parseOdooUtc(json['start_datetime']),
       endDatetime: parseOdooUtc(json['end_datetime']),
-      locationLogCount: (json['location_log_count'] as num?)?.toInt() ?? 0,
-      trackedDistanceKm:
-          (json['tracked_distance_km'] as num?)?.toDouble() ?? 0.0,
+      locationLogCount: odooInt(json['location_log_count']) ?? 0,
+      trackedDistanceKm: odooDouble(json['tracked_distance_km']) ?? 0.0,
       lastLocationDatetime: parseOdooUtc(json['last_location_datetime']),
     );
+  }
+
+  /// A many2one sent as a bare id by the REST payload, where `0` also means
+  /// "not set".
+  static int? _positiveId(dynamic raw) {
+    final id = odooInt(raw);
+    return id == null || id == 0 ? null : id;
   }
 
   /// From a full `call_kw` read on `dh.visit` (rich shape: managers, approval
@@ -413,57 +458,54 @@ class Visit extends Equatable {
     Map<String, dynamic> row, {
     List<VisitParticipant> participants = const [],
   }) {
-    final project = _m2o(row['project_id']);
-    final opp = _m2o(row['opportunity_id']);
-    final partner = _m2o(row['partner_id']);
-    final employee = _m2o(row['employee_id']);
-    final directMgr = _m2o(row['direct_manager_id']);
-    final higherMgr = _m2o(row['higher_manager_id']);
-    final approvedBy = _m2o(row['approved_by']);
-    final rejectedBy = _m2o(row['rejected_by']);
+    final project = odooMany2one(row['project_id']);
+    final opp = odooMany2one(row['opportunity_id']);
+    final partner = odooMany2one(row['partner_id']);
+    final employee = odooMany2one(row['employee_id']);
+    final directMgr = odooMany2one(row['direct_manager_id']);
+    final higherMgr = odooMany2one(row['higher_manager_id']);
 
     return Visit(
-      id: (row['id'] as num).toInt(),
-      name: _str(row['name']),
-      visitType: visitTypeFromWire(row['visit_type']?.toString()),
-      projectId: project.$1,
-      projectName: project.$2,
-      opportunityId: opp.$1,
-      opportunityName: opp.$2,
-      partnerId: partner.$1,
-      partnerName: partner.$2,
-      employeeId: employee.$1,
-      employeeName: employee.$2,
-      directManagerId: directMgr.$1,
-      directManagerName: directMgr.$2,
-      higherManagerId: higherMgr.$1,
-      higherManagerName: higherMgr.$2,
+      id: _requiredId(row['id']),
+      name: odooString(row['name']),
+      visitType: visitTypeFromWire(odooString(row['visit_type'])),
+      projectId: project.id,
+      projectName: project.name,
+      opportunityId: opp.id,
+      opportunityName: opp.name,
+      partnerId: partner.id,
+      partnerName: partner.name,
+      employeeId: employee.id,
+      employeeName: employee.name,
+      directManagerId: directMgr.id,
+      directManagerName: directMgr.name,
+      higherManagerId: higherMgr.id,
+      higherManagerName: higherMgr.name,
       scheduledDatetime: parseOdooUtc(row['scheduled_datetime']),
-      purpose: _str(row['purpose']),
-      location: _str(row['location']),
-      outcome: _str(row['outcome']),
-      state: visitStateFromWire(row['state']?.toString()),
-      latitude: _coord(row['latitude']),
-      longitude: _coord(row['longitude']),
+      purpose: odooString(row['purpose']),
+      location: odooString(row['location']),
+      outcome: odooString(row['outcome']),
+      state: visitStateFromWire(odooString(row['state'])),
+      latitude: odooCoord(row['latitude']),
+      longitude: odooCoord(row['longitude']),
       startDatetime: parseOdooUtc(row['start_datetime']),
       endDatetime: parseOdooUtc(row['end_datetime']),
-      startLat: _coord(row['start_latitude']),
-      startLng: _coord(row['start_longitude']),
-      endLat: _coord(row['end_latitude']),
-      endLng: _coord(row['end_longitude']),
-      startLocation: _str(row['start_location']),
-      endLocation: _str(row['end_location']),
+      startLat: odooCoord(row['start_latitude']),
+      startLng: odooCoord(row['start_longitude']),
+      endLat: odooCoord(row['end_latitude']),
+      endLng: odooCoord(row['end_longitude']),
+      startLocation: odooString(row['start_location']),
+      endLocation: odooString(row['end_location']),
       submittedDate: parseOdooUtc(row['submitted_date']),
       approvedDate: parseOdooUtc(row['approved_date']),
-      approvedByName: approvedBy.$2,
+      approvedByName: odooMany2one(row['approved_by']).name,
       rejectedDate: parseOdooUtc(row['rejected_date']),
-      rejectedByName: rejectedBy.$2,
-      rejectReason: _str(row['reject_reason']),
-      isEscalated: row['is_escalated'] == true,
+      rejectedByName: odooMany2one(row['rejected_by']).name,
+      rejectReason: odooString(row['reject_reason']),
+      isEscalated: odooBool(row['is_escalated']),
       escalationDate: parseOdooUtc(row['escalation_date']),
       participants: participants,
-      attachmentCount:
-          (row['attachment_ids'] is List) ? (row['attachment_ids'] as List).length : 0,
+      attachmentCount: odooList(row['attachment_ids']).length,
     );
   }
 
@@ -476,53 +518,53 @@ class Visit extends Equatable {
     int? locationLogCount,
     double? trackedDistanceKm,
     DateTime? lastLocationDatetime,
-  }) =>
-      Visit(
-        id: id,
-        name: name,
-        visitType: visitType,
-        projectId: projectId,
-        projectName: projectName,
-        opportunityId: opportunityId,
-        opportunityName: opportunityName,
-        partnerId: partnerId,
-        partnerName: partnerName,
-        employeeId: employeeId,
-        employeeName: employeeName,
-        directManagerId: directManagerId,
-        directManagerName: directManagerName,
-        higherManagerId: higherManagerId,
-        higherManagerName: higherManagerName,
-        scheduledDatetime: scheduledDatetime,
-        purpose: purpose,
-        location: location,
-        outcome: outcome ?? this.outcome,
-        state: state ?? this.state,
-        latitude: latitude,
-        longitude: longitude,
-        startDatetime: startDatetime ?? this.startDatetime,
-        endDatetime: endDatetime ?? this.endDatetime,
-        startLat: startLat,
-        startLng: startLng,
-        endLat: endLat,
-        endLng: endLng,
-        startLocation: startLocation,
-        endLocation: endLocation,
-        submittedDate: submittedDate,
-        approvedDate: approvedDate,
-        approvedByName: approvedByName,
-        rejectedDate: rejectedDate,
-        rejectedByName: rejectedByName,
-        rejectReason: rejectReason,
-        isEscalated: isEscalated,
-        escalationDate: escalationDate,
-        participants: participants ?? this.participants,
-        attachmentCount: attachmentCount,
-        locationLogCount: locationLogCount ?? this.locationLogCount,
-        trackedDistanceKm: trackedDistanceKm ?? this.trackedDistanceKm,
-        lastLocationDatetime:
-            lastLocationDatetime ?? this.lastLocationDatetime,
-      );
+  }) => Visit(
+    id: id,
+    name: name,
+    visitType: visitType,
+    projectId: projectId,
+    projectName: projectName,
+    opportunityId: opportunityId,
+    opportunityName: opportunityName,
+    partnerId: partnerId,
+    partnerName: partnerName,
+    employeeId: employeeId,
+    employeeName: employeeName,
+    directManagerId: directManagerId,
+    directManagerName: directManagerName,
+    higherManagerId: higherManagerId,
+    higherManagerName: higherManagerName,
+    scheduledDatetime: scheduledDatetime,
+    purpose: purpose,
+    location: location,
+    outcome: outcome ?? this.outcome,
+    state: state ?? this.state,
+    visitApprovalState: visitApprovalState,
+    attendeeApprovalState: attendeeApprovalState,
+    latitude: latitude,
+    longitude: longitude,
+    startDatetime: startDatetime ?? this.startDatetime,
+    endDatetime: endDatetime ?? this.endDatetime,
+    startLat: startLat,
+    startLng: startLng,
+    endLat: endLat,
+    endLng: endLng,
+    startLocation: startLocation,
+    endLocation: endLocation,
+    submittedDate: submittedDate,
+    approvedDate: approvedDate,
+    approvedByName: approvedByName,
+    rejectedDate: rejectedDate,
+    rejectedByName: rejectedByName,
+    rejectReason: rejectReason,
+    isEscalated: isEscalated,
+    escalationDate: escalationDate,
+    participants: participants ?? this.participants,
+    attachmentCount: attachmentCount,
+    locationLogCount: locationLogCount ?? this.locationLogCount,
+    trackedDistanceKm: trackedDistanceKm ?? this.trackedDistanceKm,
+    lastLocationDatetime: lastLocationDatetime ?? this.lastLocationDatetime,
+  );
 
   /// Fields fetched by the full `call_kw` detail/manager-list read.
   static const List<String> odooReadFields = [
@@ -562,6 +604,55 @@ class Visit extends Equatable {
     'attachment_ids',
   ];
 
+  /// Every field the screens render. A shorter list made a `copyWith` that
+  /// only changed the outcome, the participants or the trail counters compare
+  /// equal to the original — and an emit Equatable deems unchanged is dropped.
   @override
-  List<Object?> get props => [id, state, scheduledDatetime, startDatetime, endDatetime];
+  List<Object?> get props => [
+    id,
+    name,
+    visitType,
+    projectId,
+    projectName,
+    opportunityId,
+    opportunityName,
+    partnerId,
+    partnerName,
+    employeeId,
+    employeeName,
+    directManagerId,
+    directManagerName,
+    higherManagerId,
+    higherManagerName,
+    scheduledDatetime,
+    purpose,
+    location,
+    outcome,
+    state,
+    visitApprovalState,
+    attendeeApprovalState,
+    latitude,
+    longitude,
+    startDatetime,
+    endDatetime,
+    startLat,
+    startLng,
+    endLat,
+    endLng,
+    startLocation,
+    endLocation,
+    submittedDate,
+    approvedDate,
+    approvedByName,
+    rejectedDate,
+    rejectedByName,
+    rejectReason,
+    isEscalated,
+    escalationDate,
+    participants,
+    attachmentCount,
+    locationLogCount,
+    trackedDistanceKm,
+    lastLocationDatetime,
+  ];
 }

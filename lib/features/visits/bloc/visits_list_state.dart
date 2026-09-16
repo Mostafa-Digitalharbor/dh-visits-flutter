@@ -7,6 +7,28 @@ enum VisitsListStatus { initial, loading, success, failure }
 /// manager's hierarchy).
 enum VisitListScope { mine, pending, team, escalated }
 
+/// A preset slice the dashboard's KPI tiles open the list on. Applied on top of
+/// [VisitsListState.stateFilter] and the search, client-side.
+enum VisitsListFocus {
+  all,
+
+  /// [Visit.isOverdue] — the "Overdue" tile.
+  overdue,
+
+  /// Visits on today's calendar — the "Today" tile.
+  today,
+
+  /// Visits running right now — the "In progress" tile.
+  inProgress;
+
+  bool matches(Visit v, DateTime now) => switch (this) {
+    all => true,
+    overdue => v.isOverdueAt(now),
+    today => v.isOnDay(now),
+    inProgress => v.isInProgress,
+  };
+}
+
 class VisitsListState extends Equatable {
   final VisitsListStatus status;
   final List<Visit> items;
@@ -19,6 +41,9 @@ class VisitsListState extends Equatable {
   /// Optional client-side filter on a single workflow state. `null` = all.
   final VisitState? stateFilter;
 
+  /// The dashboard preset the list was opened with.
+  final VisitsListFocus focus;
+
   VisitsListState({
     this.status = VisitsListStatus.initial,
     this.items = const [],
@@ -26,6 +51,7 @@ class VisitsListState extends Equatable {
     this.error,
     this.searchQuery = '',
     this.stateFilter,
+    this.focus = VisitsListFocus.all,
   });
 
   /// [items] narrowed by [searchQuery] and [stateFilter] — what the list
@@ -41,15 +67,25 @@ class VisitsListState extends Equatable {
 
   List<Visit> _filter() {
     final q = searchQuery.trim().toLowerCase();
-    if (q.isEmpty && stateFilter == null) return items;
-    return items.where((v) {
-      if (stateFilter != null && v.state != stateFilter) return false;
-      if (q.isEmpty) return true;
-      return (v.partnerName ?? '').toLowerCase().contains(q) ||
-          (v.name ?? '').toLowerCase().contains(q) ||
-          (v.purpose ?? '').toLowerCase().contains(q);
-    }).toList(growable: false);
+    if (q.isEmpty && stateFilter == null && focus == VisitsListFocus.all) {
+      return items;
+    }
+    final now = DateTime.now();
+    return items
+        .where((v) {
+          if (stateFilter != null && v.state != stateFilter) return false;
+          if (!focus.matches(v, now)) return false;
+          if (q.isEmpty) return true;
+          return (v.partnerName ?? '').toLowerCase().contains(q) ||
+              (v.name ?? '').toLowerCase().contains(q) ||
+              (v.purpose ?? '').toLowerCase().contains(q);
+        })
+        .toList(growable: false);
   }
+
+  /// Whether a state filter or a dashboard preset narrows the list, so an
+  /// empty result means "nothing matches" rather than "nothing exists".
+  bool get isFiltered => stateFilter != null || focus != VisitsListFocus.all;
 
   /// The pristine state. A getter rather than a `static final` so a reset never
   /// hands back an instance whose [visible] cache was already forced.
@@ -63,17 +99,25 @@ class VisitsListState extends Equatable {
     String? searchQuery,
     VisitState? stateFilter,
     bool clearStateFilter = false,
-  }) =>
-      VisitsListState(
-        status: status ?? this.status,
-        items: items ?? this.items,
-        scope: scope ?? this.scope,
-        error: error,
-        searchQuery: searchQuery ?? this.searchQuery,
-        stateFilter: clearStateFilter ? null : (stateFilter ?? this.stateFilter),
-      );
+    VisitsListFocus? focus,
+  }) => VisitsListState(
+    status: status ?? this.status,
+    items: items ?? this.items,
+    scope: scope ?? this.scope,
+    error: error,
+    searchQuery: searchQuery ?? this.searchQuery,
+    stateFilter: clearStateFilter ? null : (stateFilter ?? this.stateFilter),
+    focus: focus ?? this.focus,
+  );
 
   @override
-  List<Object?> get props =>
-      [status, items, scope, error, searchQuery, stateFilter];
+  List<Object?> get props => [
+    status,
+    items,
+    scope,
+    error,
+    searchQuery,
+    stateFilter,
+    focus,
+  ];
 }

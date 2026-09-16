@@ -141,9 +141,60 @@ class CompSz {
   /// 6 — a [ProgressTrack]'s bar.
   static const trackHeight = 6.0;
 
+  /// 220 — the height of a map card inside a scrolling page (visit detail,
+  /// dashboard). Scaled with `context.fixedH` at the call site.
+  static const mapCard = 220.0;
+
+  /// 280 — the tallest the route screen's map may get before the stop list
+  /// below it loses its share of the screen.
+  static const routeMapMax = 280.0;
+
+  /// 560 — the widest a dialog grows on tablets and in landscape, so its
+  /// paragraphs stay a readable measure.
+  static const dialogMaxWidth = 560.0;
+
+  /// 600 — the width from which a screen counts as a tablet.
+  static const tabletBreakpoint = 600.0;
+
   /// 1.5 — the outline weight on inputs, chips and the checkbox. Material's
   /// default hairline reads too faint against this app's surfaces.
   static const outlineWidth = 1.5;
+
+  /// 1 — a hairline border or divider.
+  static const hairline = 1.0;
+
+  /// 52 — a primary / secondary button's height.
+  static const buttonHeight = 52.0;
+
+  /// 64 — the bottom navigation bar's height.
+  static const navBarHeight = 64.0;
+
+  /// 60 — a pushed screen's app bar ([CvSubAppBar]), status bar excluded.
+  static const subAppBarHeight = 60.0;
+
+  /// 42 — a map marker disc ([MapPin]).
+  static const mapPin = 42.0;
+
+  /// 2.5 — the white ring around a map marker, which keeps it legible over
+  /// tiles.
+  static const mapPinRing = 2.5;
+
+  /// 8 — the progress bar in the greeting header.
+  static const headerTrackHeight = 8.0;
+
+  /// 130 / 78 — the empty state's halo and the disc inside it.
+  static const emptyHalo = 130.0;
+  static const emptyDisc = 78.0;
+
+  /// 56 — the glyph of a full-screen error.
+  static const errorGlyph = 56.0;
+
+  /// 18 / 2.2 — the spinner inside a busy button, and its stroke.
+  static const buttonSpinner = 18.0;
+  static const buttonSpinnerStroke = 2.2;
+
+  /// 220 — the widest a note on a map (the road-matching status) may grow.
+  static const mapNoteMaxWidth = 220.0;
 }
 
 /// Opacity tokens.
@@ -179,6 +230,27 @@ class Alphas {
 
   /// 0.85 — a scrim over a map or photo so text stays legible on top.
   static const scrim = 0.85;
+
+  /// 0.22 — black laid over map tiles in dark mode, so a light map does not
+  /// glare out of a dark screen.
+  static const mapDim = 0.22;
+
+  /// 0.65 — the backing of the on-map credit badge.
+  static const mapBadge = 0.65;
+
+  /// 0.60 — a softened container colour (the confirm dialog's icon halo).
+  static const soft = 0.60;
+
+  /// 0.85 — secondary text and glyphs on the brand gradient (the greeting
+  /// header's captions), readable but a step below the white headline.
+  static const onBrandMuted = 0.85;
+
+  /// 0.20 — the empty part of a progress bar drawn on the brand gradient.
+  static const onBrandTrack = 0.20;
+
+  /// 0.10 — how much brighter a pulsing halo gets at the top of its beat, on
+  /// top of [halo].
+  static const haloPulse = 0.10;
 }
 
 // Named `AppDurations` to avoid colliding with Flutter's Material `Durations`.
@@ -217,6 +289,34 @@ class AppDurations {
   /// A picker sheet's search debounce. Shorter than [searchDebounce] because
   /// the sheet's list is the only thing on screen — the user is watching it.
   static const pickerDebounce = Duration(milliseconds: 300);
+
+  /// How long an error snackbar stays: errors are full sentences with a next
+  /// step, and the user has to be able to read them to the end.
+  static const snackError = Duration(seconds: 6);
+
+  /// A page transition played backwards (pop) — quicker than the push.
+  static const transitionReverse = Duration(milliseconds: 240);
+
+  /// One list row's entrance, and the stagger between consecutive rows.
+  static const listItemIn = Duration(milliseconds: 380);
+  static const listItemStagger = Duration(milliseconds: 55);
+
+  /// The latest a row's entrance may start, however far down the list.
+  static const listItemMaxDelay = Duration(milliseconds: 350);
+
+  /// A one-off element scaling into place (an empty state appearing).
+  static const scaleIn = Duration(milliseconds: 450);
+
+  /// One beat of an idle decorative pulse, and the rest after it
+  /// ([AmbientPulse]).
+  static const pulseBeat = Duration(milliseconds: 1100);
+  static const pulseRest = Duration(milliseconds: 1900);
+
+  /// The empty state's slower, calmer breathing.
+  static const emptyPulse = Duration(milliseconds: 1200);
+
+  /// A segmented control's selection sliding across.
+  static const segmentSwitch = Duration(milliseconds: 150);
 }
 
 class AppCurves {

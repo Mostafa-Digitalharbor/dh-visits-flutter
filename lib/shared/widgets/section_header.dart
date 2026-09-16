@@ -44,6 +44,10 @@ class SectionHeader extends StatelessWidget {
         trailing = null,
         isEyebrow = true;
 
+  /// Letter spacing of the eyebrow in Latin script. Arabic letters join, and
+  /// spacing them apart breaks the word, so RTL gets none.
+  static const double _eyebrowTracking = 1.0;
+
   @override
   Widget build(BuildContext context) {
     if (isEyebrow) {
@@ -56,7 +60,7 @@ class SectionHeader extends StatelessWidget {
           // via the token and one via `context.text.labelSmall`.
           style: AppType.eyebrow.copyWith(
             color: context.colors.primary,
-            letterSpacing: 1.0,
+            letterSpacing: context.isRtl ? 0 : _eyebrowTracking,
           ),
         ),
       );
@@ -67,9 +71,11 @@ class SectionHeader extends StatelessWidget {
           Icon(icon, size: context.r(IconSz.label), color: context.colors.primary),
           context.gapW(Insets.x2),
         ],
-        // Flexible + ellipsis: these are localized titles that run longer in
-        // Arabic and grow with the OS text scale.
-        Flexible(
+        // Expanded + ellipsis: these are localized titles that run longer in
+        // Arabic and grow with the OS text scale. Expanded, not Flexible with a
+        // Spacer after it — the two split the row in half, so a long title was
+        // cut at half width even beside a two-digit badge.
+        Expanded(
           child: Text(
             label,
             maxLines: 1,
@@ -80,7 +86,7 @@ class SectionHeader extends StatelessWidget {
           ),
         ),
         if (trailing != null) ...[
-          const Spacer(),
+          context.gapW(Insets.x2),
           trailing!,
         ],
       ],

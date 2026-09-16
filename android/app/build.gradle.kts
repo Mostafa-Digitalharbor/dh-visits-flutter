@@ -46,10 +46,12 @@ android {
         // (uses AndroidKeyStore APIs added in M) and permission_handler runtime
         // permission flow.
         minSdk = flutter.minSdkVersion
-        // 35 = Android 15. Google Play requires new apps/updates to target an
-        // API level within one year of the latest major release; as of 2025+
-        // that is API 35. compileSdk (36) must be >= targetSdk.
-        targetSdk = 35
+        // 36 = Android 16. Google Play requires new apps and app updates to
+        // target API 36 from 31 Aug 2026 (developer.android.com/google/play/
+        // requirements/target-sdk). compileSdk must be >= targetSdk. Targeting
+        // 36 enables predictive back by default (PopScope/go_router handle it)
+        // and keeps edge-to-edge enforced (already the case since 35).
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 

@@ -92,8 +92,8 @@ traceback will point straight at the offending line.
 ### Mobile workaround
 We pass the `Customer` object via `go_router` extra from the list, so the
 detail page renders instantly from cached data and never blocks on this
-endpoint. Refresh fails silently. The Nearby Map page also skips the
-fetch when given the cached object. **Please still fix the endpoint** —
+endpoint. Refresh fails silently. (The Nearby Map page that also relied
+on this was removed from the app on 2026-09-16.) **Please still fix the endpoint** —
 relying on the cached object means deep links / cold starts at a customer
 URL don't work for the Manager flow.
 
@@ -416,12 +416,13 @@ on them:
   cookie. ✓
 - `GET /api/customers?limit=...` returns `{status, data, total}` with
   partners that have coords. ✓
-- `GET /api/customers/<id>/nearby-employees?radius=10&since=...` does
-  the Haversine math server-side and returns only employees inside the
-  radius with fresh `last_location_update`. Verified end-to-end. ✓
+- ~~`GET /api/customers/<id>/nearby-employees`~~ — no longer used: the
+  nearby-employees radar was removed from the app on 2026-09-16.
 - `POST /api/visits/check-in` and `POST /api/visits/check-out` work and
   correctly transition the visit's `state` and `mobile_state`. ✓
-- `POST /api/employee/location` accepts and stores the GPS ping. ✓
+- ~~`POST /api/employee/location`~~ — no longer used: live location
+  sharing was removed from the app on 2026-09-16. The app sends location
+  only for visits (start/end and the trail of a visit in progress).
 - Security groups + record rules are set up correctly (Manager sees all,
   User sees own). ✓
 - State machine `draft → submit → under_review → done` is correct. ✓

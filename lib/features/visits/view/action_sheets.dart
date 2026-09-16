@@ -2,28 +2,50 @@ import 'package:flutter/material.dart';
 
 import '../../../app/design/app_dimens.dart';
 import '../../../app/design/responsive.dart';
-
-import '../../../core/constants.dart';
+import '../../../core/utils/app_date.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/app_sheet.dart';
+import 'visit_schedule_picker.dart';
 
 /// Bottom sheet asking for a required rejection reason. Returns the reason, or
 /// `null` if dismissed.
 Future<String?> showRejectReasonSheet(BuildContext context) {
-  return _showFormSheet<String>(
+  return showAppSheet<String>(
     context: context,
-    title: context.s.wfRejectReason,
-    builder: (ctx, submit) => _RejectReasonBody(onSubmit: submit),
+    builder: (ctx) => AppFormSheet(
+      title: ctx.s.wfRejectReason,
+      child: _RequiredTextForm(
+        hint: ctx.s.wfRejectReasonHint,
+        requiredMessage: ctx.s.wfReasonRequired,
+        lines: _RequiredTextForm.reasonLines,
+        submit: (onPressed) => AppButton.destructive(
+          label: ctx.s.wfActionReject,
+          onPressed: onPressed,
+        ),
+      ),
+    ),
   );
 }
 
 /// Bottom sheet collecting a required outcome to end a visit.
 Future<String?> showEndVisitSheet(BuildContext context, {String? initial}) {
-  return _showFormSheet<String>(
+  return showAppSheet<String>(
     context: context,
-    title: context.s.wfActionEnd,
-    builder: (ctx, submit) =>
-        _OutcomeBody(onSubmit: submit, initial: initial),
+    builder: (ctx) => AppFormSheet(
+      title: ctx.s.wfActionEnd,
+      child: _RequiredTextForm(
+        label: ctx.s.wfFieldOutcome,
+        initial: initial,
+        requiredMessage: ctx.s.wfOutcomeRequired,
+        lines: _RequiredTextForm.outcomeLines,
+        submit: (onPressed) => AppButton(
+          label: ctx.s.wfActionEnd,
+          icon: Icons.stop_circle_outlined,
+          onPressed: onPressed,
+        ),
+      ),
+    ),
   );
 }
 
@@ -41,131 +63,54 @@ Future<RescheduleResult?> showRescheduleSheet(
   String? initialPurpose,
   String? initialLocation,
 }) {
-  return _showFormSheet<RescheduleResult>(
+  return showAppSheet<RescheduleResult>(
     context: context,
-    title: context.s.wfRescheduleTitle,
-    builder: (ctx, submit) => _RescheduleBody(
-      onSubmit: submit,
-      initialSchedule: initialSchedule,
-      initialPurpose: initialPurpose,
-      initialLocation: initialLocation,
-    ),
-  );
-}
-
-Future<T?> _showFormSheet<T>({
-  required BuildContext context,
-  required String title,
-  required Widget Function(BuildContext, void Function(T)) builder,
-}) {
-  return showModalBottomSheet<T>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    // The keyboard inset lifts the sheet (every form body autofocuses), and
-    // the scroll view absorbs what's left: on a short viewport the title +
-    // multiline field + button exceed the space above the keyboard, and an
-    // unscrollable Column would overflow and block the action outright.
-    builder: (ctx) => Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: ctx.text.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(ctx).pop(),
-                ),
-              ],
-            ),
-            context.gapH(Insets.x2),
-            builder(ctx, (v) => Navigator.of(ctx).pop(v)),
-          ],
-        ),
+    builder: (ctx) => AppFormSheet(
+      title: ctx.s.wfRescheduleTitle,
+      child: _RescheduleBody(
+        initialSchedule: initialSchedule,
+        initialPurpose: initialPurpose,
+        initialLocation: initialLocation,
       ),
     ),
   );
 }
 
-class _RejectReasonBody extends StatefulWidget {
-  final void Function(String) onSubmit;
-  const _RejectReasonBody({required this.onSubmit});
+/// A single required text field and its submit button. Pops the sheet with
+/// the trimmed text; refuses to submit it blank and says why under the field.
+class _RequiredTextForm extends StatefulWidget {
+  /// Visible lines for a rejection reason — a sentence or two.
+  static const int reasonLines = 3;
 
-  @override
-  State<_RejectReasonBody> createState() => _RejectReasonBodyState();
-}
+  /// Visible lines for a visit outcome — a short report.
+  static const int outcomeLines = 4;
 
-class _RejectReasonBodyState extends State<_RejectReasonBody> {
-  final _ctrl = TextEditingController();
-  String? _error;
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final text = _ctrl.text.trim();
-    if (text.isEmpty) {
-      setState(() => _error = context.s.wfReasonRequired);
-      return;
-    }
-    widget.onSubmit(text);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          controller: _ctrl,
-          maxLines: 3,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: context.s.wfRejectReasonHint,
-            errorText: _error,
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        context.gapH(Insets.x3),
-        AppButton.destructive(
-          label: context.s.wfActionReject,
-          onPressed: _submit,
-        ),
-      ],
-    );
-  }
-}
-
-class _OutcomeBody extends StatefulWidget {
-  final void Function(String) onSubmit;
+  final String? label;
+  final String? hint;
   final String? initial;
-  const _OutcomeBody({required this.onSubmit, this.initial});
+  final String requiredMessage;
+  final int lines;
+
+  /// Builds the submit button around the callback this form owns.
+  final Widget Function(VoidCallback onPressed) submit;
+
+  const _RequiredTextForm({
+    this.label,
+    this.hint,
+    this.initial,
+    required this.requiredMessage,
+    required this.lines,
+    required this.submit,
+  });
 
   @override
-  State<_OutcomeBody> createState() => _OutcomeBodyState();
+  State<_RequiredTextForm> createState() => _RequiredTextFormState();
 }
 
-class _OutcomeBodyState extends State<_OutcomeBody> {
-  late final TextEditingController _ctrl =
-      TextEditingController(text: widget.initial ?? '');
+class _RequiredTextFormState extends State<_RequiredTextForm> {
+  late final TextEditingController _ctrl = TextEditingController(
+    text: widget.initial ?? '',
+  );
   String? _error;
 
   @override
@@ -177,10 +122,10 @@ class _OutcomeBodyState extends State<_OutcomeBody> {
   void _submit() {
     final text = _ctrl.text.trim();
     if (text.isEmpty) {
-      setState(() => _error = context.s.wfOutcomeRequired);
+      setState(() => _error = widget.requiredMessage);
       return;
     }
-    widget.onSubmit(text);
+    Navigator.of(context).pop(text);
   }
 
   @override
@@ -190,32 +135,32 @@ class _OutcomeBodyState extends State<_OutcomeBody> {
       children: [
         TextField(
           controller: _ctrl,
-          maxLines: 4,
+          maxLines: widget.lines,
           autofocus: true,
+          textInputAction: TextInputAction.newline,
+          onChanged: (_) {
+            if (_error != null) setState(() => _error = null);
+          },
           decoration: InputDecoration(
-            labelText: context.s.wfFieldOutcome,
+            labelText: widget.label,
+            hintText: widget.hint,
             errorText: _error,
+            errorMaxLines: widget.lines,
             border: const OutlineInputBorder(),
           ),
         ),
         context.gapH(Insets.x3),
-        AppButton(
-          label: context.s.wfActionEnd,
-          icon: Icons.stop_circle_outlined,
-          onPressed: _submit,
-        ),
+        widget.submit(_submit),
       ],
     );
   }
 }
 
 class _RescheduleBody extends StatefulWidget {
-  final void Function(RescheduleResult) onSubmit;
   final DateTime? initialSchedule;
   final String? initialPurpose;
   final String? initialLocation;
   const _RescheduleBody({
-    required this.onSubmit,
     this.initialSchedule,
     this.initialPurpose,
     this.initialLocation,
@@ -227,10 +172,13 @@ class _RescheduleBody extends StatefulWidget {
 
 class _RescheduleBodyState extends State<_RescheduleBody> {
   late DateTime? _scheduled = widget.initialSchedule;
-  late final TextEditingController _purpose =
-      TextEditingController(text: widget.initialPurpose ?? '');
-  late final TextEditingController _location =
-      TextEditingController(text: widget.initialLocation ?? '');
+  late final TextEditingController _purpose = TextEditingController(
+    text: widget.initialPurpose ?? '',
+  );
+  late final TextEditingController _location = TextEditingController(
+    text: widget.initialLocation ?? '',
+  );
+  String? _error;
 
   @override
   void dispose() {
@@ -240,42 +188,64 @@ class _RescheduleBodyState extends State<_RescheduleBody> {
   }
 
   Future<void> _pickDateTime() async {
-    final now = DateTime.now();
-    final base = _scheduled?.toLocal() ?? now;
-    final date = await showDatePicker(
-      context: context,
-      initialDate: base,
-      firstDate: now.subtract(AppConstants.visitSchedulePastGrace),
-      lastDate: now.add(AppConstants.visitScheduleMaxAhead),
-    );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(base),
-    );
-    if (!mounted) return;
-    final t = time ?? TimeOfDay.fromDateTime(base);
+    final picked = await pickVisitSchedule(context, current: _scheduled);
+    if (picked == null || !mounted) return;
     setState(() {
-      _scheduled = DateTime(date.year, date.month, date.day, t.hour, t.minute);
+      _scheduled = picked;
+      _error = null;
     });
+  }
+
+  static String? _nonEmpty(String text) {
+    final trimmed = text.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  /// Sends the request, unless nothing differs from the visit as it stands —
+  /// the server would accept it and record a reschedule that changes nothing.
+  void _submit() {
+    final purpose = _nonEmpty(_purpose.text);
+    final location = _nonEmpty(_location.text);
+    final initial = widget.initialSchedule;
+    final scheduled = _scheduled;
+    final scheduleChanged =
+        scheduled != null &&
+        (initial == null || !scheduled.isAtSameMomentAs(initial));
+    final changed =
+        scheduleChanged ||
+        purpose != _nonEmpty(widget.initialPurpose ?? '') ||
+        location != _nonEmpty(widget.initialLocation ?? '');
+    if (!changed) {
+      setState(() => _error = context.s.wfRescheduleNoChanges);
+      return;
+    }
+    Navigator.of(context).pop(
+      RescheduleResult(
+        scheduled: scheduled,
+        purpose: purpose,
+        location: location,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final label = _scheduled == null
+    final scheduled = _scheduled;
+    final label = scheduled == null
         ? context.s.wfFieldSchedule
-        : '${_scheduled!.toLocal()}'.split('.').first;
+        : AppDate.weekdayDateTime(context, scheduled.toLocal());
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         OutlinedButton.icon(
           onPressed: _pickDateTime,
           icon: const Icon(Icons.event),
-          label: Text(label),
+          label: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
         ),
         context.gapH(Insets.x2h),
         TextField(
           controller: _purpose,
+          onChanged: (_) => _clearError(),
           decoration: InputDecoration(
             labelText: context.s.wfFieldPurpose,
             border: const OutlineInputBorder(),
@@ -284,22 +254,28 @@ class _RescheduleBodyState extends State<_RescheduleBody> {
         context.gapH(Insets.x2h),
         TextField(
           controller: _location,
+          onChanged: (_) => _clearError(),
           decoration: InputDecoration(
             labelText: context.s.wfFieldLocation,
             border: const OutlineInputBorder(),
           ),
         ),
+        if (_error != null) ...[
+          context.gapH(Insets.x2),
+          Text(
+            _error!,
+            style: context.text.bodySmall?.copyWith(
+              color: context.colors.error,
+            ),
+          ),
+        ],
         context.gapH(Insets.x3),
-        AppButton(
-          label: context.s.wfActionReschedule,
-          onPressed: () => widget.onSubmit(RescheduleResult(
-            scheduled: _scheduled,
-            purpose: _purpose.text.trim().isEmpty ? null : _purpose.text.trim(),
-            location:
-                _location.text.trim().isEmpty ? null : _location.text.trim(),
-          )),
-        ),
+        AppButton(label: context.s.wfActionReschedule, onPressed: _submit),
       ],
     );
+  }
+
+  void _clearError() {
+    if (_error != null) setState(() => _error = null);
   }
 }

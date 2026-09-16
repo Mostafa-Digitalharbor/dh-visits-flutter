@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:io' show HttpClient;
+import 'dart:io'
+    show HttpClient, HttpException, HttpHeaders, SocketException, TlsException;
 
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
@@ -19,9 +20,8 @@ class ApiClient {
   late final Dio dio;
   final PersistCookieJar cookieJar;
 
-  /// Tracks whether the last network call we observed succeeded.
-  /// Optional so unit-test instances and feature-disabled builds keep
-  /// working — `null` means "don't bother updating connectivity".
+  /// Tracks whether the device can reach the server. Optional so unit-test
+  /// instances keep working — `null` means "don't bother updating it".
   final ConnectivityStatus? connectivity;
 
   /// Learns the device-vs-server clock offset from each response's `Date`
@@ -34,8 +34,25 @@ class ApiClient {
   /// constructor argument because the auth repository itself needs this client.
   ///
   /// Null disables the retry: the expiry then surfaces straight away through
-  /// [onUnauthorized], which is what it always did.
+  /// [onUnauthorized].
+  ///
+  /// It may throw a transient [ApiException] (offline, server down): the
+  /// refused call then fails with that error instead of signing the user out,
+  /// and the next call tries to renew again.
   Future<bool> Function()? reauthenticate;
+
+  /// Set when a renewal was refused (the stored credentials no longer work,
+  /// or now belong to another account). Every later expiry then goes straight
+  /// to sign-out instead of repeating a doomed login — which would also trip
+  /// Odoo's failed-login cooldown and lock the user out of signing in by hand.
+  /// Cleared by [sessionEstablished].
+  bool _renewalRefused = false;
+
+  /// A sign-in succeeded: renewals may be attempted again.
+  void sessionEstablished() {
+    _renewalRefused = false;
+    _sessionGeneration++;
+  }
 
   /// The re-login currently in flight, shared by every call that hit the same
   /// expired session — a screen that fans out six requests must produce one
@@ -43,12 +60,17 @@ class ApiClient {
   /// other's cookie.
   Future<bool>? _reauthInFlight;
 
+  /// Bumped by every successful re-login. A call that was sent before the
+  /// bump and comes back "expired" carried the *old* cookie: it only needs
+  /// repeating, not another sign-in.
+  int _sessionGeneration = 0;
+
   final _unauthorizedController = StreamController<void>.broadcast();
 
-  /// Fires whenever the server rejects a request as unauthorized
-  /// (HTTP 401/403 or `AUTH_REQUIRED`), or a session expiry could not be
-  /// repaired by re-authenticating. Listen once from the app shell to
-  /// trigger an automatic logout.
+  /// Fires whenever the server rejects a request as unauthorized (HTTP 401 or
+  /// `AUTH_REQUIRED`), or a session expiry could not be repaired by
+  /// re-authenticating. Listen once from the app shell to trigger an automatic
+  /// logout.
   Stream<void> get onUnauthorized => _unauthorizedController.stream;
 
   ApiClient({
@@ -62,11 +84,10 @@ class ApiClient {
         baseUrl: baseUrl,
         connectTimeout: AppConstants.apiConnectTimeout,
         receiveTimeout: AppConstants.apiReceiveTimeout,
-        contentType: 'application/json',
+        sendTimeout: AppConstants.apiSendTimeout,
+        contentType: Headers.jsonContentType,
         responseType: ResponseType.json,
-        headers: {
-          'Accept': 'application/json',
-        },
+        headers: {Headers.acceptHeader: Headers.jsonContentType},
         validateStatus: (status) => status != null && status < 500,
       ),
     );
@@ -92,7 +113,7 @@ class ApiClient {
     if (clock != null) {
       dio.interceptors.add(InterceptorsWrapper(
         onResponse: (response, handler) {
-          clock.observeHttpDate(response.headers.value('date'));
+          clock.observeHttpDate(response.headers.value(HttpHeaders.dateHeader));
           handler.next(response);
         },
       ));
@@ -114,73 +135,121 @@ class ApiClient {
 
   /// Odoo JSON-RPC call.
   ///
-  /// Success and failure are decided by the body, never the status code: Odoo
-  /// answers a refused call with HTTP 200 and an `error` block in place of
+  /// Success and failure are decided by the body, never the status code alone:
+  /// Odoo answers a refused call with HTTP 200 and an `error` block in place of
   /// `result`. When that error is `odoo.http.SessionExpiredException` the
   /// session is re-established via [reauthenticate] and the call is retried
   /// **once**; a second failure of any kind propagates.
+  ///
+  /// [reportUnauthorized] false is for probes that expect to be refused (the
+  /// server-setup screen testing an address before anyone signs in): the
+  /// failure is still thrown, but no re-login is attempted and
+  /// [onUnauthorized] stays quiet, so nobody gets logged out by a probe.
   Future<dynamic> jsonRpc(
     String path, {
     Map<String, dynamic>? params,
+    bool reportUnauthorized = true,
   }) =>
-      _jsonRpc(path, params, allowReauth: true);
+      _jsonRpc(
+        path,
+        params,
+        allowReauth: reportUnauthorized,
+        reportUnauthorized: reportUnauthorized,
+      );
 
   Future<dynamic> _jsonRpc(
     String path,
     Map<String, dynamic>? params, {
     required bool allowReauth,
+    required bool reportUnauthorized,
   }) async {
+    final generation = _sessionGeneration;
+    try {
+      return await _send(path, params);
+    } on ApiException catch (e) {
+      if (allowReauth && e.isSessionExpired && _canReauthenticate(path)) {
+        final renewed = generation != _sessionGeneration ||
+            await _reauthenticateOnce();
+        if (renewed) {
+          appLog('[ApiClient] session renewed; retrying $path once');
+          // `allowReauth: false` is what bounds this to a single retry: if the
+          // fresh session is refused too, the error falls through below.
+          return _jsonRpc(
+            path,
+            params,
+            allowReauth: false,
+            reportUnauthorized: reportUnauthorized,
+          );
+        }
+      }
+      if (reportUnauthorized) _notifyIfUnauthorized(e);
+      rethrow;
+    }
+  }
+
+  /// One round trip, turned into the `result` or an [ApiException].
+  Future<dynamic> _send(String path, Map<String, dynamic>? params) async {
     // Request/response tracing is deliberately left to PrettyLogInterceptor,
     // which is registered only under kDebugMode. `debugPrint` is NOT stripped
     // from release builds, so logging bodies here would ship session cookies
     // and record payloads to the device log on every user's phone.
+    final Response<dynamic> response;
     try {
-      final response = await dio.post(
+      response = await dio.post<dynamic>(
         path,
         data: {
           'jsonrpc': '2.0',
           'method': 'call',
           'params': params ?? {},
         },
+        options: _optionsFor(path),
       );
-
-      final body = response.data;
-      // Got a response from the server — we're online, even if the
-      // response itself is a server-side error.
-      connectivity?.markOnline();
-      // Odoo's own error block first: it carries a real message, which beats
-      // the generic transport codes below.
-      if (body is Map && body['error'] != null) {
-        throw ApiException.fromJson(Map<String, dynamic>.from(body));
-      }
-      // Then the same transport guards `_unwrap` applies to get/post. This call
-      // used to skip them entirely and hand `body['result']` straight back, so
-      // an un-deployed `/api/visit/*` route (Odoo answers 200 + website HTML)
-      // arrived as a String, callers degraded it to "no visits", and a 403
-      // never reached `onUnauthorized` so the auto-logout never fired.
-      _guardTransport(response);
-      return body is Map ? body['result'] : body;
     } on DioException catch (e) {
       throw _mapDioError(e);
-    } on ApiException catch (e) {
-      if (allowReauth && e.isSessionExpired && _canReauthenticate(path)) {
-        if (await _reauthenticateOnce()) {
-          appLog('[ApiClient] session renewed; retrying $path once');
-          // `allowReauth: false` is what bounds this to a single retry: if the
-          // fresh session is refused too, the error falls through below.
-          return _jsonRpc(path, params, allowReauth: false);
-        }
-      }
-      _notifyIfUnauthorized(e);
-      rethrow;
     }
+
+    final body = response.data;
+    // Something answered. Whether it was Odoo is decided below; the device is
+    // online either way.
+    connectivity?.markOnline();
+    // Odoo's own error block first: it carries a real message, which beats
+    // the generic transport codes below.
+    if (body is Map && body['error'] != null) {
+      throw ApiException.fromJson(Map<String, dynamic>.from(body));
+    }
+    // An un-deployed `/api/visit/*` route arrives as website HTML, a proxy
+    // error page as text; neither may be handed on as data (callers used to
+    // degrade it to "no visits").
+    _guardTransport(response);
+    // A JSON-RPC answer is always an object. Anything else — an empty body,
+    // plain text, a bare list — is not Odoo talking, and handing it on would
+    // surface later as a cast error with no explanation for the user.
+    // (`result` itself may be absent: Odoo 19 omits it for void methods
+    // such as `/web/session/destroy`.)
+    if (body is! Map) {
+      throw ApiException(
+        code: ApiErrorCode.invalidResponse,
+        details: 'Not a JSON-RPC answer from $path: '
+            '${body.runtimeType} ${_preview(body)}',
+      );
+    }
+    return body['result'];
   }
+
+  /// Per-route overrides of the default options.
+  static Options? _optionsFor(String path) => Endpoints.uploads.contains(path)
+      ? Options(
+          sendTimeout: AppConstants.apiUploadTimeout,
+          receiveTimeout: AppConstants.apiUploadTimeout,
+        )
+      : null;
 
   /// The auth routes themselves never trigger a re-login: an expired session
   /// on `/web/session/authenticate` means the credentials are the problem, and
   /// retrying `destroy` would sign the user straight back in on logout.
   bool _canReauthenticate(String path) =>
       reauthenticate != null &&
+      !_renewalRefused &&
       path != Endpoints.authenticate &&
       path != Endpoints.destroySession;
 
@@ -189,166 +258,239 @@ class ApiClient {
     if (running != null) return running;
     final attempt = () async {
       try {
-        return await reauthenticate!();
+        final ok = await reauthenticate!();
+        if (ok) {
+          _sessionGeneration++;
+        } else {
+          _renewalRefused = true;
+        }
+        return ok;
+      } on ApiException catch (e) {
+        // Could not reach the server to renew: say so, keep the session.
+        if (e.isTransient) rethrow;
+        appLog('[ApiClient] re-authentication refused: ${e.code}');
+        _renewalRefused = true;
+        return false;
       } catch (e) {
         appLog('[ApiClient] re-authentication failed: $e');
+        _renewalRefused = true;
         return false;
       }
     }();
     _reauthInFlight = attempt;
-    attempt.whenComplete(() => _reauthInFlight = null);
+    // Observed here only to clear the slot: a transient failure is delivered
+    // to the callers awaiting [attempt], not as an unhandled error.
+    unawaited(attempt
+        .then<void>((_) {}, onError: (Object _) {})
+        .whenComplete(() => _reauthInFlight = null));
     return attempt;
   }
 
-  Future<dynamic> get(
-    String path, {
-    Map<String, dynamic>? queryParameters,
-  }) async {
-    try {
-      final response =
-          await dio.get(path, queryParameters: queryParameters);
-      connectivity?.markOnline();
-      return _unwrap(response);
-    } on DioException catch (e) {
-      throw _mapDioError(e);
-    } on ApiException catch (e) {
-      _notifyIfUnauthorized(e);
-      rethrow;
-    }
-  }
+  /// Rejects a response that did not come from Odoo's JSON-RPC layer.
+  ///
+  /// `validateStatus` lets everything under 500 through, so without these
+  /// checks an error page, a redirect or a Wi-Fi login page would be handed to
+  /// the caller as if it were data.
+  void _guardTransport(Response<dynamic> response) {
+    final status = response.statusCode ?? 0;
+    final requested = response.requestOptions.uri;
+    final landed = response.realUri;
+    final path = response.requestOptions.path;
+    final html = _isHtml(response.data);
+    final where = 'HTTP $status for $path';
 
-  Future<dynamic> post(
-    String path, {
-    Map<String, dynamic>? data,
-  }) async {
-    try {
-      final response = await dio.post(path, data: data);
-      connectivity?.markOnline();
-      return _unwrap(response);
-    } on DioException catch (e) {
-      throw _mapDioError(e);
-    } on ApiException catch (e) {
-      _notifyIfUnauthorized(e);
-      rethrow;
+    // Redirected to another host: a hotel/airport Wi-Fi login page, or an
+    // address that no longer points at this company's Odoo.
+    if (landed.host.isNotEmpty &&
+        requested.host.isNotEmpty &&
+        landed.host != requested.host) {
+      throw ApiException(
+        code: ApiErrorCode.invalidResponse,
+        details: '$where: redirected to ${landed.host}',
+      );
     }
-  }
-
-  /// Transport-level checks that apply to every response regardless of which
-  /// envelope (JSON-RPC or REST) the body uses. Shared by [jsonRpc] and
-  /// [_unwrap] so neither can drift into trusting a body the other rejects.
-  void _guardTransport(Response response) {
-    final body = response.data;
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      throw ApiException.unauthorized();
+    // Bounced to Odoo's sign-in page — how a session expiry looks on a route
+    // that answers with a redirect instead of a JSON error.
+    if (_isLoginPage(landed.path) && !_isLoginPage(requested.path)) {
+      throw ApiException.sessionExpired('$where: redirected to sign-in');
     }
-    // Odoo returns the website HTML (200 OK) for any path it doesn't have a
-    // route for. Catch that here so the caller sees "endpoint missing"
-    // instead of silently treating it as empty data.
+    // A redirect dart:io does not follow for POST (301/302/307/308).
+    if (status >= 300 && status < 400) {
+      final location = response.headers.value(HttpHeaders.locationHeader);
+      final target =
+          location == null ? null : requested.resolve(location.trim());
+      if (target != null && _isLoginPage(target.path)) {
+        throw ApiException.sessionExpired('$where: redirected to sign-in');
+      }
+      // Typically http → https, or a moved server: the saved address is
+      // stale, which the "check the server address" message covers.
+      throw ApiException(
+        code: ApiErrorCode.invalidResponse,
+        details: '$where: redirected to $target',
+      );
+    }
+    if (status == 401) {
+      throw ApiException(code: ApiErrorCode.unauthorized, details: where);
+    }
+    // Odoo reports an expired session and a refused record as JSON errors,
+    // handled before this. A bare 403 comes from something in front of Odoo —
+    // a firewall, a bot check — and must not sign the user out: signing back
+    // in would meet the same wall and loop.
+    if (status == 403) {
+      throw ApiException(
+        code: html ? ApiErrorCode.invalidResponse : ApiErrorCode.permissionDenied,
+        details: where,
+      );
+    }
+    // Odoo serves its website 404 page (HTML) for a route it doesn't have. On
+    // the module's routes that means the visits module isn't installed —
+    // `notSupported`, so the admin looks for a missing module rather than a
+    // missing record. Odoo's core routes (`/web/...`) exist on every Odoo, so
+    // HTML there means whatever answered is not Odoo at all.
     //
     // The path goes in `details`, not `serverMessage`: `localize()` renders
-    // serverMessage verbatim, which would put an English sentence on an
-    // Arabic screen. The localized `errEndpointMissing` explains it instead.
-    // `notSupported`, not `notFound`: a missing route means the custom visits
-    // module isn't installed on this server, and "item not found" would send
-    // the admin looking for a missing record instead of a missing module.
-    if (body is String && body.trimLeft().startsWith('<')) {
+    // serverMessage verbatim, which would put English on an Arabic screen.
+    if (html && (status == 404 || status < 300)) {
       throw ApiException(
-        code: ApiErrorCode.notSupported,
-        details: 'Endpoint ${response.realUri.path} is not deployed.',
+        code: path.startsWith(Endpoints.coreRoutePrefix)
+            ? ApiErrorCode.invalidResponse
+            : ApiErrorCode.notSupported,
+        details: '$where: HTML',
       );
     }
-    // `validateStatus` lets everything under 500 through, so an error status
-    // with a non-Odoo body would otherwise be handed to the caller as if it
-    // were successful data — surfacing later as a confusing parse failure
-    // instead of a real message.
-    final status = response.statusCode ?? 0;
+    // Any other error status: its meaning, whatever the body looks like — a
+    // 413 from nginx is an HTML page, and still means "file too large".
     if (status >= 400) {
-      if (body is Map && body['status'] == 'error') {
-        throw ApiException.fromJson(Map<String, dynamic>.from(body));
-      }
-      throw ApiException(
-        code: switch (status) {
-          404 => ApiErrorCode.notFound,
-          409 => ApiErrorCode.conflict,
-          422 => ApiErrorCode.validation,
-          >= 500 => ApiErrorCode.server,
-          _ => ApiErrorCode.unknown,
-        },
-        details: 'HTTP $status for ${response.realUri.path}',
-      );
+      throw ApiException(code: _codeForStatus(status), details: where);
     }
   }
 
-  dynamic _unwrap(Response response) {
-    _guardTransport(response);
-    final body = response.data;
-    if (body is Map) {
-      if (body['status'] == 'error') {
-        throw ApiException.fromJson(Map<String, dynamic>.from(body));
-      }
-      return body['data'] ?? body;
-    }
-    return body;
+  static bool _isHtml(Object? body) =>
+      body is String && body.trimLeft().startsWith('<');
+
+  static bool _isLoginPage(String path) =>
+      path.startsWith(Endpoints.loginPage);
+
+  /// The meaning of an HTTP status whose body carried no Odoo error block.
+  static ApiErrorCode _codeForStatus(int status) => switch (status) {
+        404 => ApiErrorCode.notFound,
+        409 => ApiErrorCode.conflict,
+        413 => ApiErrorCode.payloadTooLarge,
+        422 => ApiErrorCode.validation,
+        429 => ApiErrorCode.rateLimited,
+        502 || 503 || 504 => ApiErrorCode.serverUnavailable,
+        >= 500 => ApiErrorCode.server,
+        _ => ApiErrorCode.unknown,
+      };
+
+  /// A short, log-safe sample of an unreadable body.
+  static String _preview(Object? body) {
+    final text = '$body'.replaceAll(RegExp(r'\s+'), ' ');
+    return text.length <= _previewLength
+        ? text
+        : '${text.substring(0, _previewLength)}…';
   }
+
+  static const _previewLength = 120;
 
   ApiException _mapDioError(DioException e) {
-    ApiException mapped;
-    if (e.response != null && e.response!.data is Map) {
-      try {
-        mapped = ApiException.fromJson(
-            Map<String, dynamic>.from(e.response!.data));
-        _notifyIfUnauthorized(mapped);
-        return mapped;
-      } catch (_) {}
-    }
+    final path = e.requestOptions.path;
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
-      case DioExceptionType.receiveTimeout:
-      case DioExceptionType.sendTimeout:
-        mapped = ApiException.timeout();
+        // Nothing answered at all: the one timeout that says "offline".
         connectivity?.markOffline();
-        break;
+        return ApiException(code: ApiErrorCode.timeout, details: path);
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        // Connected, just slow — a weak link or a busy server. Flipping the
+        // app to "offline" here would show a red banner on a working network.
+        return ApiException(
+          code: ApiErrorCode.timeout,
+          details: '$path: ${e.type.name}',
+        );
       case DioExceptionType.badCertificate:
-        mapped = ApiException(
+        return ApiException(
           code: ApiErrorCode.insecureConnection,
           details: e.message,
         );
-        break;
       case DioExceptionType.connectionError:
         // A rejected certificate can also arrive as a connectionError wrapping
         // a HandshakeException. Telling the admin to "check your internet"
         // there sends them hunting the wrong problem.
-        mapped = _isTlsFailure(e)
-            ? ApiException(
-                code: ApiErrorCode.insecureConnection,
-                details: e.message,
-              )
-            : ApiException.network();
-        if (mapped.code == ApiErrorCode.network) connectivity?.markOffline();
-        break;
-      case DioExceptionType.badResponse:
-        // `validateStatus` rejects >= 500, so 5xx lands here rather than in
-        // `_unwrap`. Without this arm it fell through to `unknown` and the
-        // user read "an unknown error occurred" for a plain server outage.
-        final status = e.response?.statusCode ?? 0;
-        mapped = ApiException(
-          code: status >= 500 ? ApiErrorCode.server : ApiErrorCode.unknown,
-          details: 'HTTP $status',
+        if (_isTlsFailure(e)) {
+          return ApiException(
+            code: ApiErrorCode.insecureConnection,
+            details: e.message,
+          );
+        }
+        connectivity?.markOffline();
+        return ApiException(
+          code: ApiErrorCode.network,
+          details: '$path: ${e.error ?? e.message}',
         );
-        break;
-      default:
+      case DioExceptionType.badResponse:
+        // `validateStatus` rejects >= 500, so 5xx lands here. The server
+        // answered, so the device is online.
+        connectivity?.markOnline();
+        final status = e.response?.statusCode ?? 0;
+        final data = e.response?.data;
+        if (data is Map && data['error'] != null) {
+          final odoo = ApiException.fromJson(Map<String, dynamic>.from(data));
+          if (odoo.code != ApiErrorCode.unknown) return odoo;
+          return ApiException(
+            code: _codeForStatus(status),
+            serverMessage: odoo.serverMessage,
+            odooName: odoo.odooName,
+            details: odoo.details,
+          );
+        }
+        return ApiException(
+          code: _codeForStatus(status),
+          details: 'HTTP $status for $path',
+        );
+      case DioExceptionType.cancel:
+      case DioExceptionType.unknown:
         // `e.message` is Dio's own diagnostic ("Connection closed before full
         // header was received") — technical, English, and not something to
-        // put in front of a user. Keep it for logs only.
-        mapped = ApiException.unexpected(e.message);
+        // put in front of a user. It goes to `details` only.
+        final error = e.error;
+        switch (error) {
+          case FormatException():
+            // A body that claimed to be JSON and wasn't (or was cut short).
+            return ApiException(
+              code: ApiErrorCode.invalidResponse,
+              details: '$path: $error',
+            );
+          case TlsException():
+            return ApiException(
+              code: ApiErrorCode.insecureConnection,
+              details: '$path: $error',
+            );
+          case SocketException():
+            // The OS lost the connection (reset, network switched, no route).
+            connectivity?.markOffline();
+            return ApiException(
+              code: ApiErrorCode.network,
+              details: '$path: $error',
+            );
+          case HttpException():
+            // The connection dropped mid-response: a flaky mobile link, not a
+            // bug, so the user is told to retry on a better connection.
+            return ApiException(
+              code: ApiErrorCode.network,
+              details: '$path: $error',
+            );
+          default:
+            return ApiException.unexpected('$path: ${e.message ?? error}');
+        }
     }
-    return mapped;
   }
 
   /// A TLS/certificate failure hiding inside a generic connection error —
   /// typical for a self-signed certificate on an on-premise Odoo, which is the
   /// most likely first-run failure on the server-setup screen.
   static bool _isTlsFailure(DioException e) {
+    if (e.error is TlsException) return true;
     final text = '${e.error ?? ''} ${e.message ?? ''}'.toLowerCase();
     return text.contains('handshake') ||
         text.contains('certificate') ||

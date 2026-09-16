@@ -9,8 +9,12 @@ import '../../../app/theme.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/settings/settings_repository.dart';
 import '../../../shared/extensions/context_extensions.dart';
+import '../../../shared/utils/validators.dart';
+import '../../../shared/widgets/confirm_dialog.dart';
+import '../../../shared/widgets/inline_notice.dart';
 import '../bloc/auth_bloc.dart';
 import 'auth_chrome.dart';
+import 'connection_messages.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -26,6 +30,11 @@ class _LoginPageState extends State<LoginPage> {
   final _settings = sl<SettingsRepository>();
   late bool _remember;
 
+  /// Why the last attempt failed — or why the previous session ended. Kept on
+  /// screen (not a snackbar) because most of these messages ask the user to do
+  /// something, and a three-second toast is gone before they have read it.
+  String? _failure;
+
   @override
   void initState() {
     super.initState();
@@ -34,6 +43,17 @@ class _LoginPageState extends State<LoginPage> {
     final remembered = _settings.readRememberedLogin();
     _remember = remembered != null;
     if (remembered != null) _loginCtrl.text = remembered;
+
+    // A session that ended before this screen existed — a 401 on another tab,
+    // a stored session that could not be restored — is already in the state.
+    // The listener below only hears *changes*, so it would never say why the
+    // user is suddenly looking at the sign-in form.
+    final pending = context.read<AuthBloc>().state;
+    if (pending.hasNotice) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showNotice(pending);
+      });
+    }
   }
 
   @override
@@ -43,9 +63,22 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  void _showNotice(AuthState state) {
+    final message = ConnectionMessages.forState(context, state);
+    if (message == null) return;
+    HapticFeedback.heavyImpact();
+    setState(() => _failure = message);
+    context.read<AuthBloc>().add(const AuthNoticeShown());
+  }
+
   void _submit() {
+    final auth = context.read<AuthBloc>();
+    // The keyboard's "done" key stays live while the button shows a spinner.
+    if (auth.state.status == AuthStatus.authenticating) return;
     if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
     HapticFeedback.lightImpact();
+    setState(() => _failure = null);
     final login = _loginCtrl.text.trim();
     // Persist (or forget) the identifier for the next sign-in.
     if (_remember) {
@@ -53,16 +86,10 @@ class _LoginPageState extends State<LoginPage> {
     } else {
       _settings.clearRememberedLogin();
     }
-    context.read<AuthBloc>().add(
-          AuthLoginRequested(
-            login: login,
-            password: _passwordCtrl.text,
-          ),
-        );
+    auth.add(AuthLoginRequested(login: login, password: _passwordCtrl.text));
   }
 
-  String? _requiredValidator(String? v) =>
-      (v == null || v.trim().isEmpty) ? context.s.commonRequired : null;
+  String? _requiredValidator(String? v) => Validators.required(context.s, v);
 
   /// Step back to the server screen — the first screen of the sign-in flow.
   /// `go`, not `pop`: the router *redirects* between the two, so /login is the
@@ -84,73 +111,67 @@ class _LoginPageState extends State<LoginPage> {
         // reads as one surface (see ServerSetupPage for the same fix).
         backgroundColor: cs.surfaceContainerLowest,
         body: BlocConsumer<AuthBloc, AuthState>(
-          listenWhen: (p, n) => p.error != n.error && n.error != null,
-          listener: (context, state) {
-            if (state.error != null) {
-              HapticFeedback.heavyImpact();
-              context.showSnack(state.error!.localize(context),
-                  kind: SnackKind.error);
-            }
-          },
+          listenWhen: ConnectionMessages.raisedNotice,
+          listener: (context, state) => _showNotice(state),
           builder: (context, state) {
             final loading = state.status == AuthStatus.authenticating;
-            return SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints:
-                    BoxConstraints(minHeight: MediaQuery.sizeOf(context).height),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    AuthHero(onBack: _backToServerSetup),
-                    AuthSheet(
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            AuthSheetTitle(
-                              title: context.s.loginWelcomeBack,
-                              subtitle: context.s.loginSubtitle,
-                            ),
-                            context.gapH(Insets.x4h),
-                            AuthField(
-                              controller: _loginCtrl,
-                              hint: context.s.loginUsername,
-                              icon: Symbols.person,
-                              validator: _requiredValidator,
-                            ),
-                            context.gapH(Insets.x3),
-                            AuthField(
-                              controller: _passwordCtrl,
-                              hint: context.s.loginPassword,
-                              icon: Symbols.lock,
-                              isPassword: true,
-                              textInputAction: TextInputAction.done,
-                              validator: _requiredValidator,
-                              onSubmitted: (_) => _submit(),
-                            ),
-                            context.gapH(Insets.x3h),
-                            _RememberRow(
-                              remember: _remember,
-                              onChanged: (v) => setState(() => _remember = v),
-                            ),
-                            context.gapH(Insets.x4h),
-                            AuthPrimaryButton(
-                              loading: loading,
-                              onPressed: _submit,
-                              icon: Symbols.login,
-                              label: context.s.loginSubmit,
-                            ),
-                            context.gapH(Insets.x4h),
-                            AuthSecureFooter(text: context.s.loginSecureFooter),
-                          ],
+            return AuthScrollBody(
+              children: [
+                AuthHero(onBack: _backToServerSetup),
+                AuthSheet(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AuthSheetTitle(
+                          title: context.s.loginWelcomeBack,
+                          subtitle: context.s.loginSubtitle,
                         ),
-                      ),
+                        context.gapH(Insets.x4h),
+                        AuthField(
+                          controller: _loginCtrl,
+                          hint: context.s.loginUsername,
+                          icon: Symbols.person,
+                          keyboardType: TextInputType.emailAddress,
+                          autofillHints: const [AutofillHints.username],
+                          validator: _requiredValidator,
+                        ),
+                        context.gapH(Insets.x3),
+                        AuthField(
+                          controller: _passwordCtrl,
+                          hint: context.s.loginPassword,
+                          icon: Symbols.lock,
+                          isPassword: true,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [AutofillHints.password],
+                          validator: _requiredValidator,
+                          onSubmitted: (_) => _submit(),
+                        ),
+                        context.gapH(Insets.x3h),
+                        _RememberRow(
+                          remember: _remember,
+                          onChanged: (v) => setState(() => _remember = v),
+                        ),
+                        if (_failure != null) ...[
+                          context.gapH(Insets.x3),
+                          InlineNotice(text: _failure!, tone: NoticeTone.error),
+                        ],
+                        context.gapH(Insets.x4h),
+                        AuthPrimaryButton(
+                          loading: loading,
+                          onPressed: _submit,
+                          icon: Symbols.login,
+                          label: context.s.loginSubmit,
+                        ),
+                        context.gapH(Insets.x4h),
+                        AuthSecureFooter(text: context.s.loginSecureFooter),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             );
           },
         ),
@@ -215,12 +236,18 @@ class _RememberRow extends StatelessWidget {
   void _showForgotPasswordHelp(BuildContext context) {
     showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        icon: const Icon(Symbols.lock_reset, size: IconSz.dialog),
-        title: Text(dialogContext.s.loginForgotPasswordTitle),
-        content: Text(dialogContext.s.loginForgotPasswordBody),
+      builder: (dialogContext) => AppDialogFrame(
+        icon: Symbols.lock_reset,
+        title: dialogContext.s.loginForgotPasswordTitle,
+        body: Text(
+          dialogContext.s.loginForgotPasswordBody,
+          textAlign: TextAlign.center,
+          style: dialogContext.text.bodyMedium?.copyWith(
+            color: dialogContext.colors.onSurfaceVariant,
+          ),
+        ),
         actions: [
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
             child: Text(dialogContext.s.commonClose),
           ),
@@ -229,6 +256,10 @@ class _RememberRow extends StatelessWidget {
     );
   }
 }
+
+/// Stroke weight of the tick inside the checkbox — heavier than the default
+/// so it reads at 14dp.
+const double _checkGlyphWeight = 700;
 
 /// The custom checkbox + its label, as one tap target.
 class _RememberToggle extends StatelessWidget {
@@ -241,49 +272,54 @@ class _RememberToggle extends StatelessWidget {
     final cs = context.colors;
     final x = context.x;
     final box = context.r(CompSz.checkbox);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => onChanged(!remember),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedContainer(
-            duration: AppDurations.fast,
-            width: box,
-            height: box,
-            decoration: BoxDecoration(
-              color: remember ? cs.primary : Colors.transparent,
-              borderRadius: BorderRadius.circular(Radii.badge),
-              border: Border.all(
-                color: remember ? cs.primary : x.outlineVariant,
-                width: CompSz.outlineWidth,
+    return Semantics(
+      checked: remember,
+      label: context.s.loginRememberMe,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onChanged(!remember),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: AppDurations.fast,
+              width: box,
+              height: box,
+              decoration: BoxDecoration(
+                color: remember ? cs.primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(Radii.badge),
+                border: Border.all(
+                  color: remember ? cs.primary : x.outlineVariant,
+                  width: CompSz.outlineWidth,
+                ),
+              ),
+              child: remember
+                  ? Icon(Symbols.check,
+                      size: context.r(IconSz.inline),
+                      color: cs.onPrimary,
+                      weight: _checkGlyphWeight)
+                  : null,
+            ),
+            context.gapW(Insets.x2),
+            // Flexible is safe here only because the parent caps this widget's
+            // width — a Row lays its non-flexible children out unbounded, and a
+            // flex child under an unbounded constraint throws rather than
+            // merely overflowing.
+            Flexible(
+              child: Text(
+                context.s.loginRememberMe,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: FontSz.base,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
+                ),
               ),
             ),
-            child: remember
-                ? Icon(Symbols.check,
-                    size: context.r(IconSz.inline),
-                    color: Colors.white,
-                    weight: 700)
-                : null,
-          ),
-          context.gapW(Insets.x2),
-          // Flexible is safe here only because the parent caps this widget's
-          // width — a Row lays its non-flexible children out unbounded, and a
-          // flex child under an unbounded constraint throws rather than
-          // merely overflowing.
-          Flexible(
-            child: Text(
-              context.s.loginRememberMe,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: FontSz.base,
-                fontWeight: FontWeight.w600,
-                color: cs.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

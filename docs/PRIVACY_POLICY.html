@@ -22,14 +22,14 @@
 <article class="privacy-policy">
 <h1>Privacy Policy — Customer Visits</h1>
 <p><strong>Effective date:</strong> 14 September 2026<br>
-<strong>Last updated:</strong> 14 September 2026</p>
-<p>This Privacy Policy describes how <strong>Digital Harbor</strong> ("we", "us", "our") collects, uses, and protects information when you use the <strong>Customer Visits</strong> mobile application ("the App"). The App is a field‑workforce tool: employees of our customer organisations use it to plan and record customer site visits, to record their route during a work day, and to share their work location with their manager during working hours.</p>
+<strong>Last updated:</strong> 16 September 2026</p>
+<p>This Privacy Policy describes how <strong>Digital Harbor</strong> ("we", "us", "our") collects, uses, and protects information when you use the <strong>Customer Visits</strong> mobile application ("the App"). The App is a field‑workforce tool: employees of our customer organisations use it to plan and record customer site visits, including where each visit started and ended and the route taken while the visit was in progress.</p>
 <p>If you have any question about this policy, contact us at: <strong><a href="mailto:ai-tools@digital-harbor.net">ai-tools@digital-harbor.net</a></strong></p>
 <hr>
 <h2>1. Who controls your data</h2>
 <p>The App is provided by Digital Harbor as a tool for our customer organisations (your employer). When you use the App as part of your job:</p>
 <ul>
-  <li><strong>Your employer is the data controller</strong> for the visit records, work-day routes and location data you generate. Your employer decides who in their organisation can see your location, routes and visit history.</li>
+  <li><strong>Your employer is the data controller</strong> for the visit records, visit locations and visit routes you generate. Your employer decides who in their organisation can see your visit history and visit routes.</li>
   <li><strong>Digital Harbor is a data processor</strong> — we build, host and maintain the App and its backend on behalf of your employer. We process your data only on their instructions.</li>
 </ul>
 <p>If you have questions about how <em>your employer</em> uses this data (retention, access, deletion), contact your employer's HR or IT department directly.</p>
@@ -38,37 +38,40 @@
 <h3>2.1 Account information</h3>
 <p>When your employer creates your account on the backend (Odoo) you provide:</p>
 <ul>
-  <li>Your name, email or username, and an internal employee ID.</li>
+  <li>Your name, email or username, and an internal user and employee ID.</li>
   <li>Authentication credentials (password). The password is kept only in the device's secure storage (Android Keystore / iOS Keychain) so the App can renew your session, and is never written to logs or crash reports.</li>
 </ul>
 <h3>2.2 Location information</h3>
-<p>The App collects your device's location — latitude, longitude, accuracy, and, for route recording, altitude, speed, heading and the time of each position — in the following cases:</p>
+<p>The App collects your device's location <strong>only for customer visits</strong>, in the following cases:</p>
 <table>
-  <thead><tr><th>When</th><th>Why</th><th>Stored where</th></tr></thead>
+  <thead><tr><th>When</th><th>What</th><th>Why</th><th>Stored where</th></tr></thead>
   <tbody>
-    <tr><td>When you start or end a customer visit</td><td>To prove you were at the customer site and record arrival/departure times</td><td>Visit record on your employer's backend</td></tr>
-    <tr><td>While a visit you started is in progress</td><td>To record the visit's route</td><td>Visit route on your employer's backend</td></tr>
-    <tr><td>About every 30 seconds <strong>while the App is open on your screen</strong></td><td>To share your current position with your manager</td><td>Your "live location" record on your employer's backend (the previous value is overwritten)</td></tr>
-    <tr><td><strong>During an active work day</strong> — from the moment you tap <strong>Start work day</strong> until you tap <strong>End work day</strong> or sign out, <strong>including while the App is in the background, closed from the screen, or while your screen is locked</strong></td><td>To record your work-day route: the whole day, including the movement between visits, and the part of it that belongs to each visit</td><td>Work-day route on your employer's backend</td></tr>
+    <tr><td>When you tap <strong>Start Visit</strong> on an approved visit</td><td>One position</td><td>To record where and when the visit started; it is the first point of the visit route</td><td>Visit record on your employer's backend</td></tr>
+    <tr><td>When you tap <strong>End Visit</strong></td><td>One position</td><td>To record where and when the visit ended; it is the last point of the visit route</td><td>Visit record on your employer's backend</td></tr>
+    <tr><td><strong>While a visit you started is in progress</strong> — from the moment your employer's backend confirms the start until you tap <strong>End Visit</strong> or sign out, <strong>including while the App is in the background or your screen is locked</strong></td><td>Positions: latitude, longitude, the time each position was taken, accuracy, altitude, speed and heading, together with a random identifier generated for this installation of the App</td><td>To record the route of that visit</td><td>Visit route on your employer's backend</td></tr>
+    <tr><td>If you add a location when you create a visit</td><td>The position or address you add</td><td>To plan where the visit takes place</td><td>Visit record on your employer's backend</td></tr>
   </tbody>
 </table>
-<p><strong>Work-day route recording.</strong> While your work day is active, the App records a position about every 5 seconds while you are moving (at least 5 metres apart, and nothing while you stand still). It keeps doing so when you switch to another app or lock your screen. On Android a notification ("Workday tracking active") is shown for as long as recording runs; on iOS the system shows its location indicator. Before the first work day, the App explains this on screen and asks for your agreement before any permission prompt.</p>
+<p><strong>Visit route recording.</strong> Recording starts only after your employer's backend has confirmed that the visit has started. If you tap Start Visit without a network connection, recording starts once the backend has accepted that start. While the visit is in progress, the App records a position about every 5 seconds while you are moving, and nothing while you stand still. It keeps doing so when you switch to another app or lock your screen. On Android a notification ("Visit tracking active") is shown for as long as recording runs; on iOS the system shows its blue location indicator. Recording stops as soon as you tap End Visit. Before your first Start Visit, the App shows a screen explaining what is collected, that recording continues in the background and with the screen locked while the visit is in progress, when it stops, and where the data goes.</p>
 <p><strong>When the App does not collect location:</strong></p>
 <ul>
-  <li>when no work day is active and the App is not open on your screen;</li>
-  <li>after you tap <strong>End work day</strong> — recording stops immediately, and positions are no longer recorded;</li>
+  <li>before you tap <strong>Start Visit</strong> — and, apart from the single Start Visit position, until your employer's backend has confirmed the start;</li>
+  <li>between visits, and whenever no visit is in progress — the App does not record your movements outside a visit, and does not record a whole work day;</li>
+  <li>after you tap <strong>End Visit</strong> — recording stops immediately;</li>
   <li>after you sign out;</li>
   <li>when you have not granted location permission, or have revoked it.</li>
 </ul>
-<p><strong>Offline storage.</strong> If there is no network, recorded positions are kept on your device, in the App's private storage, until they can be uploaded to your employer's backend. They are removed from the device once uploaded. Positions from a work day that belongs to a different account on the same device are deleted, not uploaded.</p>
-<p><strong>Road matching (map display).</strong> To draw your recorded routes along roads on the map, the App may send recorded positions (coordinates, their accuracy, heading, and time offsets relative to the first position — not the actual date and time) to a road-matching service. That service only returns a line to draw; your recorded positions are not changed. No name, employee ID, device ID, account credential or session is sent to it. In the production App this service is operated by Digital Harbor on infrastructure it controls (directly or through a hosting provider acting on its behalf), never by a public routing service; if none is configured, routes are drawn exactly as recorded and nothing is sent for road matching. The resulting map lines are cached on the device for up to 30 days and deleted when you sign out.</p>
+<p>A push notification never starts location recording.</p>
+<p><strong>Offline storage.</strong> If there is no network, recorded positions are kept on your device, in the App's private storage, and uploaded later — even after the visit has ended — with the time each position was actually taken. Your employer's backend accepts only positions taken between the start and the end of the visit. Positions are kept separately for each signed-in account and are uploaded only for the account that recorded them. They are deleted from the device once uploaded, or once the backend has permanently refused them.</p>
+<p><strong>Road matching (map display).</strong> To draw a visit's recorded route along roads on the map, the App may send the recorded positions of that visit only (coordinates, their accuracy, heading, and time offsets relative to the first position — not the actual date and time) to a road-matching service. That service only returns a line to draw; your recorded positions are not changed. No name, employee ID, device ID, account credential or session is sent to it. In the production App this service is operated by Digital Harbor on infrastructure it controls (directly or through a hosting provider acting on its behalf), never by a public routing service; if none is configured, routes are drawn exactly as recorded and nothing is sent for road matching. The resulting map lines are cached on the device for up to 30 days and deleted when you sign out.</p>
 <h3>2.3 Visit content</h3>
 <p>You create visit records that include: the customer being visited, visit type, free‑text notes you choose to write, the outcome, and the visit state. You may optionally capture a photo with the camera or attach a file as proof of the visit; only what you choose at that moment is uploaded. This content is stored on your employer's backend.</p>
 <h3>2.4 Device &amp; technical data</h3>
 <ul>
   <li>The requests needed to call your employer's backend, over HTTPS only.</li>
-  <li>A device-specific push notification token (Firebase Cloud Messaging), stored on your employer's backend against your account, so you can be notified about visit assignments and approvals.</li>
-  <li>Crash reports and performance measurements sent to Sentry, configured to exclude personal information: they do not include your name, email, location or IP address.</li>
+  <li>A device-specific push notification token (Firebase Cloud Messaging) and a random identifier generated for this installation of the App, stored on your employer's backend against your account, so you can be notified about visit assignments and approvals.</li>
+  <li>Crash reports and performance measurements sent to Sentry, configured to exclude personal information: they do not include your name, email, location or IP address, and no screenshots are attached.</li>
+  <li>Map tiles: to display a map, the App downloads the map images for the area shown on screen from OpenStreetMap tile servers. These requests contain only the map area being displayed (and, like any internet request, your device's IP address); the App does not send your position or any identifier to them.</li>
   <li>Generic device locale (so the App displays in Arabic or English).</li>
 </ul>
 <p>The App does <strong>not</strong> collect: contact lists, microphone audio, your photo library, files outside what you choose to attach, the IMEI, advertising identifiers, or any analytics fingerprint.</p>
@@ -77,43 +80,44 @@
 <p>We use the information described above strictly to provide the App's features:</p>
 <ol>
   <li><strong>Authenticate you</strong> against your employer's backend.</li>
-  <li><strong>Record visits</strong> and prove you were physically at the customer's location.</li>
-  <li><strong>Record your work-day route</strong> between Start work day and End work day, including travel between visits, for your employer's work-day and visit reports.</li>
-  <li><strong>Share your live location with your manager</strong> while the App is open.</li>
-  <li><strong>Show maps</strong> of customers, routes and positions, with routes drawn along roads where road matching is available.</li>
+  <li><strong>Record visits</strong> and prove you were physically at the customer's location when the visit started and ended.</li>
+  <li><strong>Record the route of each visit</strong> while it is in progress, for your employer's visit reports.</li>
+  <li><strong>Show maps</strong> of customers and visits, with visit routes drawn along roads where road matching is available.</li>
+  <li><strong>Notify you</strong> about visit assignments, approvals and changes.</li>
   <li><strong>Keep working offline</strong> — actions and recorded positions are stored on the device and sent automatically when connectivity returns.</li>
 </ol>
-<p>We do <strong>not</strong> use your data for advertising, profiling, behavioural analytics, or sale to third parties.</p>
+<p>We do <strong>not</strong> use your location outside customer visits, do not share your live position with anyone, and do <strong>not</strong> use your data for advertising, profiling, behavioural analytics, or sale to third parties.</p>
 <hr>
-<h2>4. Background location during an active work day</h2>
-<p>The App uses your location in the background <strong>only while a work day you started is active</strong>.</p>
+<h2>4. Background location during an active visit</h2>
+<p>The App uses your location in the background <strong>only while a customer visit you started is in progress</strong>.</p>
 <ul>
-  <li><strong>Android:</strong> recording runs in a foreground service of type "location", started when you tap Start work day, with a notification visible for as long as it runs. The App requests location access "while using the app" and does <strong>not</strong> request the Android <code>ACCESS_BACKGROUND_LOCATION</code> permission.</li>
-  <li><strong>iOS:</strong> the App declares the iOS "location" background mode. With "While Using the App" access, recording continues in the background once you started the work day in the App. The App may also ask you to allow access "Always"; this is optional and only lets recording resume if iOS closes the App during your work day. No route is recorded outside an active work day.</li>
-  <li><strong>Stopping:</strong> tap <strong>End work day</strong>, or sign out. You can also revoke location access at any time from Settings → Apps → Customer Visits → Permissions (Android) or Settings → Privacy &amp; Security → Location Services → Visits (iOS). Visit check-in/out, live sharing and work-day recording then stop working until access is granted again.</li>
+  <li><strong>Android:</strong> recording runs in a foreground service of type "location", started when your employer's backend confirms Start Visit, with a "Visit tracking active" notification visible for as long as it runs. The App requests location access only "while using the app" and does <strong>not</strong> request the Android <code>ACCESS_BACKGROUND_LOCATION</code> permission.</li>
+  <li><strong>iOS:</strong> the App declares the iOS "location" background mode. With "While Using the App" access, recording that started when you started the visit in the App continues in the background, and iOS shows the blue location indicator. The App does not ask for "Always" access. If you choose "Always" yourself in Settings, iOS may relaunch the App to continue recording a visit that is still in progress after iOS closed the App.</li>
+  <li><strong>If the App is closed:</strong> if the system stops the App during a visit, recording resumes — at the latest when you next open the App — as long as the visit is still in progress. On iOS, an App you swiped away (force-quit) is not relaunched by the system; recording resumes when you open it again.</li>
+  <li><strong>Stopping:</strong> tap <strong>End Visit</strong>, or sign out. You can also revoke location access at any time from Settings → Apps → Customer Visits → Permissions (Android) or Settings → Privacy &amp; Security → Location Services → Visits (iOS). Visit locations and visit route recording then stop working until access is granted again.</li>
 </ul>
 <hr>
 <h2>5. Permissions the App requests</h2>
 <table>
   <thead><tr><th>Permission</th><th>Reason</th></tr></thead>
   <tbody>
-    <tr><td>Precise and approximate location (while using the app)</td><td>Visit start/end coordinates, visit routes, live sharing while the App is open, and the work-day route</td></tr>
-    <tr><td>Android: foreground service (location)</td><td>Keep recording the work-day route while the App is in the background or the screen is locked, with a visible notification</td></tr>
-    <tr><td>iOS: location background mode; optional "Always" access</td><td>Keep recording the work-day route in the background; "Always" lets recording resume if iOS closes the App during a work day</td></tr>
-    <tr><td>iOS: temporary precise location</td><td>Asked only if you turned Precise Location off, because a route cannot be recorded accurately without it</td></tr>
-    <tr><td>Notifications</td><td>Visit workflow notifications; on Android also the visible work-day recording notification</td></tr>
+    <tr><td>Precise and approximate location (while using the app)</td><td>Start Visit and End Visit positions, and the route of a visit in progress</td></tr>
+    <tr><td>Android: foreground service (location)</td><td>Keep recording the route of a visit in progress while the App is in the background or the screen is locked, with a visible notification</td></tr>
+    <tr><td>iOS: location background mode</td><td>Keep recording the route of a visit in progress while the App is in the background, with the blue location indicator</td></tr>
+    <tr><td>iOS: temporary precise location</td><td>Asked only if you turned Precise Location off, because a visit route cannot be recorded accurately without it</td></tr>
+    <tr><td>Notifications</td><td>Visit workflow notifications; on Android also the visible visit-tracking notification</td></tr>
     <tr><td>Camera (and, on iOS, the photo library prompt text)</td><td>Optional proof-of-visit photos</td></tr>
     <tr><td>Internet / network state</td><td>Talk to the backend; detect offline state to queue actions</td></tr>
   </tbody>
 </table>
-<p>The App does <strong>not</strong> request: the Android background location permission (<code>ACCESS_BACKGROUND_LOCATION</code>), microphone, contacts, calendar, SMS or phone.</p>
+<p>The App does <strong>not</strong> request: the Android background location permission (<code>ACCESS_BACKGROUND_LOCATION</code>), "Always" location access on iOS, microphone, contacts, calendar, SMS or phone.</p>
 <hr>
 <h2>6. Data sharing</h2>
 <p>We share your data only with the following parties:</p>
 <ul>
-  <li><strong>Your employer</strong>, who is the controller of the data. Anyone in your employer's organisation whom your employer grants manager rights can see the live location, work-day routes and visit history of the employees they manage.</li>
+  <li><strong>Your employer</strong>, who is the controller of the data. Anyone in your employer's organisation whom your employer grants manager rights can see the visit history and visit routes of the employees they manage.</li>
   <li><strong>Our hosting providers</strong>, strictly to operate the backend and, where configured, the road-matching service. No marketing or other processing.</li>
-  <li><strong>Sentry</strong> (crash and performance reports without personal information) and <strong>Firebase Cloud Messaging</strong> (delivery of push notifications).</li>
+  <li><strong>Sentry</strong> (crash and performance reports without personal information), <strong>Firebase Cloud Messaging</strong> (delivery of push notifications) and <strong>OpenStreetMap tile servers</strong> (map images for the area displayed, without your position or any identifier).</li>
   <li><strong>Authorities</strong>, only if we are legally compelled by a valid court order.</li>
 </ul>
 <p>We do <strong>not</strong> sell or share your data with advertisers, analytics platforms, or data brokers.</p>
@@ -121,18 +125,18 @@
 <h2>7. Data retention</h2>
 <ul>
   <li><strong>Session and credentials</strong> stored on the device: deleted on sign-out.</li>
-  <li><strong>Positions waiting to upload</strong> on the device: removed once uploaded; the device keeps at most about 8,000 waiting work-day positions and discards the oldest beyond that.</li>
+  <li><strong>Positions waiting to upload</strong> on the device: deleted once uploaded, or once your employer's backend has permanently refused them.</li>
+  <li><strong>Positions left on the device by an earlier version of the App</strong> that recorded work-day routes: deleted from the device when the App is updated.</li>
   <li><strong>Road-matched map lines</strong> cached on the device: up to 30 days, deleted on sign-out.</li>
-  <li><strong>Live location</strong> on the backend: only your most recent position is kept.</li>
-  <li><strong>Visit records, visit routes and work-day routes</strong> on the backend: retained according to your employer's retention schedule. Work-day positions cannot be edited or deleted from the App. Contact your employer to request deletion.</li>
+  <li><strong>Visit records and visit routes</strong> on the backend: retained according to your employer's retention schedule. Recorded positions cannot be edited or deleted from the App. Contact your employer to request deletion.</li>
 </ul>
 <hr>
 <h2>8. Security</h2>
 <ul>
   <li>All traffic between the App and the backend and road-matching service is over HTTPS (TLS). Cleartext HTTP is blocked on both Android (<code>usesCleartextTraffic=false</code>) and iOS (App Transport Security).</li>
   <li>Credentials are stored in the device's secure storage (Android Keystore / iOS Keychain).</li>
-  <li>Positions waiting to upload are stored in the App's private storage (on iOS, protected until the device is first unlocked after a restart), and the App is excluded from Android cloud backups.</li>
-  <li>On the backend, employees can only add positions to their own active work day, managers can only see the employees they manage, and recorded positions cannot be changed.</li>
+  <li>Positions waiting to upload are stored in the App's private storage, and the App is excluded from Android cloud backups.</li>
+  <li>On the backend, only the employee responsible for a visit (or whoever planned it, or an administrator) can add positions to it, only positions taken between the visit's start and end are accepted, managers can only see the employees they manage, and recorded positions cannot be changed from the App.</li>
 </ul>
 <p>No system is 100% secure. If you suspect your account is compromised, change your password from your employer's portal immediately.</p>
 <hr>
@@ -142,7 +146,7 @@
 <h2>10. Your rights</h2>
 <p>Because your employer is the controller of the data:</p>
 <ul>
-  <li>To request <strong>access, correction, or deletion</strong> of your visit history, work-day routes or live-location record, contact your employer's HR or IT.</li>
+  <li>To request <strong>access, correction, or deletion</strong> of your visit history or visit routes, contact your employer's HR or IT.</li>
   <li>For complaints about how Digital Harbor (the processor) handles your data, contact us at <strong><a href="mailto:ai-tools@digital-harbor.net">ai-tools@digital-harbor.net</a></strong>.</li>
   <li>Depending on your country, you may also have the right to lodge a complaint with your local data protection authority.</li>
 </ul>

@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-
-import '../../../app/routes.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../../app/routes.dart';
 import '../../../app/theme.dart';
 import '../../../core/config/server_config_cubit.dart';
+import '../../../core/constants.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/pending_actions_queue.dart';
 import '../../../core/settings/settings_cubit.dart';
+import '../../../core/utils/app_log.dart';
 import '../../../core/utils/relative_time.dart';
 import '../../../shared/extensions/context_extensions.dart';
+import '../../../shared/widgets/inline_notice.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/data/models/user.dart';
@@ -35,9 +37,12 @@ class ProfileView extends StatefulWidget {
 }
 
 class _ProfileViewState extends State<ProfileView> {
-  /// Real build version, read from the platform package metadata (falls back to
-  /// a placeholder until the async read completes).
-  String _appVersion = '—';
+  /// The installed build, read from the platform package metadata; null until
+  /// that read completes (or if it fails).
+  String? _appVersion;
+
+  /// True while a user-started sync runs, so the button can't queue a second.
+  bool _syncing = false;
 
   @override
   void initState() {
@@ -45,20 +50,15 @@ class _ProfileViewState extends State<ProfileView> {
     _loadVersion();
   }
 
-  /// Host of the backend the app is pointed at, shown under "Change server"
-  /// so the user can tell which company server they are on at a glance.
-  String _serverHost(BuildContext context) {
-    final url = context.watch<ServerConfigCubit>().state.baseUrl;
-    if (url.isEmpty) return context.s.settingsServerNone;
-    return Uri.tryParse(url)?.host.isNotEmpty == true
-        ? Uri.parse(url).host
-        : url;
-  }
-
   Future<void> _loadVersion() async {
-    final info = await PackageInfo.fromPlatform();
-    if (mounted) {
-      setState(() => _appVersion = '${info.version}+${info.buildNumber}');
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() => _appVersion =
+          context.s.profileBuildVersion(info.version, info.buildNumber));
+    } catch (e) {
+      // The row keeps its placeholder; nothing the user can act on.
+      appLog('[ProfileView] app version unavailable: $e');
     }
   }
 
@@ -67,7 +67,7 @@ class _ProfileViewState extends State<ProfileView> {
       context,
       title: context.s.confirmLogoutTitle,
       message: context.s.confirmLogoutMessage,
-      icon: Icons.logout_rounded,
+      icon: Symbols.logout,
     );
     if (confirmed && context.mounted) {
       context.read<AuthBloc>().add(const AuthLogoutRequested());
@@ -77,6 +77,7 @@ class _ProfileViewState extends State<ProfileView> {
   /// Drain the offline queue on demand. Honest feedback: reports how many
   /// pending actions are waiting, or that everything is already up to date.
   Future<void> _onSyncNow(BuildContext context) async {
+    if (_syncing) return;
     final queue = sl<PendingActionsQueue>();
     final pending = queue.pendingCount.value;
     if (pending == 0) {
@@ -84,16 +85,29 @@ class _ProfileViewState extends State<ProfileView> {
       return;
     }
     context.showSnack(context.s.offlineSyncing(pending));
-    await queue.flush();
-    if (!context.mounted) return;
-    // Honest outcome: if anything is still queued the flush didn't fully
-    // succeed (usually still offline), so don't claim "synced".
-    final remaining = queue.pendingCount.value;
-    if (remaining == 0) {
-      context.showSnack(context.s.settingsSynced, kind: SnackKind.success);
-    } else {
-      context.showSnack(context.s.offlinePendingCount(remaining),
-          kind: SnackKind.error);
+    setState(() => _syncing = true);
+    try {
+      final result = await queue.flush();
+      if (!context.mounted) return;
+      // Honest outcome: anything still queued means the flush didn't fully go
+      // through (usually still offline), so don't claim "synced". Dropped
+      // actions are announced by the shell as they happen.
+      if (result.remaining == 0) {
+        context.showSnack(context.s.settingsSynced, kind: SnackKind.success);
+      } else {
+        context.showSnack(context.s.offlinePendingCount(result.remaining),
+            kind: SnackKind.error);
+      }
+    } catch (e) {
+      appLog('[ProfileView] manual sync failed: $e');
+      if (context.mounted) {
+        context.showSnack(
+          context.s.offlinePendingCount(queue.pendingCount.value),
+          kind: SnackKind.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _syncing = false);
     }
   }
 
@@ -101,130 +115,131 @@ class _ProfileViewState extends State<ProfileView> {
     showAboutDialog(
       context: context,
       applicationName: context.s.aboutAppName,
-      applicationVersion: _appVersion,
+      applicationVersion: _appVersion ?? context.s.commonNoValue,
       applicationLegalese: context.s.aboutLegalese,
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
     final user = context.watch<AuthBloc>().state.user;
-    // Built once and reused for all six separators: this screen is a stack of
+    final server = context.watch<ServerConfigCubit>().state;
+    // Built once and reused for all the separators: this screen is a stack of
     // labelled groups, and the gap between them is one decision, not six.
     final groupGap = context.gapH(Insets.x4h);
     return BlocBuilder<SettingsCubit, SettingsState>(
-        builder: (context, state) {
-          return ListView(
-            padding: _pagePadding(context),
-            children: [
-              if (user != null) _ProfileCard(user: user),
-              // The launch snackbar that says this is long gone by the time
-              // someone wonders where their buttons went, and the profile is
-              // exactly where they come to check what they are. So it is
-              // restated here, permanently, next to the role it contradicts.
-              if (user?.profileIncomplete ?? false) ...[
-                context.gapH(Insets.x3),
-                const _ProfileIncompleteNotice(),
-              ],
-              groupGap,
-              // ── الإدارة (للمدير فقط) ────────────────────────────────────
-              if (user?.canEditVisits ?? false) ...[
-                _GroupLabel(context.s.roleManagerTitle),
-                _GroupCard(children: [
-                  _NavRow(
-                    icon: Symbols.groups,
-                    label: context.s.customersTitle,
-                    onTap: () => context.push(AppRoutes.customers),
-                  ),
-                ]),
-                groupGap,
-              ],
-              // ── الحساب ──────────────────────────────────────────────────
-              _GroupLabel(context.s.settingsAccount),
-              _GroupCard(children: [
-                _SwitchRow(
-                  icon: Symbols.notifications,
-                  label: context.s.settingsNotifications,
-                  subtitle: context.s.settingsNotificationsSub,
-                  value: state.notifications,
-                  onChanged: (v) =>
-                      context.read<SettingsCubit>().setNotifications(v),
-                ),
-                const _RowDivider(),
-                // The only in-app way back to the server-setup screen. Without
-                // it, switching backends means wiping app data.
-                _NavRow(
-                  icon: Symbols.dns,
-                  label: context.s.settingsServer,
-                  subtitle: _serverHost(context),
-                  onTap: () => context.push(AppRoutes.setup),
-                ),
-              ]),
-              groupGap,
-              _GroupLabel(context.s.themeMode),
-              _GroupCard(children: [
-                _OptionRow(
-                  icon: Symbols.light_mode,
-                  label: context.s.themeLight,
-                  selected: state.themeMode == ThemeMode.light,
-                  onTap: () => context.read<SettingsCubit>().setThemeMode(ThemeMode.light),
-                ),
-                const _RowDivider(),
-                _OptionRow(
-                  icon: Symbols.dark_mode,
-                  label: context.s.themeDark,
-                  selected: state.themeMode == ThemeMode.dark,
-                  onTap: () => context.read<SettingsCubit>().setThemeMode(ThemeMode.dark),
-                ),
-                const _RowDivider(),
-                _OptionRow(
-                  icon: Symbols.brightness_auto,
-                  label: context.s.themeSystem,
-                  selected: state.themeMode == ThemeMode.system,
-                  onTap: () => context.read<SettingsCubit>().setThemeMode(ThemeMode.system),
-                ),
-              ]),
-              groupGap,
-              _GroupLabel(context.s.language),
-              _GroupCard(children: [
-                _OptionRow(
-                  icon: Symbols.translate,
-                  label: context.s.languageArabic,
-                  selected: state.locale.languageCode == 'ar',
-                  onTap: () => context.read<SettingsCubit>().setLocale(const Locale('ar')),
-                ),
-                const _RowDivider(),
-                _OptionRow(
-                  icon: Symbols.translate,
-                  label: context.s.languageEnglish,
-                  selected: state.locale.languageCode == 'en',
-                  onTap: () => context.read<SettingsCubit>().setLocale(const Locale('en')),
-                ),
-              ]),
-              groupGap,
-              // ── المزامنة / المساعدة / حول التطبيق ───────────────────────
-              _GroupCard(children: [
-                _SyncRow(onSync: () => _onSyncNow(context)),
-                const _RowDivider(),
-                _NavRow(
-                  icon: Symbols.info,
-                  label: context.s.settingsAbout,
-                  subtitle: '${context.s.settingsVersion} $_appVersion',
-                  onTap: () => _onAbout(context),
-                ),
-              ]),
-              context.gapH(Insets.x6),
-              _LogoutButton(onTap: () => _onLogoutTap(context)),
-              groupGap,
-              Center(
-                child: Text(
-                  context.s.aboutFooter,
-                  style: AppType.bodySm.copyWith(color: context.x.textTertiary),
-                ),
+      builder: (context, state) {
+        final settings = context.read<SettingsCubit>();
+        return ListView(
+          padding: _pagePadding(context),
+          children: [
+            if (user != null) _ProfileCard(user: user),
+            // The launch snackbar that says this is long gone by the time
+            // someone wonders where their buttons went, and the profile is
+            // exactly where they come to check what they are. So it is
+            // restated here, permanently, next to the role it contradicts.
+            if (user?.profileIncomplete ?? false) ...[
+              context.gapH(Insets.x3),
+              InlineNotice(
+                text: s.errProfileIncomplete,
+                tone: NoticeTone.warning,
               ),
             ],
-          );
-        },
+            groupGap,
+            // ── Management (managers only) ─────────────────────────────────
+            if (user?.canEditVisits ?? false) ...[
+              _GroupLabel(s.roleManagerTitle),
+              _GroupCard(children: [
+                _NavRow(
+                  icon: Symbols.groups,
+                  label: s.customersTitle,
+                  onTap: () => context.push(AppRoutes.customers),
+                ),
+              ]),
+              groupGap,
+            ],
+            // ── Account ────────────────────────────────────────────────────
+            _GroupLabel(s.settingsAccount),
+            _GroupCard(children: [
+              _SwitchRow(
+                icon: Symbols.notifications,
+                label: s.settingsNotifications,
+                subtitle: s.settingsNotificationsSub,
+                value: state.notifications,
+                onChanged: settings.setNotifications,
+              ),
+              const _RowDivider(),
+              // The only in-app way back to the server-setup screen. Without
+              // it, switching backends means wiping app data.
+              _NavRow(
+                icon: Symbols.dns,
+                label: s.settingsServer,
+                subtitle: server.baseUrl.isEmpty ? s.settingsServerNone : server.host,
+                onTap: () => context.push(AppRoutes.setup),
+              ),
+            ]),
+            groupGap,
+            _GroupLabel(s.themeMode),
+            _GroupCard(children: [
+              for (final (i, option) in [
+                (mode: ThemeMode.light, icon: Symbols.light_mode, label: s.themeLight),
+                (mode: ThemeMode.dark, icon: Symbols.dark_mode, label: s.themeDark),
+                (mode: ThemeMode.system, icon: Symbols.brightness_auto, label: s.themeSystem),
+              ].indexed) ...[
+                if (i > 0) const _RowDivider(),
+                _OptionRow(
+                  icon: option.icon,
+                  label: option.label,
+                  selected: state.themeMode == option.mode,
+                  onTap: () => settings.setThemeMode(option.mode),
+                ),
+              ],
+            ]),
+            groupGap,
+            _GroupLabel(s.language),
+            _GroupCard(children: [
+              for (final (i, option) in [
+                (locale: AppLocales.arabic, label: s.languageArabic),
+                (locale: AppLocales.english, label: s.languageEnglish),
+              ].indexed) ...[
+                if (i > 0) const _RowDivider(),
+                _OptionRow(
+                  icon: Symbols.translate,
+                  label: option.label,
+                  selected: state.locale.languageCode == option.locale.languageCode,
+                  onTap: () => settings.setLocale(option.locale),
+                ),
+              ],
+            ]),
+            groupGap,
+            // ── Sync / about ───────────────────────────────────────────────
+            _GroupCard(children: [
+              _SyncRow(
+                syncing: _syncing,
+                onSync: () => _onSyncNow(context),
+              ),
+              const _RowDivider(),
+              _NavRow(
+                icon: Symbols.info,
+                label: s.settingsAbout,
+                subtitle: s.settingsVersionValue(_appVersion ?? s.commonNoValue),
+                onTap: () => _onAbout(context),
+              ),
+            ]),
+            context.gapH(Insets.x6),
+            _LogoutButton(onTap: () => _onLogoutTap(context)),
+            groupGap,
+            Center(
+              child: Text(
+                s.aboutFooter,
+                textAlign: TextAlign.center,
+                style: AppType.bodySm.copyWith(color: context.x.textTertiary),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -248,7 +263,7 @@ const double _profileAvatarSize = 64.0;
 /// 2dp doubles as its ring width, which is what makes the ring read as a
 /// cut-out rather than an outline.
 const double _presenceDotSize = 15.0;
-const double _presenceDotInset = 2.0;
+const double _presenceDotInset = Insets.hair;
 
 class _ProfileCard extends StatelessWidget {
   final AuthUser user;
@@ -282,8 +297,6 @@ class _ProfileCard extends StatelessWidget {
     final cs = context.colors;
     final x = context.x;
     final dot = context.r(_presenceDotSize);
-    final name = user.displayName;
-    final login = user.username;
     final isManager = user.canEditVisits;
     return AppCard(
       child: Row(
@@ -294,7 +307,7 @@ class _ProfileCard extends StatelessWidget {
               // the proportional glyph size and — the part that matters — the
               // guard that stops an empty or whitespace-only Odoo name throwing
               // a RangeError on `name[0]`.
-              InitialAvatar(name: name, size: _profileAvatarSize),
+              InitialAvatar(name: user.displayName, size: _profileAvatarSize),
               // Online presence dot, inline-start so it mirrors in Arabic.
               PositionedDirectional(
                 start: _presenceDotInset,
@@ -321,17 +334,31 @@ class _ProfileCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name,
-                    style: AppType.titleLg.copyWith(fontWeight: FontWeight.w800, color: cs.onSurface)),
+                // Odoo names can be a full four-part Arabic name; two lines is
+                // enough to recognise it without pushing the card taller.
+                Text(
+                  user.displayName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppType.titleLg.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: cs.onSurface,
+                  ),
+                ),
                 context.gapH(Insets.hair),
+                // Logins are e-mail addresses: always left-to-right.
                 Directionality(
                   textDirection: TextDirection.ltr,
-                  child: Text(login,
-                      style: AppType.bodySm.copyWith(color: cs.onSurfaceVariant)),
+                  child: Text(
+                    user.username,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppType.bodySm.copyWith(color: cs.onSurfaceVariant),
+                  ),
                 ),
                 context.gapH(Insets.x1h),
                 Container(
-                  padding: context.padSym(h: Insets.x2h, v: Insets.x1 + 1),
+                  padding: context.padSym(h: Insets.x2h, v: Insets.x1),
                   decoration: BoxDecoration(
                     color: cs.primaryContainer,
                     borderRadius: BorderRadius.circular(Radii.pill),
@@ -343,7 +370,7 @@ class _ProfileCard extends StatelessWidget {
                           fill: 1,
                           size: context.r(IconSz.pill),
                           color: cs.onPrimaryContainer),
-                      context.gapW(Insets.x1 + 1),
+                      context.gapW(Insets.x1),
                       // Flexible: the pill is inside a Row inside a Column that
                       // the card already bounds, and "مدير المشروع" at 1.25×
                       // is wider than a 320dp card leaves for it.
@@ -368,36 +395,6 @@ class _ProfileCard extends StatelessWidget {
   }
 }
 
-/// Why the role above may be a fallback rather than the truth.
-///
-/// [AuthUser.profileIncomplete] means the post-login permission read failed, so
-/// the badge shows the default role and every workflow button is hidden. Said
-/// once in a launch snackbar it is gone before it is needed; said here it sits
-/// next to the claim it qualifies.
-class _ProfileIncompleteNotice extends StatelessWidget {
-  const _ProfileIncompleteNotice();
-
-  @override
-  Widget build(BuildContext context) {
-    final x = context.x;
-    return AppCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Symbols.warning, fill: 1, size: context.r(IconSz.sm), color: x.warning),
-          context.gapW(Insets.x2h),
-          Expanded(
-            child: Text(
-              context.s.errProfileIncomplete,
-              style: AppType.bodySm.copyWith(color: context.colors.onSurfaceVariant),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Eyebrow above a settings group card.
 class _GroupLabel extends StatelessWidget {
   final String label;
@@ -406,7 +403,10 @@ class _GroupLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SectionHeader.eyebrow(
         label: label,
-        padding: const EdgeInsetsDirectional.only(start: 6, bottom: 8),
+        padding: const EdgeInsetsDirectional.only(
+          start: Insets.x1h,
+          bottom: Insets.x2,
+        ),
       );
 }
 
@@ -426,8 +426,13 @@ class _GroupCard extends StatelessWidget {
 class _RowDivider extends StatelessWidget {
   const _RowDivider();
   @override
-  Widget build(BuildContext context) =>
-      Divider(height: 1, thickness: 1, indent: 16, endIndent: 16, color: context.x.divider);
+  Widget build(BuildContext context) => Divider(
+        height: 1,
+        thickness: 1,
+        indent: context.r(Insets.x4),
+        endIndent: context.r(Insets.x4),
+        color: context.x.divider,
+      );
 }
 
 class _OptionRow extends StatelessWidget {
@@ -443,6 +448,7 @@ class _OptionRow extends StatelessWidget {
     final cs = context.colors;
     return ListTile(
       onTap: onTap,
+      selected: selected,
       leading: Icon(icon, fill: selected ? 1 : 0, color: cs.onSurfaceVariant),
       title: Text(label, style: AppType.titleSm.copyWith(color: cs.onSurface)),
       trailing: selected
@@ -453,7 +459,7 @@ class _OptionRow extends StatelessWidget {
 }
 
 /// A tappable row that navigates / triggers an action (icon + title + optional
-/// subtitle + a direction-aware chevron).
+/// subtitle + a chevron).
 class _NavRow extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -469,12 +475,16 @@ class _NavRow extends StatelessWidget {
       leading: Icon(icon, color: cs.onSurfaceVariant),
       title: Text(label, style: AppType.titleSm.copyWith(color: cs.onSurface)),
       subtitle: subtitle != null
-          ? Text(subtitle!, style: AppType.bodySm.copyWith(color: context.x.textTertiary))
+          ? Text(
+              subtitle!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppType.bodySm.copyWith(color: context.x.textTertiary),
+            )
           : null,
-      trailing: Icon(
-        context.isRtl ? Symbols.chevron_left : Symbols.chevron_right,
-        color: context.x.textDisabled,
-      ),
+      // `chevron_right` carries `matchTextDirection`: Flutter points it left in
+      // Arabic by itself. Picking `chevron_left` for RTL mirrored it twice.
+      trailing: Icon(Symbols.chevron_right, color: context.x.textDisabled),
     );
   }
 }
@@ -507,15 +517,18 @@ class _SwitchRow extends StatelessWidget {
   }
 }
 
-/// "آخر مزامنة" row — last-sync sub-text + a "مزامنة الآن" action.
 /// "Last sync" row. The subtitle is derived from the live queue — the count of
 /// work still waiting, or when a queued action last actually reached the
 /// server. It is never a fixed string: telling a field employee "synced just
 /// now" while their GPS-stamped check-ins sit unsent is the one lie this row
 /// must not tell.
 class _SyncRow extends StatelessWidget {
+  final bool syncing;
   final VoidCallback onSync;
-  const _SyncRow({required this.onSync});
+  const _SyncRow({required this.syncing, required this.onSync});
+
+  /// Stroke of the in-button spinner, thin to match the text button.
+  static const double _spinnerStroke = 2.0;
 
   @override
   Widget build(BuildContext context) {
@@ -549,15 +562,22 @@ class _SyncRow extends StatelessWidget {
         ),
       ),
       trailing: TextButton(
-        onPressed: onSync,
-        child: Text(context.s.settingsSyncNow),
+        onPressed: syncing ? null : onSync,
+        child: syncing
+            ? SizedBox.square(
+                dimension: context.r(IconSz.xs),
+                child: const CircularProgressIndicator(strokeWidth: _spinnerStroke),
+              )
+            : Text(context.s.settingsSyncNow),
       ),
     );
   }
 }
 
 /// 54 — taller than a standard button. Sign-out is the one destructive action
-/// on this screen and is deliberately given its own weight at the foot of it.
+/// on this screen and is deliberately given its own weight at the foot of it,
+/// in the error *container* colour rather than [AppButton.destructive]'s solid
+/// red, which would shout over the settings above it.
 const double _logoutHeight = 54.0;
 
 class _LogoutButton extends StatelessWidget {
@@ -578,14 +598,24 @@ class _LogoutButton extends StatelessWidget {
           // scale instead of clipping it.
           height: context.fixedH(_logoutHeight),
           alignment: Alignment.center,
+          padding: context.padSym(h: Insets.x4),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Symbols.logout,
                   fill: 1, size: context.r(IconSz.sm), color: cs.error),
               context.gapW(Insets.x2),
-              Text(context.s.commonLogout,
-                  style: AppType.button.copyWith(fontWeight: FontWeight.w800, color: cs.error)),
+              Flexible(
+                child: Text(
+                  context.s.commonLogout,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppType.button.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: cs.error,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
