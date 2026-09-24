@@ -207,15 +207,13 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp>
         BlocProvider.value(value: _settingsCubit),
         BlocProvider.value(value: _serverConfigCubit),
         BlocProvider(
-          create: (_) =>
-              CustomersBloc(repository: sl<CustomersRepository>()),
+          create: (_) => CustomersBloc(repository: sl<CustomersRepository>()),
         ),
         BlocProvider(
           create: (_) => VisitBloc(repository: sl<VisitsRepository>()),
         ),
         BlocProvider(
-          create: (_) =>
-              VisitsListBloc(repository: sl<VisitsRepository>()),
+          create: (_) => VisitsListBloc(repository: sl<VisitsRepository>()),
         ),
       ],
       child: BlocListener<AuthBloc, AuthState>(
@@ -229,33 +227,33 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp>
             curr.status != AuthStatus.authenticated,
         listener: (context, _) => _resetUserScopedBlocs(context),
         child: BlocBuilder<SettingsCubit, SettingsState>(
-        builder: (context, settings) {
-          return MaterialApp.router(
-            debugShowCheckedModeBanner: false,
-            onGenerateTitle: (ctx) => AppLocalizations.of(ctx).appTitle,
-            theme: AppTheme.light(),
-            darkTheme: AppTheme.dark(),
-            themeMode: settings.themeMode,
-            routerConfig: _router,
-            // App-wide responsiveness guard: bound the OS text-scale so the
-            // design's fixed-height components (app bar, cards, chips, nav)
-            // stay legible without overflowing on very large / small font
-            // accessibility settings.
-            builder: (context, child) => MediaQuery.withClampedTextScaling(
-              minScaleFactor: Responsive.minTextScale,
-              maxScaleFactor: Responsive.maxTextScale,
-              child: child!,
-            ),
-            locale: settings.locale,
-            supportedLocales: AppLocalizations.supportedLocales,
-            localizationsDelegates: const [
-              AppLocalizations.delegate,
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-          );
-        },
+          builder: (context, settings) {
+            return MaterialApp.router(
+              debugShowCheckedModeBanner: false,
+              onGenerateTitle: (ctx) => AppLocalizations.of(ctx).appTitle,
+              theme: AppTheme.light(),
+              darkTheme: AppTheme.dark(),
+              themeMode: settings.themeMode,
+              routerConfig: _router,
+              // App-wide responsiveness guard: bound the OS text-scale so the
+              // design's fixed-height components (app bar, cards, chips, nav)
+              // stay legible without overflowing on very large / small font
+              // accessibility settings.
+              builder: (context, child) => MediaQuery.withClampedTextScaling(
+                minScaleFactor: Responsive.minTextScale,
+                maxScaleFactor: Responsive.maxTextScale,
+                child: child!,
+              ),
+              locale: settings.locale,
+              supportedLocales: AppLocalizations.supportedLocales,
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+            );
+          },
         ),
       ),
     );

@@ -52,8 +52,9 @@ const _routeMatchDir = 'route_match_v1';
 
 Future<void> setupServiceLocator() async {
   final dir = await getApplicationSupportDirectory();
-  final cookieJar =
-      PersistCookieJar(storage: FileStorage('${dir.path}/$_cookieDir/'));
+  final cookieJar = PersistCookieJar(
+    storage: FileStorage('${dir.path}/$_cookieDir/'),
+  );
   final prefs = await SharedPreferences.getInstance();
 
   sl.registerSingleton<SharedPreferences>(prefs);
@@ -77,19 +78,27 @@ Future<void> setupServiceLocator() async {
   sl.registerSingleton<ConnectivityStatus>(connectivity);
   final serverClock = ServerClock(prefs: prefs);
   sl.registerSingleton<ServerClock>(serverClock);
-  sl.registerSingleton<ApiClient>(ApiClient(
-    cookieJar: cookieJar,
-    connectivity: connectivity,
-    serverClock: serverClock,
-    baseUrl: serverConfig.baseUrl,
-  ));
+  sl.registerSingleton<ApiClient>(
+    ApiClient(
+      cookieJar: cookieJar,
+      connectivity: connectivity,
+      serverClock: serverClock,
+      baseUrl: serverConfig.baseUrl,
+    ),
+  );
   sl.registerSingleton<SessionStorage>(SessionStorage());
   sl.registerSingleton<LocationService>(LocationService());
   sl.registerSingleton<LocationDescriber>(LocationDescriber());
   sl.registerSingleton<SettingsRepository>(SettingsRepository(prefs: prefs));
 
-  sl.registerSingleton<AuthRepository>(AuthRepository(
-      api: sl(), session: sl(), cookieJar: sl(), serverConfig: sl()));
+  sl.registerSingleton<AuthRepository>(
+    AuthRepository(
+      api: sl(),
+      session: sl(),
+      cookieJar: sl(),
+      serverConfig: sl(),
+    ),
+  );
   // Odoo reports a dead session as `SessionExpiredException` inside an HTTP
   // 200; the client renews it with the stored credentials and retries the
   // refused call once before falling back to a logout.
@@ -97,14 +106,16 @@ Future<void> setupServiceLocator() async {
   sl.registerSingleton<CustomersRepository>(CustomersRepository(api: sl()));
   sl.registerSingleton<EmployeesRepository>(EmployeesRepository(api: sl()));
   sl.registerSingleton<VisitsRepository>(
-      VisitsRepository(api: sl(), session: sl(), serverClock: sl()));
+    VisitsRepository(api: sl(), session: sl(), serverClock: sl()),
+  );
 
   // Push notifications: token registration goes through the same authenticated
   // ApiClient; the service owns the FCM lifecycle. See app.dart for the
   // login/logout hooks and docs/BACKEND_PUSH_NOTIFICATIONS.md.
   sl.registerSingleton<PushRepository>(PushRepository(api: sl()));
   sl.registerSingleton<PushNotificationService>(
-      PushNotificationService(repository: sl(), prefs: prefs));
+    PushNotificationService(repository: sl(), prefs: prefs),
+  );
 
   // Offline work and recorded GPS are scoped to the server and user that
   // produced them.
@@ -184,17 +195,21 @@ Future<void> setupServiceLocator() async {
   // Road-following display geometry for recorded visit trails, one visit at a
   // time. Only ever draws; the recorded points are never altered.
   final matchingUrl = AppEnvironment.mapMatchingUrl;
-  sl.registerSingleton<RouteMatcher>(RouteMatcher(
-    matcher: matchingUrl.isEmpty
-        ? null
-        : OsrmMapMatcher(
-            baseUrl: matchingUrl,
-            profile: AppEnvironment.mapMatchingProfile,
-            userAgent: AppConstants.mapUserAgent,
-            maxPoints: AppEnvironment.mapMatchingMaxPoints > 0
-                ? AppEnvironment.mapMatchingMaxPoints
-                : null,
-          ),
-    cache: RouteMatchCache(directory: Directory('${dir.path}/$_routeMatchDir')),
-  ));
+  sl.registerSingleton<RouteMatcher>(
+    RouteMatcher(
+      matcher: matchingUrl.isEmpty
+          ? null
+          : OsrmMapMatcher(
+              baseUrl: matchingUrl,
+              profile: AppEnvironment.mapMatchingProfile,
+              userAgent: AppConstants.mapUserAgent,
+              maxPoints: AppEnvironment.mapMatchingMaxPoints > 0
+                  ? AppEnvironment.mapMatchingMaxPoints
+                  : null,
+            ),
+      cache: RouteMatchCache(
+        directory: Directory('${dir.path}/$_routeMatchDir'),
+      ),
+    ),
+  );
 }

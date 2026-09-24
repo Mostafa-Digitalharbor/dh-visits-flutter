@@ -129,7 +129,8 @@ class AppConstants {
 
   /// Target of the on-map credit badge ([AppMapAttribution]). OSM's ODbL
   /// licence requires the credit to be visible and to link back here.
-  static const String osmCopyrightUrl = 'https://www.openstreetmap.org/copyright';
+  static const String osmCopyrightUrl =
+      'https://www.openstreetmap.org/copyright';
 
   /// The credit OSM's licence requires on every map. A brand name and a
   /// legal notice, identical in every language, so it is not translated.

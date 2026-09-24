@@ -284,7 +284,13 @@ class TrailPoint extends Equatable {
   }
 
   @override
-  List<Object?> get props => [latitude, longitude, loggedAt, clientUid, visitId];
+  List<Object?> get props => [
+    latitude,
+    longitude,
+    loggedAt,
+    clientUid,
+    visitId,
+  ];
 }
 
 /// One point the server refused inside a batch, identified by its position in

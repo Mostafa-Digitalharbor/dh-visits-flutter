@@ -34,15 +34,14 @@ abstract final class StorageKeys {
   static const trailNativeSeq = 'visit_trail_native_seq_v1';
   static const trailEndedVisits = 'visit_trail_ended_visits_v1';
   static const visitTrackingDisclosure = 'visit_tracking_disclosure_v1';
+
   /// Keys only the retired "active visit" marker wrote. Never read:
   /// [VisitTrailTracker] deletes them on start-up.
   ///
   /// The `workday_*` keys are **not** listed here: whole-work-day tracking is
   /// live again (`WorkdayTracker` owns those keys directly), so purging them
   /// would throw away an unfinished day and its unsent points on every launch.
-  static const legacyLocationKeys = [
-    'visit_trail_active_visit_v1',
-  ];
+  static const legacyLocationKeys = ['visit_trail_active_visit_v1'];
 
   // ---- Secure storage (keystore / keychain) ----
   static const sessionUser = 'session_user';
