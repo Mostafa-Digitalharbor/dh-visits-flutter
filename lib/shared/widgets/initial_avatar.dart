@@ -43,11 +43,50 @@ class InitialAvatar extends StatelessWidget {
     this.shadow,
   });
 
-  /// The uppercase first letter of [name], or `?` when there isn't one.
+  /// A letter or digit, so a name that opens with punctuation does not put a
+  /// bracket in the circle.
+  ///
+  /// Anchored, and matched against one grapheme cluster at a time: it is the
+  /// character the cluster *starts* with that decides. An unanchored test
+  /// would accept a cluster because of a combining mark buried inside it.
+  static final _startsWithLetterOrDigit =
+      RegExp(r'^[\p{L}\p{N}]', unicode: true);
+
+  /// Punctuation, separators and control characters — never an initial, even
+  /// when the name holds nothing else. Symbols (`\p{S}`) are deliberately not
+  /// here: an emoji is a perfectly good stand-in for a name that is only an
+  /// emoji.
+  ///
+  /// Anchored for a sharper reason than the above: an emoji ZWJ sequence such
+  /// as 👩‍💼 *contains* U+200D, a format character in `\p{C}`, so an
+  /// unanchored test rejected the whole cluster and the emoji-only name fell
+  /// through to `?`.
+  static final _startsWithNonInitial =
+      RegExp(r'^[\p{P}\p{Z}\p{C}]', unicode: true);
+
+  /// The uppercase first *letter or digit* of [name], or `?` when there isn't
+  /// one.
+  ///
+  /// Not simply the first character. Odoo names arrive with tag prefixes and
+  /// decoration — the live server's own QA account is literally
+  /// `[QA-AUTO] Workday Tester` — and taking character zero put a `[` in the
+  /// avatar. On an Arabic screen the bidi algorithm then *mirrored* it, so the
+  /// circle read `]`: a punctuation mark, pointing the wrong way, as
+  /// somebody's initial.
+  ///
   /// Trims first: Odoo happily returns names that are only whitespace.
   static String initialOf(String? name) {
     final trimmed = name?.trim() ?? '';
-    return trimmed.isEmpty ? '?' : trimmed.characters.first.toUpperCase();
+    if (trimmed.isEmpty) return '?';
+    for (final ch in trimmed.characters) {
+      if (_startsWithLetterOrDigit.hasMatch(ch)) return ch.toUpperCase();
+    }
+    // No letter or digit anywhere: an emoji or another symbol still beats a
+    // question mark, but a string of punctuation does not.
+    for (final ch in trimmed.characters) {
+      if (!_startsWithNonInitial.hasMatch(ch)) return ch.toUpperCase();
+    }
+    return '?';
   }
 
   @override

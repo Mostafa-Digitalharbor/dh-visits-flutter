@@ -144,7 +144,7 @@ class _CustomerBody extends StatelessWidget {
               horizontal: context.r(Insets.x12 + Insets.x2),
               vertical: context.r(Insets.x3h),
             ),
-            title: Text(
+            title: AutoDirectionText(
               customer.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -211,7 +211,7 @@ class _LastVisitCard extends StatelessWidget {
       onTap: () => context.push(AppRoutes.visitDetail(visit.id)),
       child: ListTile(
         leading: const Icon(Symbols.history),
-        title: Text(
+        title: AutoDirectionText(
           visit.employeeName ?? s.visitFallbackTitle(visit.id),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,

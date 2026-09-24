@@ -122,12 +122,6 @@ abstract class AppLocalizations {
   /// **'Retry'**
   String get commonRetry;
 
-  /// No description provided for @commonLoading.
-  ///
-  /// In en, this message translates to:
-  /// **'Loading…'**
-  String get commonLoading;
-
   /// No description provided for @commonSearch.
   ///
   /// In en, this message translates to:
@@ -140,35 +134,17 @@ abstract class AppLocalizations {
   /// **'Cancel'**
   String get commonCancel;
 
-  /// No description provided for @commonSave.
-  ///
-  /// In en, this message translates to:
-  /// **'Save'**
-  String get commonSave;
-
   /// No description provided for @commonClose.
   ///
   /// In en, this message translates to:
   /// **'Close'**
   String get commonClose;
 
-  /// No description provided for @commonOptional.
-  ///
-  /// In en, this message translates to:
-  /// **'(optional)'**
-  String get commonOptional;
-
   /// No description provided for @commonLogout.
   ///
   /// In en, this message translates to:
   /// **'Sign out'**
   String get commonLogout;
-
-  /// No description provided for @commonRefresh.
-  ///
-  /// In en, this message translates to:
-  /// **'Refresh'**
-  String get commonRefresh;
 
   /// No description provided for @commonYes.
   ///
@@ -326,12 +302,6 @@ abstract class AppLocalizations {
   /// **'{value}%'**
   String unitPercentValue(String value);
 
-  /// No description provided for @unitMinShort.
-  ///
-  /// In en, this message translates to:
-  /// **'min'**
-  String get unitMinShort;
-
   /// No description provided for @relativeNow.
   ///
   /// In en, this message translates to:
@@ -422,12 +392,6 @@ abstract class AppLocalizations {
   /// **'Continue'**
   String get commonContinue;
 
-  /// No description provided for @commonOpenSettings.
-  ///
-  /// In en, this message translates to:
-  /// **'Open settings'**
-  String get commonOpenSettings;
-
   /// No description provided for @serverSetupTitle.
   ///
   /// In en, this message translates to:
@@ -439,12 +403,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter your organization\'s server address to get started'**
   String get serverSetupSubtitle;
-
-  /// No description provided for @serverSetupUrlLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Server URL'**
-  String get serverSetupUrlLabel;
 
   /// No description provided for @serverSetupUrlHint.
   ///
@@ -470,12 +428,6 @@ abstract class AppLocalizations {
   /// **'Ask your system administrator if you don\'t know your server address.'**
   String get serverSetupHelp;
 
-  /// No description provided for @serverSetupDatabaseLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Database name'**
-  String get serverSetupDatabaseLabel;
-
   /// No description provided for @serverSetupDatabaseHint.
   ///
   /// In en, this message translates to:
@@ -487,12 +439,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This server doesn\'t list its databases, so the app can\'t detect yours. Enter your company\'s database name — your administrator can tell you.'**
   String get serverSetupDatabasePrompt;
-
-  /// No description provided for @serverSetupChecking.
-  ///
-  /// In en, this message translates to:
-  /// **'Connecting…'**
-  String get serverSetupChecking;
 
   /// No description provided for @serverSetupDetectDb.
   ///
@@ -511,12 +457,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Database detected: {db}'**
   String serverSetupDetected(String db);
-
-  /// No description provided for @serverSetupDetectFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t detect the database automatically — enter its name manually.'**
-  String get serverSetupDetectFailed;
 
   /// No description provided for @serverSetupInsecureUrl.
   ///
@@ -572,12 +512,6 @@ abstract class AppLocalizations {
   /// **'Couldn\'t save the server settings on this device. Try again; if it keeps failing, restart the app.'**
   String get serverSetupSaveFailed;
 
-  /// No description provided for @loginChangeServer.
-  ///
-  /// In en, this message translates to:
-  /// **'Change server'**
-  String get loginChangeServer;
-
   /// No description provided for @loginTitle.
   ///
   /// In en, this message translates to:
@@ -596,12 +530,6 @@ abstract class AppLocalizations {
   /// **'Welcome back'**
   String get loginWelcomeBack;
 
-  /// No description provided for @loginRoleLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign in as'**
-  String get loginRoleLabel;
-
   /// No description provided for @loginUsername.
   ///
   /// In en, this message translates to:
@@ -613,6 +541,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Password'**
   String get loginPassword;
+
+  /// Tooltip / screen-reader label of the eye button that reveals the password on the sign-in form.
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get authShowPassword;
+
+  /// Tooltip / screen-reader label of the eye button that masks the password again.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get authHidePassword;
+
+  /// Tooltip / screen-reader label of the icon-only theme chip on the sign-in and server-setup screens, shown while the light theme is on.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to dark theme'**
+  String get authSwitchToDarkTheme;
+
+  /// Counterpart of authSwitchToDarkTheme, shown while the dark theme is on.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to light theme'**
+  String get authSwitchToLightTheme;
 
   /// No description provided for @loginSubmit.
   ///
@@ -860,12 +812,6 @@ abstract class AppLocalizations {
   /// **'Can\'t reach the server. Check your internet connection (Wi-Fi or mobile data) and try again.'**
   String get errNetworkUnreachable;
 
-  /// No description provided for @errNetworkUnknown.
-  ///
-  /// In en, this message translates to:
-  /// **'A connection problem occurred. Check your internet connection and try again.'**
-  String get errNetworkUnknown;
-
   /// No description provided for @errLocationPermission.
   ///
   /// In en, this message translates to:
@@ -991,12 +937,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Visit updated'**
   String get pushEventUpdated;
-
-  /// No description provided for @unitPercent.
-  ///
-  /// In en, this message translates to:
-  /// **'%'**
-  String get unitPercent;
 
   /// No description provided for @unitBytes.
   ///
@@ -1124,12 +1064,6 @@ abstract class AppLocalizations {
   /// **'Last visit'**
   String get customerLastVisit;
 
-  /// No description provided for @customerActionCheckIn.
-  ///
-  /// In en, this message translates to:
-  /// **'Start visit'**
-  String get customerActionCheckIn;
-
   /// No description provided for @customerActionCall.
   ///
   /// In en, this message translates to:
@@ -1166,18 +1100,6 @@ abstract class AppLocalizations {
   /// **'Contact details'**
   String get customerSectionInfo;
 
-  /// No description provided for @customerFieldType.
-  ///
-  /// In en, this message translates to:
-  /// **'Type'**
-  String get customerFieldType;
-
-  /// No description provided for @customerFieldEmail.
-  ///
-  /// In en, this message translates to:
-  /// **'Email'**
-  String get customerFieldEmail;
-
   /// No description provided for @customerFieldJob.
   ///
   /// In en, this message translates to:
@@ -1195,12 +1117,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tags'**
   String get customerFieldTags;
-
-  /// No description provided for @customerFieldWebsite.
-  ///
-  /// In en, this message translates to:
-  /// **'Website'**
-  String get customerFieldWebsite;
 
   /// No description provided for @customerFieldVat.
   ///
@@ -1226,113 +1142,11 @@ abstract class AppLocalizations {
   /// **'This customer no longer exists, or you no longer have access to it. Go back and refresh the customer list.'**
   String get customerNotFound;
 
-  /// No description provided for @customerAlreadyCheckedIn.
-  ///
-  /// In en, this message translates to:
-  /// **'You have a visit in progress here'**
-  String get customerAlreadyCheckedIn;
-
-  /// No description provided for @customerActiveVisitBadge.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit in progress'**
-  String get customerActiveVisitBadge;
-
-  /// No description provided for @customerCheckInBlocked.
-  ///
-  /// In en, this message translates to:
-  /// **'You have a visit in progress at {customer}. End it before starting another.'**
-  String customerCheckInBlocked(String customer);
-
-  /// No description provided for @customerCheckInBlockedShort.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit in progress elsewhere'**
-  String get customerCheckInBlockedShort;
-
-  /// No description provided for @checkInSuccess.
-  ///
-  /// In en, this message translates to:
-  /// **'Checked-in successfully'**
-  String get checkInSuccess;
-
-  /// No description provided for @visitActiveTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit in progress'**
-  String get visitActiveTitle;
-
-  /// No description provided for @visitActiveEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'No visit in progress.\nPick a customer and start a visit.'**
-  String get visitActiveEmpty;
-
-  /// No description provided for @visitStartedAt.
-  ///
-  /// In en, this message translates to:
-  /// **'Started at {time}'**
-  String visitStartedAt(String time);
-
-  /// No description provided for @visitLiveIndicator.
-  ///
-  /// In en, this message translates to:
-  /// **'Live'**
-  String get visitLiveIndicator;
-
-  /// No description provided for @mapZoomIn.
-  ///
-  /// In en, this message translates to:
-  /// **'Zoom in'**
-  String get mapZoomIn;
-
-  /// No description provided for @mapZoomOut.
-  ///
-  /// In en, this message translates to:
-  /// **'Zoom out'**
-  String get mapZoomOut;
-
-  /// No description provided for @mapRecenter.
-  ///
-  /// In en, this message translates to:
-  /// **'Centre the map'**
-  String get mapRecenter;
-
   /// No description provided for @mapOpenDirections.
   ///
   /// In en, this message translates to:
   /// **'Open directions'**
   String get mapOpenDirections;
-
-  /// No description provided for @visitNotesLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Notes (optional)'**
-  String get visitNotesLabel;
-
-  /// No description provided for @visitActionCheckOut.
-  ///
-  /// In en, this message translates to:
-  /// **'Check-out'**
-  String get visitActionCheckOut;
-
-  /// No description provided for @checkOutSuccess.
-  ///
-  /// In en, this message translates to:
-  /// **'Checked-out successfully'**
-  String get checkOutSuccess;
-
-  /// No description provided for @employeesTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Employees'**
-  String get employeesTitle;
-
-  /// No description provided for @employeesEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'No employees set up yet'**
-  String get employeesEmpty;
 
   /// No description provided for @employeesSearchHint.
   ///
@@ -1340,179 +1154,11 @@ abstract class AppLocalizations {
   /// **'Search employees…'**
   String get employeesSearchHint;
 
-  /// No description provided for @createVisitCustomerLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Customer'**
-  String get createVisitCustomerLabel;
-
-  /// No description provided for @createVisitEmployeeLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Employee'**
-  String get createVisitEmployeeLabel;
-
-  /// No description provided for @createVisitDateLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit date'**
-  String get createVisitDateLabel;
-
-  /// No description provided for @createVisitTypeLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit type (optional)'**
-  String get createVisitTypeLabel;
-
-  /// No description provided for @createVisitNotesLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Notes (optional)'**
-  String get createVisitNotesLabel;
-
-  /// No description provided for @createVisitStateLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Initial state'**
-  String get createVisitStateLabel;
-
-  /// No description provided for @visitStateDraft.
-  ///
-  /// In en, this message translates to:
-  /// **'Draft'**
-  String get visitStateDraft;
-
-  /// No description provided for @visitStateSubmit.
-  ///
-  /// In en, this message translates to:
-  /// **'Submit'**
-  String get visitStateSubmit;
-
-  /// No description provided for @visitStateUnderReview.
-  ///
-  /// In en, this message translates to:
-  /// **'Under review'**
-  String get visitStateUnderReview;
-
-  /// No description provided for @visitStateDone.
-  ///
-  /// In en, this message translates to:
-  /// **'Done'**
-  String get visitStateDone;
-
-  /// No description provided for @visitStateCancel.
-  ///
-  /// In en, this message translates to:
-  /// **'Cancelled'**
-  String get visitStateCancel;
-
-  /// No description provided for @visitDetailVisitTypeLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit type'**
-  String get visitDetailVisitTypeLabel;
-
-  /// No description provided for @visitDetailEditVisitType.
-  ///
-  /// In en, this message translates to:
-  /// **'Change visit type'**
-  String get visitDetailEditVisitType;
-
-  /// No description provided for @visitDetailMarkAsDone.
-  ///
-  /// In en, this message translates to:
-  /// **'Mark as reviewed'**
-  String get visitDetailMarkAsDone;
-
-  /// No description provided for @visitDetailMarkAsDoneSuccess.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit marked as reviewed'**
-  String get visitDetailMarkAsDoneSuccess;
-
-  /// No description provided for @visitDetailSendToEmployee.
-  ///
-  /// In en, this message translates to:
-  /// **'Send to employee'**
-  String get visitDetailSendToEmployee;
-
-  /// No description provided for @visitDetailSentToEmployeeSuccess.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit sent to employee'**
-  String get visitDetailSentToEmployeeSuccess;
-
-  /// No description provided for @visitDetailEditState.
-  ///
-  /// In en, this message translates to:
-  /// **'Change state'**
-  String get visitDetailEditState;
-
-  /// No description provided for @visitDetailPickState.
-  ///
-  /// In en, this message translates to:
-  /// **'Select a status'**
-  String get visitDetailPickState;
-
-  /// No description provided for @createVisitSuccess.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit created'**
-  String get createVisitSuccess;
-
-  /// No description provided for @createVisitCustomerRequired.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick a customer'**
-  String get createVisitCustomerRequired;
-
-  /// No description provided for @createVisitEmployeeRequired.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick an employee'**
-  String get createVisitEmployeeRequired;
-
-  /// No description provided for @createVisitDateRequired.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick a visit date'**
-  String get createVisitDateRequired;
-
   /// No description provided for @createVisitTooltip.
   ///
   /// In en, this message translates to:
   /// **'New visit'**
   String get createVisitTooltip;
-
-  /// No description provided for @createVisitPickType.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick visit type'**
-  String get createVisitPickType;
-
-  /// No description provided for @createVisitPickCustomer.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick customer'**
-  String get createVisitPickCustomer;
-
-  /// No description provided for @createVisitPickEmployee.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick employee'**
-  String get createVisitPickEmployee;
-
-  /// No description provided for @visitsSearchHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Search by customer name…'**
-  String get visitsSearchHint;
-
-  /// No description provided for @pickerSearchHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Search…'**
-  String get pickerSearchHint;
 
   /// No description provided for @pickerNoResults.
   ///
@@ -1520,353 +1166,11 @@ abstract class AppLocalizations {
   /// **'No results'**
   String get pickerNoResults;
 
-  /// No description provided for @groupToday.
-  ///
-  /// In en, this message translates to:
-  /// **'Today'**
-  String get groupToday;
-
-  /// No description provided for @groupYesterday.
-  ///
-  /// In en, this message translates to:
-  /// **'Yesterday'**
-  String get groupYesterday;
-
-  /// No description provided for @groupEarlierThisWeek.
-  ///
-  /// In en, this message translates to:
-  /// **'Earlier this week'**
-  String get groupEarlierThisWeek;
-
-  /// No description provided for @groupEarlier.
-  ///
-  /// In en, this message translates to:
-  /// **'Earlier'**
-  String get groupEarlier;
-
-  /// No description provided for @groupTomorrow.
-  ///
-  /// In en, this message translates to:
-  /// **'Tomorrow'**
-  String get groupTomorrow;
-
-  /// No description provided for @groupLaterThisWeek.
-  ///
-  /// In en, this message translates to:
-  /// **'Later this week'**
-  String get groupLaterThisWeek;
-
-  /// No description provided for @groupUpcoming.
-  ///
-  /// In en, this message translates to:
-  /// **'Upcoming'**
-  String get groupUpcoming;
-
-  /// No description provided for @statsTotal.
-  ///
-  /// In en, this message translates to:
-  /// **'Total'**
-  String get statsTotal;
-
-  /// No description provided for @statsActive.
-  ///
-  /// In en, this message translates to:
-  /// **'In progress'**
-  String get statsActive;
-
-  /// No description provided for @statsCompleted.
-  ///
-  /// In en, this message translates to:
-  /// **'Completed'**
-  String get statsCompleted;
-
-  /// No description provided for @statsPendingReview.
-  ///
-  /// In en, this message translates to:
-  /// **'Pending review'**
-  String get statsPendingReview;
-
-  /// No description provided for @statsDone.
-  ///
-  /// In en, this message translates to:
-  /// **'Done'**
-  String get statsDone;
-
-  /// No description provided for @visitsHistoryTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'History'**
-  String get visitsHistoryTitle;
-
-  /// No description provided for @visitsHistoryEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'No visits recorded yet'**
-  String get visitsHistoryEmpty;
-
   /// No description provided for @visitsListTitle.
   ///
   /// In en, this message translates to:
   /// **'Visits'**
   String get visitsListTitle;
-
-  /// No description provided for @visitsFilterToday.
-  ///
-  /// In en, this message translates to:
-  /// **'Today'**
-  String get visitsFilterToday;
-
-  /// No description provided for @visitsFilterAll.
-  ///
-  /// In en, this message translates to:
-  /// **'All'**
-  String get visitsFilterAll;
-
-  /// No description provided for @filterStatusLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Status'**
-  String get filterStatusLabel;
-
-  /// No description provided for @filterStatusAll.
-  ///
-  /// In en, this message translates to:
-  /// **'All'**
-  String get filterStatusAll;
-
-  /// No description provided for @filterStatusCompleted.
-  ///
-  /// In en, this message translates to:
-  /// **'Completed'**
-  String get filterStatusCompleted;
-
-  /// No description provided for @filterStatusPendingReview.
-  ///
-  /// In en, this message translates to:
-  /// **'Pending review'**
-  String get filterStatusPendingReview;
-
-  /// No description provided for @filterStatusIncomplete.
-  ///
-  /// In en, this message translates to:
-  /// **'Incomplete'**
-  String get filterStatusIncomplete;
-
-  /// No description provided for @filterTimingLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Timing'**
-  String get filterTimingLabel;
-
-  /// No description provided for @filterTimingAll.
-  ///
-  /// In en, this message translates to:
-  /// **'All'**
-  String get filterTimingAll;
-
-  /// No description provided for @filterTimingOnTime.
-  ///
-  /// In en, this message translates to:
-  /// **'On schedule'**
-  String get filterTimingOnTime;
-
-  /// No description provided for @filterTimingEarly.
-  ///
-  /// In en, this message translates to:
-  /// **'Early'**
-  String get filterTimingEarly;
-
-  /// No description provided for @filterTimingOverdue.
-  ///
-  /// In en, this message translates to:
-  /// **'Overdue'**
-  String get filterTimingOverdue;
-
-  /// No description provided for @visitsTodayEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'No visits scheduled for today'**
-  String get visitsTodayEmpty;
-
-  /// No description provided for @visitDetailTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit details'**
-  String get visitDetailTitle;
-
-  /// No description provided for @visitDetailNotesSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Notes'**
-  String get visitDetailNotesSection;
-
-  /// No description provided for @visitDetailNoNotes.
-  ///
-  /// In en, this message translates to:
-  /// **'No notes added'**
-  String get visitDetailNoNotes;
-
-  /// No description provided for @visitDetailEditNotes.
-  ///
-  /// In en, this message translates to:
-  /// **'Edit notes'**
-  String get visitDetailEditNotes;
-
-  /// No description provided for @visitDetailMetaSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit info'**
-  String get visitDetailMetaSection;
-
-  /// No description provided for @visitDetailTimelineSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Timeline'**
-  String get visitDetailTimelineSection;
-
-  /// No description provided for @visitDetailVisitDate.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit date'**
-  String get visitDetailVisitDate;
-
-  /// No description provided for @visitDetailVisitType.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit type'**
-  String get visitDetailVisitType;
-
-  /// No description provided for @visitDetailSaveChanges.
-  ///
-  /// In en, this message translates to:
-  /// **'Save changes'**
-  String get visitDetailSaveChanges;
-
-  /// No description provided for @visitDetailReadOnlyHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Only your manager can edit these fields.'**
-  String get visitDetailReadOnlyHint;
-
-  /// No description provided for @visitDetailNotesEditableHint.
-  ///
-  /// In en, this message translates to:
-  /// **'You can add notes while you are checked-in.'**
-  String get visitDetailNotesEditableHint;
-
-  /// No description provided for @visitDetailSaved.
-  ///
-  /// In en, this message translates to:
-  /// **'Changes saved'**
-  String get visitDetailSaved;
-
-  /// No description provided for @visitDetailDelete.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete visit'**
-  String get visitDetailDelete;
-
-  /// No description provided for @visitDetailNotStartedYet.
-  ///
-  /// In en, this message translates to:
-  /// **'Not started yet'**
-  String get visitDetailNotStartedYet;
-
-  /// No description provided for @visitDetailNotEndedYet.
-  ///
-  /// In en, this message translates to:
-  /// **'Not ended yet'**
-  String get visitDetailNotEndedYet;
-
-  /// No description provided for @visitDetailOpenCheckInLocation.
-  ///
-  /// In en, this message translates to:
-  /// **'Show check-in location'**
-  String get visitDetailOpenCheckInLocation;
-
-  /// No description provided for @visitDetailOpenCheckOutLocation.
-  ///
-  /// In en, this message translates to:
-  /// **'Show check-out location'**
-  String get visitDetailOpenCheckOutLocation;
-
-  /// No description provided for @visitDetailTimelineLocationsSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Timeline & locations'**
-  String get visitDetailTimelineLocationsSection;
-
-  /// No description provided for @visitDetailEditCustomer.
-  ///
-  /// In en, this message translates to:
-  /// **'Change customer'**
-  String get visitDetailEditCustomer;
-
-  /// No description provided for @visitDetailEditEmployee.
-  ///
-  /// In en, this message translates to:
-  /// **'Change employee'**
-  String get visitDetailEditEmployee;
-
-  /// No description provided for @visitDetailCustomer.
-  ///
-  /// In en, this message translates to:
-  /// **'Customer'**
-  String get visitDetailCustomer;
-
-  /// No description provided for @visitDetailEmployee.
-  ///
-  /// In en, this message translates to:
-  /// **'Employee'**
-  String get visitDetailEmployee;
-
-  /// No description provided for @visitDetailStatusLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Status'**
-  String get visitDetailStatusLabel;
-
-  /// No description provided for @visitDetailStateBadgeDraft.
-  ///
-  /// In en, this message translates to:
-  /// **'Draft'**
-  String get visitDetailStateBadgeDraft;
-
-  /// No description provided for @visitDetailStateBadgeSubmitted.
-  ///
-  /// In en, this message translates to:
-  /// **'Submitted'**
-  String get visitDetailStateBadgeSubmitted;
-
-  /// No description provided for @visitDetailStateBadgeUnderReview.
-  ///
-  /// In en, this message translates to:
-  /// **'Under review'**
-  String get visitDetailStateBadgeUnderReview;
-
-  /// No description provided for @visitDetailStateBadgeDone.
-  ///
-  /// In en, this message translates to:
-  /// **'Done'**
-  String get visitDetailStateBadgeDone;
-
-  /// No description provided for @confirmDeleteVisitTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete visit'**
-  String get confirmDeleteVisitTitle;
-
-  /// No description provided for @confirmDeleteVisitMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'Are you sure you want to delete this visit? This action cannot be undone.'**
-  String get confirmDeleteVisitMessage;
-
-  /// No description provided for @visitDeletedSuccess.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit deleted'**
-  String get visitDeletedSuccess;
 
   /// No description provided for @roleManager.
   ///
@@ -1922,18 +1226,6 @@ abstract class AppLocalizations {
   /// **'In progress'**
   String get visitsHistoryActiveBadge;
 
-  /// No description provided for @visitsScheduledLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Scheduled'**
-  String get visitsScheduledLabel;
-
-  /// No description provided for @dashboardGreeting.
-  ///
-  /// In en, this message translates to:
-  /// **'Good morning'**
-  String get dashboardGreeting;
-
   /// No description provided for @dashboardTodayProgress.
   ///
   /// In en, this message translates to:
@@ -1951,42 +1243,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{hours} h'**
   String dashboardFieldHoursValue(String hours);
-
-  /// No description provided for @dashboardDaySchedule.
-  ///
-  /// In en, this message translates to:
-  /// **'Your day\'s schedule'**
-  String get dashboardDaySchedule;
-
-  /// No description provided for @affordanceScheduled.
-  ///
-  /// In en, this message translates to:
-  /// **'Tap to start the visit'**
-  String get affordanceScheduled;
-
-  /// No description provided for @affordanceActive.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit in progress'**
-  String get affordanceActive;
-
-  /// No description provided for @affordanceReview.
-  ///
-  /// In en, this message translates to:
-  /// **'Awaiting manager review'**
-  String get affordanceReview;
-
-  /// No description provided for @affordanceApproved.
-  ///
-  /// In en, this message translates to:
-  /// **'Approved'**
-  String get affordanceApproved;
-
-  /// No description provided for @affordanceRejected.
-  ///
-  /// In en, this message translates to:
-  /// **'Rejected — redo the visit'**
-  String get affordanceRejected;
 
   /// No description provided for @analyticsTabTitle.
   ///
@@ -2036,12 +1292,6 @@ abstract class AppLocalizations {
   /// **'By employee'**
   String get analyticsByEmployee;
 
-  /// How many visits an employee's on-time rate is based on.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{1 visit} other{{count} visits}}'**
-  String analyticsVisitsCount(int count);
-
   /// No description provided for @reviewTitle.
   ///
   /// In en, this message translates to:
@@ -2083,12 +1333,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Visit rejected'**
   String get reviewRejected;
-
-  /// No description provided for @reviewOutOfRangeBanner.
-  ///
-  /// In en, this message translates to:
-  /// **'Out of range · recorded outside the approved location'**
-  String get reviewOutOfRangeBanner;
 
   /// No description provided for @routeTabTitle.
   ///
@@ -2144,120 +1388,6 @@ abstract class AppLocalizations {
   /// **'No stops on today\'s route'**
   String get routeEmpty;
 
-  /// No description provided for @reportTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit report'**
-  String get reportTitle;
-
-  /// No description provided for @reportOutcome.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit outcome'**
-  String get reportOutcome;
-
-  /// No description provided for @reportOutcomeDone.
-  ///
-  /// In en, this message translates to:
-  /// **'Successful'**
-  String get reportOutcomeDone;
-
-  /// No description provided for @reportOutcomePostponed.
-  ///
-  /// In en, this message translates to:
-  /// **'Postponed'**
-  String get reportOutcomePostponed;
-
-  /// No description provided for @reportOutcomeAbsent.
-  ///
-  /// In en, this message translates to:
-  /// **'Customer absent'**
-  String get reportOutcomeAbsent;
-
-  /// No description provided for @reportNotes.
-  ///
-  /// In en, this message translates to:
-  /// **'Notes'**
-  String get reportNotes;
-
-  /// No description provided for @reportNotesHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Write a summary of the visit and key notes...'**
-  String get reportNotesHint;
-
-  /// No description provided for @reportPhoto.
-  ///
-  /// In en, this message translates to:
-  /// **'Proof photo'**
-  String get reportPhoto;
-
-  /// No description provided for @reportAddPhoto.
-  ///
-  /// In en, this message translates to:
-  /// **'Add photo'**
-  String get reportAddPhoto;
-
-  /// No description provided for @reportSignature.
-  ///
-  /// In en, this message translates to:
-  /// **'Customer signature'**
-  String get reportSignature;
-
-  /// No description provided for @reportSignHere.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign here'**
-  String get reportSignHere;
-
-  /// No description provided for @reportClear.
-  ///
-  /// In en, this message translates to:
-  /// **'Clear'**
-  String get reportClear;
-
-  /// No description provided for @reportSubmit.
-  ///
-  /// In en, this message translates to:
-  /// **'Finish and save report'**
-  String get reportSubmit;
-
-  /// No description provided for @createVisitTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Create a new visit'**
-  String get createVisitTitle;
-
-  /// No description provided for @createVisitSectionCustomer.
-  ///
-  /// In en, this message translates to:
-  /// **'Customer'**
-  String get createVisitSectionCustomer;
-
-  /// No description provided for @createVisitSectionEmployee.
-  ///
-  /// In en, this message translates to:
-  /// **'Field rep'**
-  String get createVisitSectionEmployee;
-
-  /// No description provided for @createVisitSectionType.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit type'**
-  String get createVisitSectionType;
-
-  /// No description provided for @createVisitSectionDate.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit date'**
-  String get createVisitSectionDate;
-
-  /// No description provided for @createVisitChange.
-  ///
-  /// In en, this message translates to:
-  /// **'Change'**
-  String get createVisitChange;
-
   /// No description provided for @createVisitSubmit.
   ///
   /// In en, this message translates to:
@@ -2270,114 +1400,6 @@ abstract class AppLocalizations {
   /// **'Completed'**
   String get visitsHistoryCompletedBadge;
 
-  /// No description provided for @visitsHistoryIncompleteBadge.
-  ///
-  /// In en, this message translates to:
-  /// **'Incomplete'**
-  String get visitsHistoryIncompleteBadge;
-
-  /// No description provided for @visitsHistoryOverdueBadge.
-  ///
-  /// In en, this message translates to:
-  /// **'Overdue'**
-  String get visitsHistoryOverdueBadge;
-
-  /// No description provided for @visitDetailOverdueHint.
-  ///
-  /// In en, this message translates to:
-  /// **'The scheduled day has passed and the visit hasn\'t been completed yet. Reschedule or follow up.'**
-  String get visitDetailOverdueHint;
-
-  /// No description provided for @visitExecutedOnTime.
-  ///
-  /// In en, this message translates to:
-  /// **'Completed on schedule'**
-  String get visitExecutedOnTime;
-
-  /// No description provided for @visitExecutedEarly.
-  ///
-  /// In en, this message translates to:
-  /// **'{days, plural, =1{Completed 1 day earlier than scheduled} other{Completed {days} days earlier than scheduled}}'**
-  String visitExecutedEarly(int days);
-
-  /// No description provided for @visitExecutedLate.
-  ///
-  /// In en, this message translates to:
-  /// **'{days, plural, =1{Completed 1 day later than scheduled} other{Completed {days} days later than scheduled}}'**
-  String visitExecutedLate(int days);
-
-  /// No description provided for @visitsHistoryRunning.
-  ///
-  /// In en, this message translates to:
-  /// **'Running'**
-  String get visitsHistoryRunning;
-
-  /// No description provided for @timelineCheckIn.
-  ///
-  /// In en, this message translates to:
-  /// **'Check-in'**
-  String get timelineCheckIn;
-
-  /// No description provided for @timelineCheckOut.
-  ///
-  /// In en, this message translates to:
-  /// **'Check-out'**
-  String get timelineCheckOut;
-
-  /// No description provided for @timelineDuration.
-  ///
-  /// In en, this message translates to:
-  /// **'{value} min'**
-  String timelineDuration(String value);
-
-  /// No description provided for @visitRangeInRange.
-  ///
-  /// In en, this message translates to:
-  /// **'In range'**
-  String get visitRangeInRange;
-
-  /// No description provided for @visitRangeOutOfRange.
-  ///
-  /// In en, this message translates to:
-  /// **'Out of range'**
-  String get visitRangeOutOfRange;
-
-  /// No description provided for @statusScheduled.
-  ///
-  /// In en, this message translates to:
-  /// **'Scheduled'**
-  String get statusScheduled;
-
-  /// No description provided for @statusActive.
-  ///
-  /// In en, this message translates to:
-  /// **'In progress'**
-  String get statusActive;
-
-  /// No description provided for @statusReview.
-  ///
-  /// In en, this message translates to:
-  /// **'Pending review'**
-  String get statusReview;
-
-  /// No description provided for @statusApproved.
-  ///
-  /// In en, this message translates to:
-  /// **'Approved'**
-  String get statusApproved;
-
-  /// No description provided for @statusRejected.
-  ///
-  /// In en, this message translates to:
-  /// **'Rejected'**
-  String get statusRejected;
-
-  /// No description provided for @visitDetailScheduledTimeLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit time'**
-  String get visitDetailScheduledTimeLabel;
-
   /// No description provided for @visitDetailInRange.
   ///
   /// In en, this message translates to:
@@ -2389,144 +1411,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You\'re outside the customer\'s range'**
   String get visitDetailOutRange;
-
-  /// No description provided for @visitDetailRangeMeta.
-  ///
-  /// In en, this message translates to:
-  /// **'{distance} m away · check-in range {radius} m'**
-  String visitDetailRangeMeta(String distance, String radius);
-
-  /// No description provided for @visitDetailOutRangeHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Move closer to the customer\'s location to start the visit.'**
-  String get visitDetailOutRangeHint;
-
-  /// No description provided for @visitDetailCheckInTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Start the visit'**
-  String get visitDetailCheckInTitle;
-
-  /// No description provided for @visitDetailCheckInInRangeSub.
-  ///
-  /// In en, this message translates to:
-  /// **'You\'re in range'**
-  String get visitDetailCheckInInRangeSub;
-
-  /// No description provided for @visitDetailCheckInLocatingSub.
-  ///
-  /// In en, this message translates to:
-  /// **'Locating you…'**
-  String get visitDetailCheckInLocatingSub;
-
-  /// No description provided for @visitDetailCheckInOverride.
-  ///
-  /// In en, this message translates to:
-  /// **'Check in out of range'**
-  String get visitDetailCheckInOverride;
-
-  /// No description provided for @visitDetailElapsedLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Elapsed time'**
-  String get visitDetailElapsedLabel;
-
-  /// No description provided for @visitDetailStartedAt.
-  ///
-  /// In en, this message translates to:
-  /// **'Started {time}'**
-  String visitDetailStartedAt(String time);
-
-  /// No description provided for @visitDetailCheckOutTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'End the visit'**
-  String get visitDetailCheckOutTitle;
-
-  /// No description provided for @visitDetailCheckOutSub.
-  ///
-  /// In en, this message translates to:
-  /// **'Your location will be captured'**
-  String get visitDetailCheckOutSub;
-
-  /// No description provided for @visitDetailOnTime.
-  ///
-  /// In en, this message translates to:
-  /// **'Completed on time'**
-  String get visitDetailOnTime;
-
-  /// No description provided for @visitDetailDurationLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit duration'**
-  String get visitDetailDurationLabel;
-
-  /// No description provided for @timelineCreated.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit created'**
-  String get timelineCreated;
-
-  /// No description provided for @visitShowLocation.
-  ///
-  /// In en, this message translates to:
-  /// **'Show customer location'**
-  String get visitShowLocation;
-
-  /// No description provided for @visitDetailCustomerLocationSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Customer location'**
-  String get visitDetailCustomerLocationSection;
-
-  /// No description provided for @visitDetailNavigate.
-  ///
-  /// In en, this message translates to:
-  /// **'Show customer location on map'**
-  String get visitDetailNavigate;
-
-  /// No description provided for @visitDetailNoCustomerLocation.
-  ///
-  /// In en, this message translates to:
-  /// **'This customer has no saved location. Ask your manager to add it.'**
-  String get visitDetailNoCustomerLocation;
-
-  /// No description provided for @visitDetailCheckInStartedAt.
-  ///
-  /// In en, this message translates to:
-  /// **'Visit at {customer} started — your location was recorded'**
-  String visitDetailCheckInStartedAt(String customer);
-
-  /// No description provided for @visitLocationDialogTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Check-in location'**
-  String get visitLocationDialogTitle;
-
-  /// No description provided for @visitLocationCustomer.
-  ///
-  /// In en, this message translates to:
-  /// **'Customer office'**
-  String get visitLocationCustomer;
-
-  /// No description provided for @visitLocationCheckIn.
-  ///
-  /// In en, this message translates to:
-  /// **'Check-in point'**
-  String get visitLocationCheckIn;
-
-  /// No description provided for @visitLocationCheckOut.
-  ///
-  /// In en, this message translates to:
-  /// **'Check-out point'**
-  String get visitLocationCheckOut;
-
-  /// No description provided for @visitLocationNotAvailable.
-  ///
-  /// In en, this message translates to:
-  /// **'This customer has no saved location. Ask your manager to add it.'**
-  String get visitLocationNotAvailable;
 
   /// No description provided for @offlineNoQueue.
   ///
@@ -2551,12 +1435,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 action is still pending — check your connection and try again.} other{{count} actions are still pending — check your connection and try again.}}'**
   String offlinePendingCount(int count);
-
-  /// No description provided for @offlineCheckInQueued.
-  ///
-  /// In en, this message translates to:
-  /// **'Saved locally — will sync when you\'re back online'**
-  String get offlineCheckInQueued;
 
   /// No description provided for @dashboardTabTitle.
   ///
@@ -2630,36 +1508,6 @@ abstract class AppLocalizations {
   /// **'Visits'**
   String get visitsTabTitle;
 
-  /// No description provided for @homeTabCustomers.
-  ///
-  /// In en, this message translates to:
-  /// **'Customers'**
-  String get homeTabCustomers;
-
-  /// No description provided for @homeTabActive.
-  ///
-  /// In en, this message translates to:
-  /// **'In progress'**
-  String get homeTabActive;
-
-  /// No description provided for @homeTabHistory.
-  ///
-  /// In en, this message translates to:
-  /// **'History'**
-  String get homeTabHistory;
-
-  /// No description provided for @settingsTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Settings'**
-  String get settingsTitle;
-
-  /// No description provided for @settingsAppearance.
-  ///
-  /// In en, this message translates to:
-  /// **'Appearance'**
-  String get settingsAppearance;
-
   /// No description provided for @settingsAccount.
   ///
   /// In en, this message translates to:
@@ -2684,12 +1532,6 @@ abstract class AppLocalizations {
   /// **'About'**
   String get settingsAbout;
 
-  /// No description provided for @settingsVersion.
-  ///
-  /// In en, this message translates to:
-  /// **'Version'**
-  String get settingsVersion;
-
   /// No description provided for @settingsVersionValue.
   ///
   /// In en, this message translates to:
@@ -2701,12 +1543,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{version} ({build})'**
   String profileBuildVersion(String version, String build);
-
-  /// No description provided for @settingsEditProfile.
-  ///
-  /// In en, this message translates to:
-  /// **'Edit profile'**
-  String get settingsEditProfile;
 
   /// No description provided for @settingsNotifications.
   ///
@@ -2749,12 +1585,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 action waiting to sync} other{{count} actions waiting to sync}}'**
   String settingsSyncPendingCount(int count);
-
-  /// No description provided for @settingsHelp.
-  ///
-  /// In en, this message translates to:
-  /// **'Help & support'**
-  String get settingsHelp;
 
   /// No description provided for @confirmLogoutTitle.
   ///
@@ -3134,12 +1964,6 @@ abstract class AppLocalizations {
   /// **'Plan it for myself'**
   String get wfPlanForMyself;
 
-  /// No description provided for @wfPurposeRequired.
-  ///
-  /// In en, this message translates to:
-  /// **'Purpose is required'**
-  String get wfPurposeRequired;
-
   /// No description provided for @wfOutcomeRequired.
   ///
   /// In en, this message translates to:
@@ -3374,12 +2198,6 @@ abstract class AppLocalizations {
   /// **'Rejected'**
   String get wfParticipantRejectedState;
 
-  /// No description provided for @wfNoParticipants.
-  ///
-  /// In en, this message translates to:
-  /// **'No additional participants'**
-  String get wfNoParticipants;
-
   /// No description provided for @wfUnknownEmployee.
   ///
   /// In en, this message translates to:
@@ -3431,7 +2249,7 @@ abstract class AppLocalizations {
   /// No description provided for @wfSearchNoMatch.
   ///
   /// In en, this message translates to:
-  /// **'No visits match your search'**
+  /// **'No visits in this list match your search. Try another list above, or pull down to refresh.'**
   String get wfSearchNoMatch;
 
   /// No description provided for @wfFilterNoMatch.
@@ -3458,23 +2276,11 @@ abstract class AppLocalizations {
   /// **'Nothing has changed. Change the date, purpose or location before sending the request.'**
   String get wfRescheduleNoChanges;
 
-  /// No description provided for @wfListTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Visits'**
-  String get wfListTitle;
-
   /// No description provided for @wfDetailTitle.
   ///
   /// In en, this message translates to:
   /// **'Visit'**
   String get wfDetailTitle;
-
-  /// No description provided for @wfStartLocationCaptured.
-  ///
-  /// In en, this message translates to:
-  /// **'Your GPS location will be recorded'**
-  String get wfStartLocationCaptured;
 
   /// No description provided for @wfConfirmCancelTitle.
   ///
@@ -3487,12 +2293,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Are you sure you want to cancel this visit?'**
   String get wfConfirmCancelMessage;
-
-  /// No description provided for @wfScheduledLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Scheduled'**
-  String get wfScheduledLabel;
 
   /// No description provided for @wfStartedLabel.
   ///
@@ -3566,24 +2366,6 @@ abstract class AppLocalizations {
   /// **'check-in range {radius}'**
   String wfRangeRadius(String radius);
 
-  /// No description provided for @wfHoursShort.
-  ///
-  /// In en, this message translates to:
-  /// **'h'**
-  String get wfHoursShort;
-
-  /// No description provided for @wfMinutesShort.
-  ///
-  /// In en, this message translates to:
-  /// **'m'**
-  String get wfMinutesShort;
-
-  /// No description provided for @wfDaysShort.
-  ///
-  /// In en, this message translates to:
-  /// **'d'**
-  String get wfDaysShort;
-
   /// No description provided for @wfShortVisitHint.
   ///
   /// In en, this message translates to:
@@ -3656,12 +2438,6 @@ abstract class AppLocalizations {
   /// **'GPS trail'**
   String get trailMapTitle;
 
-  /// No description provided for @trailEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'No points recorded yet'**
-  String get trailEmpty;
-
   /// No description provided for @trailEmptyRunning.
   ///
   /// In en, this message translates to:
@@ -3692,35 +2468,17 @@ abstract class AppLocalizations {
   /// **'Distance'**
   String get trailDistance;
 
-  /// No description provided for @trailDistanceKm.
-  ///
-  /// In en, this message translates to:
-  /// **'{value} km'**
-  String trailDistanceKm(String value);
-
   /// No description provided for @trailAvgSpeed.
   ///
   /// In en, this message translates to:
   /// **'Average speed'**
   String get trailAvgSpeed;
 
-  /// No description provided for @trailSpeedKmh.
-  ///
-  /// In en, this message translates to:
-  /// **'{value} km/h'**
-  String trailSpeedKmh(String value);
-
   /// No description provided for @trailLastFix.
   ///
   /// In en, this message translates to:
   /// **'Last position'**
   String get trailLastFix;
-
-  /// No description provided for @trailFirstFix.
-  ///
-  /// In en, this message translates to:
-  /// **'First position'**
-  String get trailFirstFix;
 
   /// No description provided for @trailOpenFull.
   ///
@@ -3763,12 +2521,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 point waiting to upload} other{{count} points waiting to upload}}'**
   String trailPendingUploads(int count);
-
-  /// No description provided for @trailUploadNow.
-  ///
-  /// In en, this message translates to:
-  /// **'Upload now'**
-  String get trailUploadNow;
 
   /// No description provided for @trailUploadDone.
   ///
@@ -3908,23 +2660,11 @@ abstract class AppLocalizations {
   /// **'Routes recorded today'**
   String get routeRecordedTrails;
 
-  /// No description provided for @routeTrailSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'{points, plural, =1{1 point} other{{points} points}} · {km} km'**
-  String routeTrailSummary(int points, String km);
-
   /// Number of recorded GPS points on a route row.
   ///
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 point} other{{count} points}}'**
   String routePointsCount(int count);
-
-  /// No description provided for @routeTrailsPartial.
-  ///
-  /// In en, this message translates to:
-  /// **'Some visit routes couldn\'t be loaded. Pull down to try again.'**
-  String get routeTrailsPartial;
 
   /// No description provided for @routeTrailsLoadFailed.
   ///
@@ -3955,6 +2695,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No road match — showing raw GPS'**
   String get routeLineUnmatched;
+
+  /// No description provided for @workdayNotStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Work day not started'**
+  String get workdayNotStarted;
+
+  /// No description provided for @workdayStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start work day'**
+  String get workdayStart;
+
+  /// No description provided for @workdayEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End work day'**
+  String get workdayEnd;
+
+  /// No description provided for @workdayActiveSince.
+  ///
+  /// In en, this message translates to:
+  /// **'Work day active since {time}'**
+  String workdayActiveSince(String time);
+
+  /// No description provided for @workdayPending.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 point waiting to upload} other{{count} points waiting to upload}}'**
+  String workdayPending(int count);
+
+  /// No description provided for @workdayCaptureOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Location tracking is paused — allow location access to resume'**
+  String get workdayCaptureOff;
+
+  /// No description provided for @workdayEndConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'End your work day?'**
+  String get workdayEndConfirmTitle;
+
+  /// No description provided for @workdayEndConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Location tracking stops and today\'s route is closed.'**
+  String get workdayEndConfirmMessage;
+
+  /// No description provided for @workdayNotificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workday tracking active'**
+  String get workdayNotificationTitle;
+
+  /// No description provided for @workdayNotificationText.
+  ///
+  /// In en, this message translates to:
+  /// **'Location tracking is currently running'**
+  String get workdayNotificationText;
+
+  /// No description provided for @workdayStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Work day started — your route is being recorded'**
+  String get workdayStarted;
+
+  /// No description provided for @workdayEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'Work day ended'**
+  String get workdayEnded;
+
+  /// No description provided for @workdayEndQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Work day ended — it will sync when you\'re back online'**
+  String get workdayEndQueued;
+
+  /// No description provided for @workdayUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Work-day tracking isn\'t available on this server'**
+  String get workdayUnsupported;
+
+  /// No description provided for @workdayLocationDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Location access is required to record your work day.'**
+  String get workdayLocationDenied;
+
+  /// No description provided for @workdayLocationDeniedForever.
+  ///
+  /// In en, this message translates to:
+  /// **'Location access is blocked for this app. Allow it in Settings to start your work day.'**
+  String get workdayLocationDeniedForever;
+
+  /// No description provided for @workdayLocationServiceOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on location services to start your work day.'**
+  String get workdayLocationServiceOff;
+
+  /// No description provided for @workdayOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get workdayOpenSettings;
+
+  /// No description provided for @workdayPreciseOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Precise location is off for this app, so your route can\'t be recorded accurately. Turn on Precise Location in Settings to start your work day.'**
+  String get workdayPreciseOff;
+
+  /// No description provided for @workdayDisclosureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Work-day location tracking'**
+  String get workdayDisclosureTitle;
+
+  /// No description provided for @workdayDisclosureBody.
+  ///
+  /// In en, this message translates to:
+  /// **'While your work day is active, Visits collects this device\'s precise location — also when the app is closed or in the background and while the screen is locked — to record your work-day route and your customer visits for your employer.'**
+  String get workdayDisclosureBody;
+
+  /// No description provided for @workdayDisclosureStops.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking starts only when you tap Start work day, and stops when you tap End work day or sign out.'**
+  String get workdayDisclosureStops;
+
+  /// No description provided for @workdayDisclosureStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Locations are kept on this phone until they reach your company\'s server. To draw routes along roads, recorded points may be sent to your company\'s map-matching service.'**
+  String get workdayDisclosureStorage;
+
+  /// No description provided for @workdayDisclosureAndroid.
+  ///
+  /// In en, this message translates to:
+  /// **'A notification stays visible for as long as tracking runs.'**
+  String get workdayDisclosureAndroid;
+
+  /// No description provided for @workdayDisclosureIos.
+  ///
+  /// In en, this message translates to:
+  /// **'iOS will ask for location access. Choosing \"Always\" lets recording continue if iOS closes the app during your work day.'**
+  String get workdayDisclosureIos;
+
+  /// No description provided for @workdayDisclosureAgree.
+  ///
+  /// In en, this message translates to:
+  /// **'Agree and continue'**
+  String get workdayDisclosureAgree;
+
+  /// No description provided for @workdayDisclosureDecline.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get workdayDisclosureDecline;
 }
 
 class _AppLocalizationsDelegate

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../app/design/app_dimens.dart';
+
 /// Wraps a list child in a one-shot fade-in + slide-up animation. Items
 /// stagger based on their `index` so longer lists "cascade" instead of
 /// popping in at once.
@@ -37,9 +39,9 @@ class AnimatedListItem extends StatelessWidget {
     super.key,
     required this.index,
     required this.child,
-    this.step = const Duration(milliseconds: 55),
-    this.duration = const Duration(milliseconds: 380),
-    this.maxDelay = const Duration(milliseconds: 350),
+    this.step = AppDurations.listItemStagger,
+    this.duration = AppDurations.listItemIn,
+    this.maxDelay = AppDurations.listItemMaxDelay,
     this.animateBelowIndex = 12,
   });
 
@@ -123,7 +125,7 @@ class ScaleFadeIn extends StatefulWidget {
   const ScaleFadeIn({
     super.key,
     required this.child,
-    this.duration = const Duration(milliseconds: 450),
+    this.duration = AppDurations.scaleIn,
     this.delay = Duration.zero,
   });
 

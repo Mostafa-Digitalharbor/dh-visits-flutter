@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,6 +31,10 @@ import '../../visits/data/visits_repository.dart';
 import '../../visits/view/persistent_visit_bar.dart';
 import '../../visits/view/visit_tracking_disclosure_dialog.dart';
 import '../../visits/view/visits_list_page.dart';
+import '../../workday/bloc/workday_cubit.dart';
+import '../../workday/data/workday_tracker.dart';
+import '../../workday/view/workday_bar.dart';
+import '../../workday/view/workday_disclosure_dialog.dart';
 
 /// Root shell after login. Branches on the user's role:
 ///
@@ -48,6 +53,7 @@ class _HomeShellState extends State<HomeShell> {
   StreamSubscription<SyncedAction>? _syncedSub;
   StreamSubscription<DroppedAction>? _droppedSub;
   StreamSubscription<int>? _trailDroppedSub;
+  StreamSubscription<int>? _workdayDroppedSub;
   VisitTrailTracker? _tracker;
 
   /// The disclosure is offered at most once per session for a visit restored
@@ -84,7 +90,10 @@ class _HomeShellState extends State<HomeShell> {
     final tracker = slMaybe<VisitTrailTracker>();
     _trailDroppedSub = tracker?.onPointsDropped.listen((count) {
       if (!mounted || count <= 0) return;
-      context.showSnack(context.s.trailPointsDropped(count), kind: SnackKind.error);
+      context.showSnack(
+        context.s.trailPointsDropped(count),
+        kind: SnackKind.error,
+      );
     });
 
     // A visit already in progress (started on another device, or before this
@@ -92,14 +101,46 @@ class _HomeShellState extends State<HomeShell> {
     _tracker = tracker;
     tracker?.status.addListener(_onTrailStatus);
 
+    final workday = slMaybe<WorkdayTracker>();
+    _workdayDroppedSub = workday?.onPointsDropped.listen((count) {
+      if (!mounted || count <= 0) return;
+      context.showSnack(
+        context.s.trailPointsDropped(count),
+        kind: SnackKind.error,
+      );
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      // An open work day survives app restarts: resume capturing it (or adopt
+      // the one open on the server) before anything else asks for location.
+      unawaited(workday?.restore(
+        notificationTitle: context.s.workdayNotificationTitle,
+        notificationText: context.s.workdayNotificationText,
+        // Restoring resumes background recording. On an install that has not
+        // shown the disclosure yet (a day started on another device, or before
+        // the disclosure existed) it is shown first, exactly as on Start.
+        beforeCapture: () async {
+          final prefs = slMaybe<SharedPreferences>();
+          if (prefs == null ||
+              (prefs.getBool(WorkdayCubit.disclosureKey) ?? false)) {
+            return true;
+          }
+          if (!mounted) return false;
+          final agreed = await WorkdayDisclosureDialog.show(context);
+          if (agreed) await prefs.setBool(WorkdayCubit.disclosureKey, true);
+          return agreed;
+        },
+      ));
       final user = context.read<AuthBloc>().state.user;
       final isManager = user?.canEditVisits ?? false;
       // Their permissions never loaded, so the workflow buttons won't appear.
       // Say why — otherwise the app just looks broken or their account revoked.
       if (user?.profileIncomplete == true) {
-        context.showSnack(context.s.errProfileIncomplete, kind: SnackKind.error);
+        context.showSnack(
+          context.s.errProfileIncomplete,
+          kind: SnackKind.error,
+        );
       }
       // Restore the caller's own running visit for every role (and with it
       // its trail recording — only if the server still has it in progress).
@@ -108,9 +149,11 @@ class _HomeShellState extends State<HomeShell> {
       // visit here. The active-visit bar itself is shown in the field-user
       // shell only.
       context.read<VisitBloc>().add(const VisitResumeRequested());
-      context.read<VisitsListBloc>().add(VisitsListLoadRequested(
-            scope: isManager ? VisitListScope.pending : VisitListScope.mine,
-          ));
+      context.read<VisitsListBloc>().add(
+        VisitsListLoadRequested(
+          scope: isManager ? VisitListScope.pending : VisitListScope.mine,
+        ),
+      );
     });
   }
 
@@ -135,6 +178,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void dispose() {
     _trailDroppedSub?.cancel();
+    _workdayDroppedSub?.cancel();
     _tracker?.status.removeListener(_onTrailStatus);
     _syncedSub?.cancel();
     _droppedSub?.cancel();
@@ -249,19 +293,18 @@ class _RoleShellState extends State<_RoleShell> {
     // banners would leave a landscape phone no room for the list itself, so
     // they step aside until typing is done.
     final keyboardOpen = context.keyboardInset > 0;
+    // A phone on its side, or a tablet: the navigation moves to a side rail.
+    // A bottom bar there spent a fifth of the screen's scarce height on four
+    // icons (seen on a 2400×1080 emulator), leaving lists a sliver.
+    final useRail = context.isLandscape || context.isTablet;
     return ValueListenableBuilder<int>(
       valueListenable: widget.selection,
-      builder: (context, tab, _) => Scaffold(
-        appBar: _AppBar(
-          title: tabs[tab].title,
-          topInset: MediaQuery.paddingOf(context).top,
-          textScale: context.textScale,
-        ),
-        body: Column(
+      builder: (context, tab, _) {
+        final content = Column(
           children: [
-            if (!keyboardOpen) ...[
-              const OfflineBanner(),
-            ],
+            if (!keyboardOpen) const OfflineBanner(),
+            // Field users run the work day; managers oversee it.
+            if (widget.showVisitBar) const WorkdayBar(),
             Expanded(
               child: LazyIndexedStack(
                 index: tab,
@@ -269,40 +312,105 @@ class _RoleShellState extends State<_RoleShell> {
               ),
             ),
           ],
-        ),
-        floatingActionButton: tab == widget.fabTab
-            ? FloatingActionButton.extended(
-                heroTag: widget.fabHeroTag,
-                onPressed: () => context.push(AppRoutes.createVisit),
-                icon: const Icon(Symbols.add),
-                label: Text(context.s.createVisitTooltip),
-              )
-            : null,
-        bottomNavigationBar: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (widget.showVisitBar)
-              PersistentVisitBar(
-                onTap: () {
-                  final active = context.read<VisitBloc>().state.activeVisit;
-                  if (active != null) {
-                    context.push(AppRoutes.visitDetail(active.id), extra: active);
-                  }
-                },
-              ),
-            NavigationBar(
-              selectedIndex: tab,
-              onDestinationSelected: _select,
+        );
+        return Scaffold(
+          appBar: _AppBar(
+            title: tabs[tab].title,
+            topInset: MediaQuery.paddingOf(context).top,
+            textScale: context.textScale,
+          ),
+          body: useRail
+              ? Row(
+                  children: [
+                    _SideRail(tabs: tabs, selected: tab, onSelected: _select),
+                    const VerticalDivider(width: CompSz.hairline),
+                    Expanded(child: content),
+                  ],
+                )
+              : content,
+          // Hidden while typing: in landscape the keyboard pushed it up over
+          // the search field it was meant to sit below, covering its clear
+          // button.
+          floatingActionButton: tab == widget.fabTab && !keyboardOpen
+              ? FloatingActionButton.extended(
+                  heroTag: widget.fabHeroTag,
+                  onPressed: () => context.push(AppRoutes.createVisit),
+                  icon: const Icon(Symbols.add),
+                  label: Text(context.s.createVisitTooltip),
+                )
+              : null,
+          bottomNavigationBar: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.showVisitBar)
+                PersistentVisitBar(
+                  onTap: () {
+                    final active = context.read<VisitBloc>().state.activeVisit;
+                    if (active != null) {
+                      context.push(
+                        AppRoutes.visitDetail(active.id),
+                        extra: active,
+                      );
+                    }
+                  },
+                ),
+              if (!useRail)
+                NavigationBar(
+                  selectedIndex: tab,
+                  onDestinationSelected: _select,
+                  destinations: [
+                    for (final t in tabs)
+                      NavigationDestination(
+                        icon: Icon(t.icon),
+                        selectedIcon: Icon(t.icon, fill: 1),
+                        label: t.label,
+                      ),
+                  ],
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// The shell's tabs as a side rail, for wide or short screens. Scrolls when
+/// the destinations are taller than the space beside the app bar (a small
+/// phone on its side at the largest text scale).
+class _SideRail extends StatelessWidget {
+  final List<_Tab> tabs;
+  final int selected;
+  final ValueChanged<int> onSelected;
+
+  const _SideRail({
+    required this.tabs,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, box) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: box.maxHeight),
+          child: IntrinsicHeight(
+            child: NavigationRail(
+              selectedIndex: selected,
+              onDestinationSelected: onSelected,
+              labelType: NavigationRailLabelType.all,
+              groupAlignment: 0,
               destinations: [
                 for (final t in tabs)
-                  NavigationDestination(
+                  NavigationRailDestination(
                     icon: Icon(t.icon),
                     selectedIcon: Icon(t.icon, fill: 1),
-                    label: t.label,
+                    label: Text(t.label),
                   ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -359,11 +467,11 @@ class _UserShellState extends State<_UserShell> {
 /// The account tab, identical in both shells — same icon, label and body, so
 /// the two role layouts differ only in the tabs that are actually role-specific.
 _Tab _profileTab(AppLocalizations s) => _Tab(
-      icon: Symbols.person,
-      label: s.profileTabTitle,
-      title: s.profileTitle,
-      page: const ProfileView(),
-    );
+  icon: Symbols.person,
+  label: s.profileTabTitle,
+  title: s.profileTitle,
+  page: const ProfileView(),
+);
 
 /// Manager layout: four-tab shell
 /// {لوحة التحكم · زيارات الفريق · التحليلات · حسابي} with a FAB to create
@@ -486,14 +594,10 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
   /// getter has no `BuildContext`, so the value must be threaded in.
   final double textScale;
 
-  const _AppBar({
-    this.title,
-    this.topInset = 0,
-    this.textScale = 1.0,
-  });
+  const _AppBar({this.title, this.topInset = 0, this.textScale = 1.0});
 
-  /// Vertical padding above and below the two text lines.
-  static const double _padV = Insets.x2h;
+  /// Vertical padding above and below the row.
+  static const double _padV = Insets.x1h;
   static const double _padH = Insets.x3h;
 
   /// The eyebrow (~13dp) and title (~22dp) lines at 1× text, less the 1dp the
@@ -504,16 +608,17 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
   static const double _slack = Insets.x1;
 
   static const double _lineHeight = 1.15;
-  static const double _eyebrowTracking = 0.3;
-  static const double _titleTracking = -0.2;
 
-  /// The fixed chrome plus the text block, grown by the OS font scale — the
-  /// same growth `context.fixedH` applies, which a `PreferredSize` getter
-  /// cannot call.
-  double get _barHeight =>
-      _padV * 2 +
-      _slack +
-      _textBlock * textScale.clamp(1.0, Responsive.maxTextScale);
+  /// The row: the text block grown by the OS font scale — the same growth
+  /// `context.fixedH` applies, which a `PreferredSize` getter cannot call —
+  /// and never shorter than a touch target, or the notification chip at its
+  /// end is squashed below 48dp (it measured 40×37).
+  double get _rowHeight => math.max(
+        IconSz.hit,
+        _slack + _textBlock * textScale.clamp(1.0, Responsive.maxTextScale),
+      );
+
+  double get _barHeight => _padV * 2 + _rowHeight;
 
   @override
   Size get preferredSize => Size.fromHeight(_barHeight + topInset);
@@ -525,8 +630,14 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
     final isManager = context.select<AuthBloc, bool>(
       (bloc) => bloc.state.user?.canEditVisits ?? false,
     );
-    final eyebrow =
-        isManager ? context.s.roleManagerTitle : context.s.roleEmployeeTitle;
+    final eyebrow = isManager
+        ? context.s.roleManagerTitle
+        : context.s.roleEmployeeTitle;
+    // Latin tracking pulls Arabic letterforms apart — they are meant to join —
+    // so the eyebrow and title drop it on an RTL screen. `CvSubAppBar` does
+    // the same; this bar was spelling its styles out by hand and had never
+    // picked the guard up.
+    final rtl = context.isRtl;
 
     return Material(
       color: cs.surfaceContainerLowest,
@@ -566,24 +677,26 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(eyebrow,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: FontSz.xs,
-                          height: _lineHeight,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: _eyebrowTracking,
-                          color: cs.onSurfaceVariant)),
-                  Text(title ?? context.s.appTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: FontSz.appBar,
-                          height: _lineHeight,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: _titleTracking,
-                          color: cs.onSurface)),
+                  Text(
+                    eyebrow,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppType.eyebrow.copyWith(
+                      height: _lineHeight,
+                      letterSpacing: rtl ? 0 : null,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                  Text(
+                    title ?? context.s.appTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppType.appBarTitle.copyWith(
+                      height: _lineHeight,
+                      letterSpacing: rtl ? 0 : null,
+                      color: cs.onSurface,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -619,8 +732,7 @@ class _NotificationChipState extends State<_NotificationChip>
   static const _badgeOverhang = -2.0;
 
   /// Tight enough that one digit makes a circle, wide enough for "99+".
-  static const _badgePadding =
-      EdgeInsets.symmetric(horizontal: 5, vertical: 1);
+  static const _badgePadding = EdgeInsets.symmetric(horizontal: 5, vertical: 1);
 
   int _count = 0;
 

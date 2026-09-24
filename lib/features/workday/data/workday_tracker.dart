@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/api/api_exceptions.dart';
 import '../../../core/constants.dart';
 import '../../../core/location/location_service.dart';
+import '../../../core/location/tracker_plumbing.dart';
 import '../../../core/location/workday_location_channel.dart';
 import '../../../core/network/connectivity_status.dart';
 import '../../../core/network/server_clock.dart';
@@ -88,14 +89,18 @@ class WorkdayStatus extends Equatable {
 /// **Privacy.** Capture runs only between an explicit Start and End (or until
 /// logout). Ending stops the service before anything else happens; a fix that
 /// still reaches the journal afterwards is ignored.
-class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
+class WorkdayTracker
+    with WidgetsBindingObserver, TrackerPlumbing
+    implements TrailFeed {
   final SharedPreferences prefs;
   final WorkdayRepository repository;
   final SessionStorage sessionStorage;
   final LocationService locationService;
   final ConnectivityStatus connectivity;
   final WorkdayLocationChannel channel;
+  @override
   final ServerClock? serverClock;
+  @override
   final Future<String?> Function()? deviceId;
 
   /// Resolved lazily: the visit tracker is built first and points back here.
@@ -123,12 +128,14 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
   static const String _samplingKey = 'workday_sampling_v1';
 
   /// The sampling rules the native service was last started with.
-  static final String _sampling = '${AppConstants.workdayMinDistanceMeters}|'
+  static final String _sampling =
+      '${AppConstants.workdayMinDistanceMeters}|'
       '${AppConstants.workdayMinInterval.inMilliseconds}|'
       '${AppConstants.workdayMaxAccuracyMeters}';
 
-  final ValueNotifier<WorkdayStatus> _status =
-      ValueNotifier<WorkdayStatus>(const WorkdayStatus());
+  final ValueNotifier<WorkdayStatus> _status = ValueNotifier<WorkdayStatus>(
+    const WorkdayStatus(),
+  );
   ValueListenable<WorkdayStatus> get status => _status;
 
   /// Bumped whenever something landed on the server, so an open route screen
@@ -151,7 +158,8 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
   /// (Start, or Retry after agreeing) and on sign-out.
   bool _consentHeld = false;
   bool _disposed = false;
-  String? _deviceIdValue;
+  @override
+  String get logTag => '[WorkdayTracker]';
   Timer? _drainTimer;
   Timer? _flushTimer;
   Future<void>? _draining;
@@ -173,7 +181,9 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
   void activeVisitChanged(int? visitId) {
     _fallbackVisitId = visitId;
     if (!channel.isAvailable || _activeDay == null) return;
-    unawaited(_guard('set visit', () => channel.setVisit(visitId, DateTime.now())));
+    unawaited(
+      guard('set visit', () => channel.setVisit(visitId, DateTime.now())),
+    );
   }
 
   /// Moves every fix the native service journalled into the upload queue.
@@ -217,11 +227,15 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
     if (user == null) return;
     _userId = user.uid;
     _unsupported = false;
-    await _resolveDeviceId();
+    await resolveDeviceId();
 
     final foreign = _readDays().where((d) => d.userId != user.uid).toList();
     if (foreign.isNotEmpty) {
-      await _discard(foreign, reason: 'recorded under another account', notify: false);
+      await _discard(
+        foreign,
+        reason: 'recorded under another account',
+        notify: false,
+      );
     }
 
     var day = _activeDay;
@@ -230,19 +244,23 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
         final server = await repository.readSession(day.serverId!);
         if (server == null || !server.isActive) {
           await _stopCapture();
-          await _discard([day], reason: 'the work day was closed on the server');
+          await _discard([
+            day,
+          ], reason: 'the work day was closed on the server');
           day = null;
         }
       } on ApiException catch (e) {
         if (WorkdayRepository.isMissingModel(e)) return _markUnsupported();
-        appLog('[WorkdayTracker] could not verify the open work day: ${e.code}');
+        appLog(
+          '[WorkdayTracker] could not verify the open work day: ${e.code}',
+        );
       }
     }
 
     if (day == null) {
       // Nothing open here: native capture must not be running either.
       if (channel.isAvailable) {
-        await _guard('status', () async {
+        await guard('status', () async {
           final st = await channel.status();
           if (st.active || st.running) await channel.stop();
         });
@@ -254,11 +272,15 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
         if (server != null) {
           day = _DayRecord.fromServer(server, userId: user.uid);
           await _saveDay(day);
-          appLog('[WorkdayTracker] resumed work day ${server.id} open on the server');
+          appLog(
+            '[WorkdayTracker] resumed work day ${server.id} open on the server',
+          );
         }
       } on ApiException catch (e) {
         if (WorkdayRepository.isMissingModel(e)) return _markUnsupported();
-        appLog('[WorkdayTracker] could not look up an open work day: ${e.code}');
+        appLog(
+          '[WorkdayTracker] could not look up an open work day: ${e.code}',
+        );
       }
     }
 
@@ -274,12 +296,16 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
         await _stopCapture();
         _capturing = false;
         _consentHeld = true;
-        appLog('[WorkdayTracker] disclosure not accepted on this install; capture paused');
+        appLog(
+          '[WorkdayTracker] disclosure not accepted on this install; capture paused',
+        );
       } else {
         _consentHeld = false;
         if (!await locationService.ensurePermission()) {
           _capturing = false;
-          appLog('[WorkdayTracker] location permission missing; capture paused');
+          appLog(
+            '[WorkdayTracker] location permission missing; capture paused',
+          );
         } else {
           await _startCapture(day);
         }
@@ -307,7 +333,7 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
     final user = await _currentUser();
     if (user == null) throw ApiException.unauthorized();
     _userId = user.uid;
-    await _resolveDeviceId();
+    await resolveDeviceId();
 
     final open = _activeDay;
     if (open != null) {
@@ -327,14 +353,14 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
       server = await repository.activeSession(user.uid);
     } on ApiException catch (e) {
       // Offline: start locally; the session is created when the network is back.
-      if (!_isTransient(e)) rethrow;
+      if (!e.isRetryable) rethrow;
     }
 
     final _DayRecord day;
     if (server != null) {
       day = _DayRecord.fromServer(server, userId: user.uid);
     } else {
-      final now = _serverNow();
+      final now = serverNow();
       day = _DayRecord(
         uid: _newUid(),
         userId: user.uid,
@@ -349,17 +375,19 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
       ..text = notificationText;
     await _saveDay(day);
     if (server == null) {
-      await _enqueue(WorkdayPoint(
-        uid: '${day.uid}-start',
-        sessionUid: day.uid,
-        source: WorkdayPointSource.start,
-        point: TrailPoint(
-          latitude: latitude,
-          longitude: longitude,
-          loggedAt: day.startedAt,
-          deviceId: _deviceIdValue,
+      await _enqueue(
+        WorkdayPoint(
+          uid: '${day.uid}-start',
+          sessionUid: day.uid,
+          source: WorkdayPointSource.start,
+          point: TrailPoint(
+            latitude: latitude,
+            longitude: longitude,
+            loggedAt: day.startedAt,
+            deviceId: deviceIdValue,
+          ),
         ),
-      ));
+      );
     }
     appLog('[WorkdayTracker] work day ${day.uid} started');
     await _startCapture(day);
@@ -378,7 +406,7 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
     await _stopCapture();
     await drain();
 
-    final now = _serverNow();
+    final now = serverNow();
     day
       ..state = _DayRecord.ending
       ..endedAt = now
@@ -386,18 +414,20 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
       ..endLongitude = longitude;
     await _saveDay(day);
     if (latitude != null && longitude != null) {
-      await _enqueue(WorkdayPoint(
-        uid: '${day.uid}-end',
-        sessionUid: day.uid,
-        visitId: visitTracker?.call()?.activeVisitId,
-        source: WorkdayPointSource.end,
-        point: TrailPoint(
-          latitude: latitude,
-          longitude: longitude,
-          loggedAt: now,
-          deviceId: _deviceIdValue,
+      await _enqueue(
+        WorkdayPoint(
+          uid: '${day.uid}-end',
+          sessionUid: day.uid,
+          visitId: visitTracker?.call()?.activeVisitId,
+          source: WorkdayPointSource.end,
+          point: TrailPoint(
+            latitude: latitude,
+            longitude: longitude,
+            loggedAt: now,
+            deviceId: deviceIdValue,
+          ),
         ),
-      ));
+      );
     }
     appLog('[WorkdayTracker] work day ${day.uid} ended');
     _publish();
@@ -495,7 +525,7 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
     } else {
       _capturing = true;
       _fallbackVisitId = visitTracker?.call()?.activeVisitId;
-      if (_foreground) _subscribeFallback();
+      if (isForeground) _subscribeFallback();
     }
     _startTimers();
     visitTracker?.call()?.feedChanged();
@@ -507,7 +537,7 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
   Future<void> _ensureNativeRunning(_DayRecord day) async {
     // Waiting for, or refused, the disclosure on this install: nothing starts.
     if (_consentHeld) return;
-    await _guard('ensure capture', () async {
+    await guard('ensure capture', () async {
       final st = await channel.status();
       if (st.active && st.running) return;
       if (!await locationService.ensurePermission()) {
@@ -525,7 +555,7 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
     _fallback = null;
     _lastFallback = null;
     if (channel.isAvailable) {
-      await _guard('stop capture', channel.stop);
+      await guard('stop capture', channel.stop);
     }
     visitTracker?.call()?.feedChanged();
   }
@@ -536,7 +566,8 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
         .watch(distanceFilter: AppConstants.workdayMinDistanceMeters.round())
         .listen(
           _onFallbackPosition,
-          onError: (Object e) => appLog('[WorkdayTracker] position stream error: $e'),
+          onError: (Object e) =>
+              appLog('[WorkdayTracker] position stream error: $e'),
           cancelOnError: false,
         );
   }
@@ -551,7 +582,11 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
       // and not faster than the sampling interval unless covering ground.
       if (!pos.timestamp.isAfter(last.timestamp)) return;
       final moved = haversineMeters(
-          last.latitude, last.longitude, pos.latitude, pos.longitude);
+        last.latitude,
+        last.longitude,
+        pos.latitude,
+        pos.longitude,
+      );
       final elapsed = pos.timestamp.difference(last.timestamp);
       if (moved < AppConstants.workdayMinDistanceMeters) return;
       if (elapsed < AppConstants.workdayMinInterval &&
@@ -564,21 +599,23 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
     final point = TrailPoint(
       latitude: pos.latitude,
       longitude: pos.longitude,
-      loggedAt: _serverTime(pos.timestamp),
+      loggedAt: serverTimeOf(pos.timestamp),
       accuracy: pos.accuracy > 0 ? pos.accuracy : null,
       altitude: pos.altitude,
       speed: pos.speed >= 0 ? pos.speed : null,
       heading: pos.heading >= 0 ? pos.heading : null,
-      deviceId: _deviceIdValue,
+      deviceId: deviceIdValue,
     );
     unawaited(() async {
-      await _enqueue(WorkdayPoint(
-        uid: '${day.uid}-f${pos.timestamp.microsecondsSinceEpoch}',
-        sessionUid: day.uid,
-        visitId: visitId,
-        source: WorkdayPointSource.track,
-        point: point,
-      ));
+      await _enqueue(
+        WorkdayPoint(
+          uid: '${day.uid}-f${pos.timestamp.microsecondsSinceEpoch}',
+          sessionUid: day.uid,
+          visitId: visitId,
+          source: WorkdayPointSource.track,
+          point: point,
+        ),
+      );
       if (visitId != null) await visitTracker?.call()?.ingest(visitId, point);
       _publish();
     }());
@@ -596,7 +633,8 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
     if (saved != null) return saved;
     final r = Random.secure();
     final token = [
-      for (var i = 0; i < 4; i++) r.nextInt(256).toRadixString(16).padLeft(2, '0'),
+      for (var i = 0; i < 4; i++)
+        r.nextInt(256).toRadixString(16).padLeft(2, '0'),
     ].join();
     await prefs.setString(_installKey, token);
     return token;
@@ -627,10 +665,12 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
         if (d.uid == f.sessionUid) day = d;
       }
       if (day == null) {
-        appLog('[WorkdayTracker] fix #${f.seq} belongs to no open work day; ignored');
+        appLog(
+          '[WorkdayTracker] fix #${f.seq} belongs to no open work day; ignored',
+        );
         continue;
       }
-      final at = _serverTime(f.deviceTime);
+      final at = serverTimeOf(f.deviceTime);
       final endedAt = day.endedAt;
       if (endedAt != null && at.isAfter(endedAt)) continue;
       final point = TrailPoint(
@@ -642,15 +682,17 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
         altitude: f.altitude,
         speed: f.speed,
         heading: f.heading,
-        deviceId: _deviceIdValue,
+        deviceId: deviceIdValue,
       );
-      taken.add(WorkdayPoint(
-        uid: '${day.uid}-$install-${f.seq}',
-        sessionUid: day.uid,
-        visitId: f.visitId,
-        source: WorkdayPointSource.track,
-        point: point,
-      ));
+      taken.add(
+        WorkdayPoint(
+          uid: '${day.uid}-$install-${f.seq}',
+          sessionUid: day.uid,
+          visitId: f.visitId,
+          source: WorkdayPointSource.track,
+          point: point,
+        ),
+      );
       if (f.visitId != null) forwards.add((f.visitId!, point));
     }
 
@@ -669,7 +711,7 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
       appLog('[WorkdayTracker] took over ${taken.length} captured fix(es)');
     }
     await prefs.setInt(_seqKey, maxSeq);
-    await _guard('ack journal', () => channel.ack(maxSeq));
+    await guard('ack journal', () => channel.ack(maxSeq));
     if (forwards.isNotEmpty && vt != null) unawaited(vt.flushNow());
     _publish();
     if (_readQueue().length >= AppConstants.trailFlushBatchSize) {
@@ -716,18 +758,21 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
           // Look it up first: a create whose response never arrived may well
           // have happened.
           final existing = await repository.sessionByClientUid(day.uid);
-          day.serverId = existing?.id ??
+          day.serverId =
+              existing?.id ??
               await repository.createSession(
                 clientUid: day.uid,
                 employeeId: day.employeeId,
                 startedAt: day.startedAt,
                 latitude: day.startLatitude,
                 longitude: day.startLongitude,
-                deviceId: _deviceIdValue,
+                deviceId: deviceIdValue,
               );
           await _saveDay(day);
           landed = true;
-          appLog('[WorkdayTracker] work day ${day.uid} is server session ${day.serverId}');
+          appLog(
+            '[WorkdayTracker] work day ${day.uid} is server session ${day.serverId}',
+          );
         }
         final result = await _flushPoints(day);
         dropped += result.dropped;
@@ -743,7 +788,9 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
       if (WorkdayRepository.isMissingModel(e)) {
         await _markUnsupported();
       } else {
-        appLog('[WorkdayTracker] sync paused: ${e.code} ${e.serverMessage ?? ''}');
+        appLog(
+          '[WorkdayTracker] sync paused: ${e.code} ${e.serverMessage ?? ''}',
+        );
       }
     } catch (e) {
       appLog('[WorkdayTracker] sync failed: $e');
@@ -777,22 +824,31 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
       var batch = remaining.take(AppConstants.trailMaxBatchSize).toList();
       final rest = remaining.skip(batch.length).toList();
       try {
-        final unsure = [for (final p in batch) if (p.maybeSent) p.uid];
+        final unsure = [
+          for (final p in batch)
+            if (p.maybeSent) p.uid,
+        ];
         if (unsure.isNotEmpty) {
           final already = await repository.existingPointUids(unsure);
           if (already.isNotEmpty) {
             landed = true;
-            batch = [for (final p in batch) if (!already.contains(p.uid)) p];
+            batch = [
+              for (final p in batch)
+                if (!already.contains(p.uid)) p,
+            ];
           }
         }
         if (batch.isNotEmpty) {
-          await repository.createPoints(sessionId,
-              employeeId: day.employeeId, points: batch);
+          await repository.createPoints(
+            sessionId,
+            employeeId: day.employeeId,
+            points: batch,
+          );
           landed = true;
         }
         remaining = rest;
       } on ApiException catch (e) {
-        if (_isTransient(e)) {
+        if (e.isRetryable) {
           // Unknown whether it was stored: check before resending.
           keep
             ..addAll([for (final p in batch) p.markMaybeSent()])
@@ -804,19 +860,24 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
         // so a single bad fix never holds back the rest of the day.
         for (final p in batch) {
           try {
-            await repository.createPoints(sessionId,
-                employeeId: day.employeeId, points: [p]);
+            await repository.createPoints(
+              sessionId,
+              employeeId: day.employeeId,
+              points: [p],
+            );
             landed = true;
           } on ApiException catch (single) {
-            if (_isTransient(single)) {
+            if (single.isRetryable) {
               keep.add(p.markMaybeSent());
             } else if (single.code == ApiErrorCode.permissionDenied ||
                 p.attempts + 1 >= AppConstants.trailMaxFlushAttempts) {
               // Refused by the access rules (e.g. the day was already closed)
               // or refused again and again: it will never be accepted.
               dropped++;
-              appLog('[WorkdayTracker] point ${p.uid} refused: '
-                  '${single.serverMessage ?? single.code}');
+              appLog(
+                '[WorkdayTracker] point ${p.uid} refused: '
+                '${single.serverMessage ?? single.code}',
+              );
             } else {
               keep.add(p.withAttempt());
             }
@@ -841,12 +902,12 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
     try {
       await repository.completeSession(
         day.serverId!,
-        endedAt: day.endedAt ?? _serverNow(),
+        endedAt: day.endedAt ?? serverNow(),
         latitude: day.endLatitude,
         longitude: day.endLongitude,
       );
     } on ApiException catch (e) {
-      if (_isTransient(e)) rethrow;
+      if (e.isRetryable) rethrow;
       // A completed session can't be written again: refused because it
       // already is completed (e.g. a retried request) counts as done.
       final server = await repository.readSession(day.serverId!);
@@ -860,29 +921,6 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
   // Helpers
   // ---------------------------------------------------------------------------
 
-  static bool _isTransient(ApiException e) =>
-      e.code == ApiErrorCode.network ||
-      e.code == ApiErrorCode.timeout ||
-      e.code == ApiErrorCode.unauthorized;
-
-  bool get _foreground {
-    final s = WidgetsBinding.instance.lifecycleState;
-    return s == null || s == AppLifecycleState.resumed;
-  }
-
-  DateTime _serverTime(DateTime deviceTime) =>
-      serverClock?.toServer(deviceTime) ?? deviceTime.toUtc();
-
-  DateTime _serverNow() => serverClock?.now() ?? DateTime.now().toUtc();
-
-  Future<void> _guard(String what, Future<void> Function() body) async {
-    try {
-      await body();
-    } catch (e) {
-      appLog('[WorkdayTracker] $what failed: $e');
-    }
-  }
-
   Future<({int uid, int? employeeId})?> _currentUser() async {
     try {
       final user = await sessionStorage.getUser();
@@ -894,15 +932,6 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
     }
   }
 
-  Future<void> _resolveDeviceId() async {
-    if (_deviceIdValue != null || deviceId == null) return;
-    try {
-      _deviceIdValue = await deviceId!();
-    } catch (e) {
-      appLog('[WorkdayTracker] device id unavailable: $e');
-    }
-  }
-
   /// True / false once known; null when it could not be checked (offline).
   Future<bool?> _checkSupport() async {
     if (prefs.getBool(_supportedKey) == true) return true;
@@ -911,7 +940,7 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
       if (supported) await prefs.setBool(_supportedKey, true);
       return supported;
     } on ApiException catch (e) {
-      if (_isTransient(e)) return null;
+      if (e.isRetryable) return null;
       rethrow;
     }
   }
@@ -922,7 +951,11 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
     await _stopCapture();
     final days = _readDays();
     if (days.isNotEmpty) {
-      await _discard(days, reason: 'the server has no work-day store', notify: false);
+      await _discard(
+        days,
+        reason: 'the server has no work-day store',
+        notify: false,
+      );
     }
     _stopTimers();
     _publish();
@@ -930,9 +963,13 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
 
   void _startTimers() {
     _drainTimer ??= Timer.periodic(
-        AppConstants.workdayDrainInterval, (_) => unawaited(drain()));
-    _flushTimer ??= Timer.periodic(AppConstants.workdayFlushInterval,
-        (_) => unawaited(flushNow(probe: true)));
+      AppConstants.workdayDrainInterval,
+      (_) => unawaited(drain()),
+    );
+    _flushTimer ??= Timer.periodic(
+      AppConstants.workdayFlushInterval,
+      (_) => unawaited(flushNow(probe: true)),
+    );
   }
 
   void _stopTimers() {
@@ -945,7 +982,8 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
   String _newUid() {
     final r = Random.secure();
     final hex = [
-      for (var i = 0; i < 6; i++) r.nextInt(256).toRadixString(16).padLeft(2, '0'),
+      for (var i = 0; i < 6; i++)
+        r.nextInt(256).toRadixString(16).padLeft(2, '0'),
     ].join();
     return 'wd-${DateTime.now().toUtc().millisecondsSinceEpoch}-$hex';
   }
@@ -957,10 +995,10 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
       phase: _unsupported
           ? WorkdayPhase.unsupported
           : _userId == null
-              ? WorkdayPhase.unknown
-              : day != null
-                  ? WorkdayPhase.active
-                  : WorkdayPhase.inactive,
+          ? WorkdayPhase.unknown
+          : day != null
+          ? WorkdayPhase.active
+          : WorkdayPhase.inactive,
       startedAt: day?.startedAt,
       pending: _readQueue().length,
       capturing: _capturing && day != null,
@@ -980,24 +1018,19 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
     return null;
   }
 
-  List<_DayRecord> _readDays() {
-    final raw = prefs.getString(_daysKey);
-    if (raw == null || raw.isEmpty) return [];
-    try {
-      return [
-        for (final m in (jsonDecode(raw) as List).whereType<Map>())
-          ?_DayRecord.tryFromJson(Map<String, dynamic>.from(m)),
-      ];
-    } catch (_) {
-      return [];
-    }
-  }
+  List<_DayRecord> _readDays() => [
+    for (final m in decodeStoredJsonList(() => prefs.getString(_daysKey)))
+      ?_DayRecord.tryFromJson(m),
+  ];
 
   Future<void> _writeDays(List<_DayRecord> days) async {
     if (days.isEmpty) {
       await prefs.remove(_daysKey);
     } else {
-      await prefs.setString(_daysKey, jsonEncode([for (final d in days) d.toJson()]));
+      await prefs.setString(
+        _daysKey,
+        jsonEncode([for (final d in days) d.toJson()]),
+      );
     }
   }
 
@@ -1028,27 +1061,21 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
     final uids = {for (final d in days) d.uid};
     final queue = _readQueue();
     final lost = queue.where((p) => uids.contains(p.sessionUid)).length;
-    await _writeQueue(queue.where((p) => !uids.contains(p.sessionUid)).toList());
+    await _writeQueue(
+      queue.where((p) => !uids.contains(p.sessionUid)).toList(),
+    );
     await _removeDays(uids);
-    appLog('[WorkdayTracker] discarded ${days.length} work day(s) and $lost '
-        'point(s): $reason');
+    appLog(
+      '[WorkdayTracker] discarded ${days.length} work day(s) and $lost '
+      'point(s): $reason',
+    );
     if (notify && lost > 0 && !_disposed) _dropped.add(lost);
   }
 
-  List<WorkdayPoint> _readQueue() {
-    final raw = prefs.getString(_queueKey);
-    if (raw == null || raw.isEmpty) return [];
-    final List<dynamic> list;
-    try {
-      list = jsonDecode(raw) as List;
-    } catch (_) {
-      return [];
-    }
-    return [
-      for (final m in list.whereType<Map>())
-        ?WorkdayPoint.tryFromJson(Map<String, dynamic>.from(m)),
-    ];
-  }
+  List<WorkdayPoint> _readQueue() => [
+    for (final m in decodeStoredJsonList(() => prefs.getString(_queueKey)))
+      ?WorkdayPoint.tryFromJson(m),
+  ];
 
   Future<void> _writeQueue(List<WorkdayPoint> points) async {
     if (points.length > AppConstants.workdayMaxBufferedPoints) {
@@ -1061,7 +1088,9 @@ class WorkdayTracker with WidgetsBindingObserver implements TrailFeed {
       await prefs.remove(_queueKey);
     } else {
       await prefs.setString(
-          _queueKey, jsonEncode([for (final p in points) p.toJson()]));
+        _queueKey,
+        jsonEncode([for (final p in points) p.toJson()]),
+      );
     }
   }
 
@@ -1133,20 +1162,20 @@ class _DayRecord {
       );
 
   Map<String, dynamic> toJson() => {
-        'uid': uid,
-        'user': userId,
-        if (employeeId != null) 'emp': employeeId,
-        'start': startedAt.toUtc().toIso8601String(),
-        if (startLatitude != null) 'slat': startLatitude,
-        if (startLongitude != null) 'slng': startLongitude,
-        if (serverId != null) 'sid': serverId,
-        'state': state,
-        if (endedAt != null) 'end': endedAt!.toUtc().toIso8601String(),
-        if (endLatitude != null) 'elat': endLatitude,
-        if (endLongitude != null) 'elng': endLongitude,
-        'title': title,
-        'text': text,
-      };
+    'uid': uid,
+    'user': userId,
+    if (employeeId != null) 'emp': employeeId,
+    'start': startedAt.toUtc().toIso8601String(),
+    if (startLatitude != null) 'slat': startLatitude,
+    if (startLongitude != null) 'slng': startLongitude,
+    if (serverId != null) 'sid': serverId,
+    'state': state,
+    if (endedAt != null) 'end': endedAt!.toUtc().toIso8601String(),
+    if (endLatitude != null) 'elat': endLatitude,
+    if (endLongitude != null) 'elng': endLongitude,
+    'title': title,
+    'text': text,
+  };
 
   static _DayRecord? tryFromJson(Map<String, dynamic> j) {
     final uid = j['uid'];
@@ -1154,14 +1183,19 @@ class _DayRecord {
     final start = DateTime.tryParse(j['start']?.toString() ?? '');
     if (uid is! String || user is! num || start == null) return null;
     double? d(Object? v) => v is num ? v.toDouble() : null;
+    // Type-checked rather than cast: a corrupt row (a string where a number
+    // belongs, after a partial write) must return null, not throw. It used to
+    // throw, and the caller's only recourse was to discard *every* stored day
+    // — which silently ended an active work day's tracking.
+    int? i(Object? v) => v is num ? v.toInt() : null;
     return _DayRecord(
       uid: uid,
       userId: user.toInt(),
-      employeeId: (j['emp'] as num?)?.toInt(),
+      employeeId: i(j['emp']),
       startedAt: start.toUtc(),
       startLatitude: d(j['slat']),
       startLongitude: d(j['slng']),
-      serverId: (j['sid'] as num?)?.toInt(),
+      serverId: i(j['sid']),
       state: j['state'] == ending ? ending : active,
       endedAt: DateTime.tryParse(j['end']?.toString() ?? '')?.toUtc(),
       endLatitude: d(j['elat']),

@@ -59,16 +59,28 @@ class RouteNotice extends StatelessWidget {
           Icon(Symbols.error, size: context.r(IconSz.label), color: cs.error),
           context.gapW(Insets.x2),
           Expanded(
-            child: Text(
-              message,
-              style: context.text.bodySmall?.copyWith(
-                color: cs.onErrorContainer,
-                fontWeight: FontWeight.w600,
-              ),
+            // Side by side while both fit; otherwise the button drops under
+            // the message. In one Row the button could not give way, and a
+            // long Arabic reason pushed its label off a small phone's edge.
+            child: OverflowBar(
+              alignment: MainAxisAlignment.spaceBetween,
+              overflowAlignment: OverflowBarAlignment.start,
+              children: [
+                Text(
+                  message,
+                  style: context.text.bodySmall?.copyWith(
+                    color: cs.onErrorContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (onRetry != null)
+                  TextButton(
+                    onPressed: onRetry,
+                    child: Text(context.s.commonRetry),
+                  ),
+              ],
             ),
           ),
-          if (onRetry != null)
-            TextButton(onPressed: onRetry, child: Text(context.s.commonRetry)),
         ],
       ),
     );
@@ -110,7 +122,7 @@ class RouteVisitRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  AutoDirectionText(
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -118,6 +130,7 @@ class RouteVisitRow extends StatelessWidget {
                         fontWeight: FontWeight.w700, color: cs.onSurface),
                   ),
                   context.gapH(Insets.x1),
+                  // Composed with joinFacts: follows the screen direction.
                   Text(
                     subtitle,
                     maxLines: 1,

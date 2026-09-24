@@ -31,8 +31,11 @@ class _AppCardState extends State<AppCard>
   AnimationController _ensureCtrl() {
     return _ctrl ??= AnimationController(
       vsync: this,
-      duration: AppDurations.fast,
-      reverseDuration: AppDurations.cardRelease,
+      // The press runs `reverse()` (down to 0.96) and the release runs
+      // `forward()` (back to 1.0), so the release is `duration` — the slower
+      // one, so the card settles rather than snapping back.
+      duration: AppDurations.cardRelease,
+      reverseDuration: AppDurations.fast,
       value: 1.0,
       lowerBound: 0.96,
       upperBound: 1.0,
@@ -62,14 +65,18 @@ class _AppCardState extends State<AppCard>
 
   @override
   Widget build(BuildContext context) {
+    // Any non-null tap handler enables the InkWell, so the press handlers are
+    // wired only for a tappable card — otherwise a static card rippled, showed
+    // a click cursor and took keyboard focus while doing nothing.
+    final tappable = widget.onTap != null;
     final card = Card(
       color: widget.color,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: widget.onTap,
-        onTapDown: _onTapDown,
-        onTapUp: _onTapUp,
-        onTapCancel: _onTapCancel,
+        onTapDown: tappable ? _onTapDown : null,
+        onTapUp: tappable ? _onTapUp : null,
+        onTapCancel: tappable ? _onTapCancel : null,
         child: Padding(padding: widget.padding, child: widget.child),
       ),
     );

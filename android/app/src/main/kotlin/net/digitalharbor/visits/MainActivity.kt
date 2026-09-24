@@ -6,6 +6,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import net.digitalharbor.visits.visittracking.VisitLocationChannel
+import net.digitalharbor.visits.workday.WorkdayChannel
 
 class MainActivity : FlutterActivity() {
     // ANDROID_ID on purpose, see below; it is app-scoped and only sent hashed.
@@ -14,6 +15,7 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         val messenger = flutterEngine.dartExecutor.binaryMessenger
         VisitLocationChannel.register(this, messenger)
+        WorkdayChannel.register(this, messenger)
         // The install identity behind `device_id` (lib/core/push/device_identity.dart).
         // ANDROID_ID is scoped to this app's signing key and the device user, and
         // survives a reinstall — which is what lets the server retire the token of

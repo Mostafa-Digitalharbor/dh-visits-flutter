@@ -4,7 +4,9 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../../../app/design/app_dimens.dart';
 import '../../../app/design/responsive.dart';
+import '../../../core/constants.dart';
 import '../../../shared/extensions/context_extensions.dart';
+import '../../../shared/widgets/widgets.dart';
 
 /// Shown before the first "Start work day" (and again when its text version
 /// changes): what is collected, that it continues in the background and with
@@ -36,56 +38,44 @@ class WorkdayDisclosureDialog extends StatelessWidget {
       s.workdayDisclosureStorage,
       ios ? s.workdayDisclosureIos : s.workdayDisclosureAndroid,
     ];
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.lg)),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: colors.primaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Symbols.share_location, size: 32, color: colors.primary),
-              ),
-            ),
-            context.gapH(Insets.x3),
+    final buttonPadding = context.padSym(v: Insets.x3h, h: Insets.x2);
+    // The shared frame, like the visit disclosure beside it: it owns the
+    // rounded shape, the tinted icon halo, the scroll for a long translation
+    // and the equal-width action row. Hand-rolling those again is how this
+    // dialog ended up with four raw dp values and its own key strings.
+    return AppDialogFrame(
+      icon: Symbols.share_location,
+      title: s.workdayDisclosureTitle,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < paragraphs.length; i++) ...[
+            if (i > 0) context.gapH(Insets.x3),
             Text(
-              s.workdayDisclosureTitle,
-              textAlign: TextAlign.center,
-              style: context.text.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            for (final paragraph in paragraphs) ...[
-              context.gapH(Insets.x3),
-              Text(
-                paragraph,
-                style: context.text.bodyMedium?.copyWith(color: colors.onSurfaceVariant),
-              ),
-            ],
-            context.gapH(Insets.x6),
-            FilledButton(
-              key: const Key('workday-disclosure-agree'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.sm)),
-              ),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(s.workdayDisclosureAgree),
-            ),
-            context.gapH(Insets.x2),
-            TextButton(
-              key: const Key('workday-disclosure-decline'),
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(s.workdayDisclosureDecline),
+              paragraphs[i],
+              style: context.text.bodyMedium
+                  ?.copyWith(color: colors.onSurfaceVariant),
             ),
           ],
-        ),
+        ],
       ),
+      // Decline first: in the frame's row the primary action sits at the end,
+      // as on every other dialog in the app.
+      actions: [
+        TextButton(
+          key: WidgetKeys.workdayDisclosureDecline,
+          style: TextButton.styleFrom(padding: buttonPadding),
+          onPressed: () => Navigator.of(context).pop(false),
+          child:
+              Text(s.workdayDisclosureDecline, textAlign: TextAlign.center),
+        ),
+        FilledButton(
+          key: WidgetKeys.workdayDisclosureAgree,
+          style: FilledButton.styleFrom(padding: buttonPadding),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(s.workdayDisclosureAgree, textAlign: TextAlign.center),
+        ),
+      ],
     );
   }
 }

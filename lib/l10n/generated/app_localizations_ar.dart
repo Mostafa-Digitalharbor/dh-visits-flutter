@@ -21,28 +21,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get commonRetry => 'إعادة المحاولة';
 
   @override
-  String get commonLoading => 'جارٍ التحميل…';
-
-  @override
   String get commonSearch => 'بحث…';
 
   @override
   String get commonCancel => 'إلغاء';
 
   @override
-  String get commonSave => 'حفظ';
-
-  @override
   String get commonClose => 'إغلاق';
 
   @override
-  String get commonOptional => '(اختياري)';
-
-  @override
   String get commonLogout => 'تسجيل الخروج';
-
-  @override
-  String get commonRefresh => 'تحديث';
 
   @override
   String get commonYes => 'نعم';
@@ -156,9 +144,6 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get unitMinShort => 'د';
-
-  @override
   String get relativeNow => 'الآن';
 
   @override
@@ -239,16 +224,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get commonContinue => 'متابعة';
 
   @override
-  String get commonOpenSettings => 'فتح الإعدادات';
-
-  @override
   String get serverSetupTitle => 'اتصل بالخادم';
 
   @override
   String get serverSetupSubtitle => 'أدخل عنوان خادم شركتك للبدء';
-
-  @override
-  String get serverSetupUrlLabel => 'رابط الخادم';
 
   @override
   String get serverSetupUrlHint => 'https://your-company.odoo.com';
@@ -265,17 +244,11 @@ class AppLocalizationsAr extends AppLocalizations {
       'اسأل مسؤول النظام إذا كنت لا تعرف عنوان الخادم.';
 
   @override
-  String get serverSetupDatabaseLabel => 'اسم قاعدة البيانات';
-
-  @override
   String get serverSetupDatabaseHint => 'مثال: company-main';
 
   @override
   String get serverSetupDatabasePrompt =>
       'تعذّر اكتشاف قاعدة البيانات تلقائيًا. أدخل اسمها (اسأل مسؤول النظام).';
-
-  @override
-  String get serverSetupChecking => 'جارٍ الاتصال…';
 
   @override
   String get serverSetupDetectDb => 'اكتشاف قاعدة البيانات';
@@ -287,10 +260,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String serverSetupDetected(String db) {
     return 'تم اكتشاف قاعدة البيانات: $db';
   }
-
-  @override
-  String get serverSetupDetectFailed =>
-      'تعذّر اكتشاف قاعدة البيانات تلقائيًا — أدخل اسمها يدويًا.';
 
   @override
   String get serverSetupInsecureUrl =>
@@ -336,9 +305,6 @@ class AppLocalizationsAr extends AppLocalizations {
       'تعذّر حفظ إعدادات الخادم على هذا الجهاز. أعد المحاولة، وإن تكرّر الخطأ فأعد تشغيل التطبيق.';
 
   @override
-  String get loginChangeServer => 'تغيير الخادم';
-
-  @override
   String get loginTitle => 'الزيارات';
 
   @override
@@ -348,13 +314,22 @@ class AppLocalizationsAr extends AppLocalizations {
   String get loginWelcomeBack => 'أهلًا بعودتك';
 
   @override
-  String get loginRoleLabel => 'الدخول بصفتك';
-
-  @override
   String get loginUsername => 'البريد الإلكتروني / اسم المستخدم';
 
   @override
   String get loginPassword => 'كلمة المرور';
+
+  @override
+  String get authShowPassword => 'إظهار كلمة المرور';
+
+  @override
+  String get authHidePassword => 'إخفاء كلمة المرور';
+
+  @override
+  String get authSwitchToDarkTheme => 'التبديل إلى المظهر الداكن';
+
+  @override
+  String get authSwitchToLightTheme => 'التبديل إلى المظهر الفاتح';
 
   @override
   String get loginSubmit => 'تسجيل الدخول';
@@ -515,10 +490,6 @@ class AppLocalizationsAr extends AppLocalizations {
       'تعذّر الوصول إلى الخادم. تحقّق من اتصالك بالإنترنت (واي فاي أو بيانات الجوال) ثم أعد المحاولة.';
 
   @override
-  String get errNetworkUnknown =>
-      'حدثت مشكلة في الاتصال. تحقّق من اتصالك بالإنترنت ثم أعد المحاولة.';
-
-  @override
   String get errLocationPermission =>
       'لا يستطيع التطبيق الوصول إلى موقعك. فعّل خدمات الموقع واسمح للتطبيق باستخدام موقعك، ثم أعد المحاولة.';
 
@@ -587,9 +558,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get pushEventUpdated => 'تم تحديث الزيارة';
-
-  @override
-  String get unitPercent => '٪';
 
   @override
   String unitBytes(String size) {
@@ -672,9 +640,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get customerLastVisit => 'آخر زيارة';
 
   @override
-  String get customerActionCheckIn => 'بدء الزيارة';
-
-  @override
   String get customerActionCall => 'اتصال';
 
   @override
@@ -693,12 +658,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get customerSectionInfo => 'بيانات التواصل';
 
   @override
-  String get customerFieldType => 'النوع';
-
-  @override
-  String get customerFieldEmail => 'البريد الإلكتروني';
-
-  @override
   String get customerFieldJob => 'المسمى الوظيفي';
 
   @override
@@ -706,9 +665,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get customerFieldTags => 'الوسوم';
-
-  @override
-  String get customerFieldWebsite => 'الموقع الإلكتروني';
 
   @override
   String get customerFieldVat => 'الرقم الضريبي';
@@ -724,333 +680,19 @@ class AppLocalizationsAr extends AppLocalizations {
       'هذا العميل لم يعد موجودًا، أو لم تعد لديك صلاحية الوصول إليه. ارجع وحدّث قائمة العملاء.';
 
   @override
-  String get customerAlreadyCheckedIn => 'لديك زيارة جارية هنا الآن';
-
-  @override
-  String get customerActiveVisitBadge => 'زيارة جارية';
-
-  @override
-  String customerCheckInBlocked(String customer) {
-    return 'لديك زيارة جارية عند $customer. أنهِها قبل بدء زيارة أخرى.';
-  }
-
-  @override
-  String get customerCheckInBlockedShort => 'زيارة جارية في مكان آخر';
-
-  @override
-  String get checkInSuccess => 'تم تسجيل الوصول';
-
-  @override
-  String get visitActiveTitle => 'زيارة جارية';
-
-  @override
-  String get visitActiveEmpty =>
-      'لا توجد زيارة جارية الآن.\nاختر عميلًا وابدأ الزيارة.';
-
-  @override
-  String visitStartedAt(String time) {
-    return 'بدأت الساعة $time';
-  }
-
-  @override
-  String get visitLiveIndicator => 'مباشر';
-
-  @override
-  String get mapZoomIn => 'تكبير';
-
-  @override
-  String get mapZoomOut => 'تصغير';
-
-  @override
-  String get mapRecenter => 'توسيط الخريطة';
-
-  @override
   String get mapOpenDirections => 'فتح الاتجاهات';
-
-  @override
-  String get visitNotesLabel => 'ملاحظات (اختياري)';
-
-  @override
-  String get visitActionCheckOut => 'إنهاء الزيارة';
-
-  @override
-  String get checkOutSuccess => 'تم إنهاء الزيارة';
-
-  @override
-  String get employeesTitle => 'الموظفون';
-
-  @override
-  String get employeesEmpty => 'لا يوجد موظفون مُضافون بعد';
 
   @override
   String get employeesSearchHint => 'بحث عن موظف…';
 
   @override
-  String get createVisitCustomerLabel => 'العميل';
-
-  @override
-  String get createVisitEmployeeLabel => 'الموظف';
-
-  @override
-  String get createVisitDateLabel => 'تاريخ الزيارة';
-
-  @override
-  String get createVisitTypeLabel => 'نوع الزيارة (اختياري)';
-
-  @override
-  String get createVisitNotesLabel => 'ملاحظات (اختياري)';
-
-  @override
-  String get createVisitStateLabel => 'الحالة الابتدائية';
-
-  @override
-  String get visitStateDraft => 'مسودة';
-
-  @override
-  String get visitStateSubmit => 'إرسال';
-
-  @override
-  String get visitStateUnderReview => 'قيد المراجعة';
-
-  @override
-  String get visitStateDone => 'منتهية';
-
-  @override
-  String get visitStateCancel => 'ملغاة';
-
-  @override
-  String get visitDetailVisitTypeLabel => 'نوع الزيارة';
-
-  @override
-  String get visitDetailEditVisitType => 'تغيير نوع الزيارة';
-
-  @override
-  String get visitDetailMarkAsDone => 'تأكيد المراجعة';
-
-  @override
-  String get visitDetailMarkAsDoneSuccess => 'تم تأكيد مراجعة الزيارة';
-
-  @override
-  String get visitDetailSendToEmployee => 'إرسال للموظف';
-
-  @override
-  String get visitDetailSentToEmployeeSuccess => 'تم إرسال الزيارة للموظف';
-
-  @override
-  String get visitDetailEditState => 'تغيير الحالة';
-
-  @override
-  String get visitDetailPickState => 'اختر الحالة';
-
-  @override
-  String get createVisitSuccess => 'تم إنشاء الزيارة';
-
-  @override
-  String get createVisitCustomerRequired => 'اختر عميلًا';
-
-  @override
-  String get createVisitEmployeeRequired => 'اختر موظفًا';
-
-  @override
-  String get createVisitDateRequired => 'حدد تاريخ الزيارة';
-
-  @override
   String get createVisitTooltip => 'زيارة جديدة';
-
-  @override
-  String get createVisitPickType => 'اختر نوع الزيارة';
-
-  @override
-  String get createVisitPickCustomer => 'اختر العميل';
-
-  @override
-  String get createVisitPickEmployee => 'اختر الموظف';
-
-  @override
-  String get visitsSearchHint => 'بحث باسم العميل…';
-
-  @override
-  String get pickerSearchHint => 'بحث…';
 
   @override
   String get pickerNoResults => 'لا توجد نتائج';
 
   @override
-  String get groupToday => 'اليوم';
-
-  @override
-  String get groupYesterday => 'أمس';
-
-  @override
-  String get groupEarlierThisWeek => 'في وقت سابق من هذا الأسبوع';
-
-  @override
-  String get groupEarlier => 'سابقًا';
-
-  @override
-  String get groupTomorrow => 'غدًا';
-
-  @override
-  String get groupLaterThisWeek => 'لاحقًا هذا الأسبوع';
-
-  @override
-  String get groupUpcoming => 'القادمة';
-
-  @override
-  String get statsTotal => 'الإجمالي';
-
-  @override
-  String get statsActive => 'جارية';
-
-  @override
-  String get statsCompleted => 'مكتملة';
-
-  @override
-  String get statsPendingReview => 'بانتظار المراجعة';
-
-  @override
-  String get statsDone => 'منتهية';
-
-  @override
-  String get visitsHistoryTitle => 'سجل الزيارات';
-
-  @override
-  String get visitsHistoryEmpty => 'لا يوجد سجل زيارات';
-
-  @override
   String get visitsListTitle => 'الزيارات';
-
-  @override
-  String get visitsFilterToday => 'اليوم';
-
-  @override
-  String get visitsFilterAll => 'الكل';
-
-  @override
-  String get filterStatusLabel => 'الحالة';
-
-  @override
-  String get filterStatusAll => 'الكل';
-
-  @override
-  String get filterStatusCompleted => 'مكتملة';
-
-  @override
-  String get filterStatusPendingReview => 'بانتظار المراجعة';
-
-  @override
-  String get filterStatusIncomplete => 'غير مكتملة';
-
-  @override
-  String get filterTimingLabel => 'التوقيت';
-
-  @override
-  String get filterTimingAll => 'الكل';
-
-  @override
-  String get filterTimingOnTime => 'في موعدها';
-
-  @override
-  String get filterTimingEarly => 'قبل الموعد';
-
-  @override
-  String get filterTimingOverdue => 'متأخرة';
-
-  @override
-  String get visitsTodayEmpty => 'لا توجد زيارات مجدولة لليوم';
-
-  @override
-  String get visitDetailTitle => 'تفاصيل الزيارة';
-
-  @override
-  String get visitDetailNotesSection => 'الملاحظات';
-
-  @override
-  String get visitDetailNoNotes => 'لا توجد ملاحظات';
-
-  @override
-  String get visitDetailEditNotes => 'تعديل الملاحظات';
-
-  @override
-  String get visitDetailMetaSection => 'بيانات الزيارة';
-
-  @override
-  String get visitDetailTimelineSection => 'التوقيتات';
-
-  @override
-  String get visitDetailVisitDate => 'تاريخ الزيارة';
-
-  @override
-  String get visitDetailVisitType => 'نوع الزيارة';
-
-  @override
-  String get visitDetailSaveChanges => 'حفظ التعديلات';
-
-  @override
-  String get visitDetailReadOnlyHint =>
-      'هذه الحقول قابلة للتعديل من قِبل المدير فقط.';
-
-  @override
-  String get visitDetailNotesEditableHint =>
-      'يمكنك إضافة ملاحظات أثناء تسجيل الوصول.';
-
-  @override
-  String get visitDetailSaved => 'تم حفظ التعديلات';
-
-  @override
-  String get visitDetailDelete => 'حذف الزيارة';
-
-  @override
-  String get visitDetailNotStartedYet => 'لم تبدأ الزيارة بعد';
-
-  @override
-  String get visitDetailNotEndedYet => 'لم تنتهِ الزيارة بعد';
-
-  @override
-  String get visitDetailOpenCheckInLocation => 'عرض موقع البدء على الخريطة';
-
-  @override
-  String get visitDetailOpenCheckOutLocation => 'عرض موقع الإنهاء على الخريطة';
-
-  @override
-  String get visitDetailTimelineLocationsSection => 'التوقيتات والمواقع';
-
-  @override
-  String get visitDetailEditCustomer => 'تغيير العميل';
-
-  @override
-  String get visitDetailEditEmployee => 'تغيير الموظف';
-
-  @override
-  String get visitDetailCustomer => 'العميل';
-
-  @override
-  String get visitDetailEmployee => 'الموظف';
-
-  @override
-  String get visitDetailStatusLabel => 'الحالة';
-
-  @override
-  String get visitDetailStateBadgeDraft => 'مسودة';
-
-  @override
-  String get visitDetailStateBadgeSubmitted => 'مُرسَلة';
-
-  @override
-  String get visitDetailStateBadgeUnderReview => 'قيد المراجعة';
-
-  @override
-  String get visitDetailStateBadgeDone => 'منتهية';
-
-  @override
-  String get confirmDeleteVisitTitle => 'حذف الزيارة';
-
-  @override
-  String get confirmDeleteVisitMessage =>
-      'هل أنت متأكد من حذف هذه الزيارة؟ لا يمكن التراجع عن هذا الإجراء.';
-
-  @override
-  String get visitDeletedSuccess => 'تم حذف الزيارة';
 
   @override
   String get roleManager => 'مدير';
@@ -1080,12 +722,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get visitsHistoryActiveBadge => 'جارية الآن';
 
   @override
-  String get visitsScheduledLabel => 'الموعد';
-
-  @override
-  String get dashboardGreeting => 'صباح الخير';
-
-  @override
   String get dashboardTodayProgress => 'إنجاز اليوم';
 
   @override
@@ -1095,24 +731,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String dashboardFieldHoursValue(String hours) {
     return '$hours س';
   }
-
-  @override
-  String get dashboardDaySchedule => 'جدول يومك';
-
-  @override
-  String get affordanceScheduled => 'اضغط لبدء الزيارة';
-
-  @override
-  String get affordanceActive => 'زيارة جارية الآن';
-
-  @override
-  String get affordanceReview => 'بانتظار مراجعة المدير';
-
-  @override
-  String get affordanceApproved => 'تم اعتمادها';
-
-  @override
-  String get affordanceRejected => 'مرفوضة — أعد الزيارة';
 
   @override
   String get analyticsTabTitle => 'التحليلات';
@@ -1137,21 +755,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get analyticsByEmployee => 'حسب الموظف';
-
-  @override
-  String analyticsVisitsCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count زيارة',
-      many: '$count زيارةً',
-      few: '$count زيارات',
-      two: 'زيارتان',
-      one: 'زيارة واحدة',
-      zero: 'لا توجد زيارات',
-    );
-    return '$_temp0';
-  }
 
   @override
   String get reviewTitle => 'مراجعة الزيارات';
@@ -1185,10 +788,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get reviewRejected => 'تم رفض الزيارة';
-
-  @override
-  String get reviewOutOfRangeBanner =>
-      'خارج النطاق · سُجّلت خارج نطاق الموقع المعتمد';
 
   @override
   String get routeTabTitle => 'مسار اليوم';
@@ -1232,230 +831,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get routeEmpty => 'لا توجد محطات في مسار اليوم';
 
   @override
-  String get reportTitle => 'تقرير الزيارة';
-
-  @override
-  String get reportOutcome => 'نتيجة الزيارة';
-
-  @override
-  String get reportOutcomeDone => 'تمّت بنجاح';
-
-  @override
-  String get reportOutcomePostponed => 'مؤجلة';
-
-  @override
-  String get reportOutcomeAbsent => 'العميل غير موجود';
-
-  @override
-  String get reportNotes => 'ملاحظات';
-
-  @override
-  String get reportNotesHint => 'اكتب ملخص الزيارة وأهم الملاحظات...';
-
-  @override
-  String get reportPhoto => 'صورة إثبات';
-
-  @override
-  String get reportAddPhoto => 'إضافة صورة';
-
-  @override
-  String get reportSignature => 'توقيع العميل';
-
-  @override
-  String get reportSignHere => 'وقّع هنا';
-
-  @override
-  String get reportClear => 'مسح';
-
-  @override
-  String get reportSubmit => 'إنهاء وحفظ التقرير';
-
-  @override
-  String get createVisitTitle => 'إنشاء زيارة جديدة';
-
-  @override
-  String get createVisitSectionCustomer => 'العميل';
-
-  @override
-  String get createVisitSectionEmployee => 'المندوب الميداني';
-
-  @override
-  String get createVisitSectionType => 'نوع الزيارة';
-
-  @override
-  String get createVisitSectionDate => 'موعد الزيارة';
-
-  @override
-  String get createVisitChange => 'تغيير';
-
-  @override
   String get createVisitSubmit => 'إنشاء الزيارة';
 
   @override
   String get visitsHistoryCompletedBadge => 'مكتملة';
 
   @override
-  String get visitsHistoryIncompleteBadge => 'غير مكتملة';
-
-  @override
-  String get visitsHistoryOverdueBadge => 'متأخرة';
-
-  @override
-  String get visitDetailOverdueHint =>
-      'انقضى موعد الزيارة ولم تكتمل بعد. أعد جدولتها أو تابعها.';
-
-  @override
-  String get visitExecutedOnTime => 'نُفِّذت في موعدها';
-
-  @override
-  String visitExecutedEarly(int days) {
-    String _temp0 = intl.Intl.pluralLogic(
-      days,
-      locale: localeName,
-      other: 'نُفِّذت قبل موعدها بـ$days يوم',
-      many: 'نُفِّذت قبل موعدها بـ$days يومًا',
-      few: 'نُفِّذت قبل موعدها بـ$days أيام',
-      two: 'نُفِّذت قبل موعدها بيومين',
-      one: 'نُفِّذت قبل موعدها بيوم واحد',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String visitExecutedLate(int days) {
-    String _temp0 = intl.Intl.pluralLogic(
-      days,
-      locale: localeName,
-      other: 'نُفِّذت بعد موعدها بـ$days يوم',
-      many: 'نُفِّذت بعد موعدها بـ$days يومًا',
-      few: 'نُفِّذت بعد موعدها بـ$days أيام',
-      two: 'نُفِّذت بعد موعدها بيومين',
-      one: 'نُفِّذت بعد موعدها بيوم واحد',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get visitsHistoryRunning => 'جارية';
-
-  @override
-  String get timelineCheckIn => 'وصول';
-
-  @override
-  String get timelineCheckOut => 'مغادرة';
-
-  @override
-  String timelineDuration(String value) {
-    return '$value د';
-  }
-
-  @override
-  String get visitRangeInRange => 'ضمن النطاق';
-
-  @override
-  String get visitRangeOutOfRange => 'خارج النطاق';
-
-  @override
-  String get statusScheduled => 'مجدولة';
-
-  @override
-  String get statusActive => 'جارية الآن';
-
-  @override
-  String get statusReview => 'بانتظار المراجعة';
-
-  @override
-  String get statusApproved => 'معتمدة';
-
-  @override
-  String get statusRejected => 'مرفوضة';
-
-  @override
-  String get visitDetailScheduledTimeLabel => 'موعد الزيارة';
-
-  @override
   String get visitDetailInRange => 'أنت داخل نطاق العميل';
 
   @override
   String get visitDetailOutRange => 'أنت خارج نطاق العميل';
-
-  @override
-  String visitDetailRangeMeta(String distance, String radius) {
-    return 'يبعد $distance م · نطاق التسجيل $radius م';
-  }
-
-  @override
-  String get visitDetailOutRangeHint =>
-      'اقترب أكثر من موقع العميل لبدء الزيارة.';
-
-  @override
-  String get visitDetailCheckInTitle => 'تسجيل بدء الزيارة';
-
-  @override
-  String get visitDetailCheckInInRangeSub => 'أنت داخل النطاق';
-
-  @override
-  String get visitDetailCheckInLocatingSub => 'جارٍ تحديد موقعك…';
-
-  @override
-  String get visitDetailCheckInOverride => 'تسجيل خارج النطاق';
-
-  @override
-  String get visitDetailElapsedLabel => 'الوقت المنقضي';
-
-  @override
-  String visitDetailStartedAt(String time) {
-    return 'بدء الزيارة $time';
-  }
-
-  @override
-  String get visitDetailCheckOutTitle => 'تسجيل إنهاء الزيارة';
-
-  @override
-  String get visitDetailCheckOutSub => 'سيتم التقاط موقعك عند الإنهاء';
-
-  @override
-  String get visitDetailOnTime => 'تمّت في موعدها';
-
-  @override
-  String get visitDetailDurationLabel => 'مدة الزيارة';
-
-  @override
-  String get timelineCreated => 'تم إنشاء الزيارة';
-
-  @override
-  String get visitShowLocation => 'عرض موقع العميل';
-
-  @override
-  String get visitDetailCustomerLocationSection => 'موقع العميل';
-
-  @override
-  String get visitDetailNavigate => 'عرض موقع العميل على الخريطة';
-
-  @override
-  String get visitDetailNoCustomerLocation =>
-      'لا يوجد موقع محفوظ لهذا العميل. اطلب من مديرك إضافته.';
-
-  @override
-  String visitDetailCheckInStartedAt(String customer) {
-    return 'بدأت الزيارة عند $customer — تم تسجيل موقعك';
-  }
-
-  @override
-  String get visitLocationDialogTitle => 'موقع تسجيل الوصول';
-
-  @override
-  String get visitLocationCustomer => 'مكتب العميل';
-
-  @override
-  String get visitLocationCheckIn => 'نقطة الوصول';
-
-  @override
-  String get visitLocationCheckOut => 'نقطة المغادرة';
-
-  @override
-  String get visitLocationNotAvailable =>
-      'لا يوجد موقع محفوظ لهذا العميل. اطلب من مديرك إضافته.';
 
   @override
   String get offlineNoQueue =>
@@ -1507,10 +892,6 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get offlineCheckInQueued =>
-      'حُفظ على الجهاز — ستتم المزامنة عند عودة الاتصال';
-
-  @override
   String get dashboardTabTitle => 'لوحة المتابعة';
 
   @override
@@ -1558,21 +939,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get visitsTabTitle => 'الزيارات';
 
   @override
-  String get homeTabCustomers => 'العملاء';
-
-  @override
-  String get homeTabActive => 'الجارية';
-
-  @override
-  String get homeTabHistory => 'السجل';
-
-  @override
-  String get settingsTitle => 'الإعدادات';
-
-  @override
-  String get settingsAppearance => 'المظهر';
-
-  @override
   String get settingsAccount => 'الحساب';
 
   @override
@@ -1585,9 +951,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsAbout => 'حول التطبيق';
 
   @override
-  String get settingsVersion => 'الإصدار';
-
-  @override
   String settingsVersionValue(String version) {
     return 'الإصدار $version';
   }
@@ -1596,9 +959,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String profileBuildVersion(String version, String build) {
     return '$version ($build)';
   }
-
-  @override
-  String get settingsEditProfile => 'تعديل الملف الشخصي';
 
   @override
   String get settingsNotifications => 'الإشعارات';
@@ -1631,9 +991,6 @@ class AppLocalizationsAr extends AppLocalizations {
     );
     return '$_temp0';
   }
-
-  @override
-  String get settingsHelp => 'المساعدة والدعم';
 
   @override
   String get confirmLogoutTitle => 'تسجيل الخروج';
@@ -1834,9 +1191,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get wfPlanForMyself => 'خطّط لها لنفسي';
 
   @override
-  String get wfPurposeRequired => 'الغرض مطلوب';
-
-  @override
   String get wfOutcomeRequired => 'النتيجة مطلوبة لإنهاء الزيارة';
 
   @override
@@ -1963,9 +1317,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get wfParticipantRejectedState => 'مرفوض';
 
   @override
-  String get wfNoParticipants => 'لا يوجد مشاركون إضافيون';
-
-  @override
   String get wfUnknownEmployee => 'موظف غير معروف';
 
   @override
@@ -1990,7 +1341,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get wfSearchHint => 'ابحث بالعميل أو المرجع أو الغرض…';
 
   @override
-  String get wfSearchNoMatch => 'لا توجد زيارات مطابقة لبحثك';
+  String get wfSearchNoMatch =>
+      'لا توجد زيارات في هذه القائمة تطابق بحثك. جرّب قائمة أخرى من الأعلى، أو اسحب للأسفل للتحديث.';
 
   @override
   String get wfFilterNoMatch =>
@@ -2007,23 +1359,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'لم يتغيّر شيء. غيّر التاريخ أو الغرض أو الموقع قبل إرسال الطلب.';
 
   @override
-  String get wfListTitle => 'الزيارات';
-
-  @override
   String get wfDetailTitle => 'زيارة';
-
-  @override
-  String get wfStartLocationCaptured =>
-      'سيُسجَّل موقعك الحالي عبر نظام تحديد المواقع';
 
   @override
   String get wfConfirmCancelTitle => 'إلغاء الزيارة';
 
   @override
   String get wfConfirmCancelMessage => 'هل أنت متأكد من إلغاء هذه الزيارة؟';
-
-  @override
-  String get wfScheduledLabel => 'مجدولة';
 
   @override
   String get wfStartedLabel => 'بدأت';
@@ -2064,15 +1406,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String wfRangeRadius(String radius) {
     return 'نطاق التسجيل $radius';
   }
-
-  @override
-  String get wfHoursShort => 'س';
-
-  @override
-  String get wfMinutesShort => 'د';
-
-  @override
-  String get wfDaysShort => 'ي';
 
   @override
   String get wfShortVisitHint => 'زيارة قصيرة';
@@ -2116,9 +1449,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get trailMapTitle => 'مسار التتبّع';
 
   @override
-  String get trailEmpty => 'لم تُسجَّل أي نقاط بعد';
-
-  @override
   String get trailEmptyRunning => 'جارٍ تسجيل مسارك — يظهر الخط أثناء تحركك';
 
   @override
@@ -2146,23 +1476,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get trailDistance => 'المسافة';
 
   @override
-  String trailDistanceKm(String value) {
-    return '$value كم';
-  }
-
-  @override
   String get trailAvgSpeed => 'متوسط السرعة';
 
   @override
-  String trailSpeedKmh(String value) {
-    return '$value كم/س';
-  }
-
-  @override
   String get trailLastFix => 'آخر موقع';
-
-  @override
-  String get trailFirstFix => 'أول موقع';
 
   @override
   String get trailOpenFull => 'عرض المسار كاملًا';
@@ -2197,9 +1514,6 @@ class AppLocalizationsAr extends AppLocalizations {
     );
     return '$_temp0';
   }
-
-  @override
-  String get trailUploadNow => 'رفع الآن';
 
   @override
   String get trailUploadDone => 'تم رفع النقاط المسجّلة';
@@ -2254,7 +1568,7 @@ class AppLocalizationsAr extends AppLocalizations {
       'لا يمكن بدء الزيارة إلا مع تسجيل مسارها. اضغط «بدء الزيارة» مجددًا ووافق على تسجيل المسار للمتابعة.';
 
   @override
-  String get visitTrackingNotificationTitle => 'تتبع الزيارة نشط';
+  String get visitTrackingNotificationTitle => 'تتبّع الزيارة نشط';
 
   @override
   String get visitTrackingNotificationText => 'يجري تسجيل مسار زيارتك';
@@ -2314,21 +1628,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get routeRecordedTrails => 'المسارات المسجّلة اليوم';
 
   @override
-  String routeTrailSummary(int points, String km) {
-    String _temp0 = intl.Intl.pluralLogic(
-      points,
-      locale: localeName,
-      other: '$points نقطة',
-      many: '$points نقطةً',
-      few: '$points نقاط',
-      two: 'نقطتان',
-      one: 'نقطة واحدة',
-      zero: 'لا توجد نقاط',
-    );
-    return '$_temp0 · $km كم';
-  }
-
-  @override
   String routePointsCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2342,10 +1641,6 @@ class AppLocalizationsAr extends AppLocalizations {
     );
     return '$_temp0';
   }
-
-  @override
-  String get routeTrailsPartial =>
-      'تعذّر تحميل مسارات بعض الزيارات. اسحب للأسفل لإعادة المحاولة.';
 
   @override
   String routeTrailsLoadFailed(int count) {
@@ -2374,4 +1669,105 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get routeLineUnmatched =>
       'تعذّرت المطابقة مع الطرق — يُعرض المسار الخام';
+
+  @override
+  String get workdayNotStarted => 'لم يبدأ يوم العمل بعد';
+
+  @override
+  String get workdayStart => 'بدء يوم العمل';
+
+  @override
+  String get workdayEnd => 'إنهاء يوم العمل';
+
+  @override
+  String workdayActiveSince(String time) {
+    return 'يوم العمل نشط منذ $time';
+  }
+
+  @override
+  String workdayPending(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count نقطة بانتظار الرفع',
+      one: 'نقطة واحدة بانتظار الرفع',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get workdayCaptureOff =>
+      'تتبع الموقع متوقف مؤقتًا — اسمح بالوصول إلى الموقع للاستئناف';
+
+  @override
+  String get workdayEndConfirmTitle => 'إنهاء يوم العمل؟';
+
+  @override
+  String get workdayEndConfirmMessage =>
+      'سيتوقف تتبع الموقع وسيُغلق مسار اليوم.';
+
+  @override
+  String get workdayNotificationTitle => 'تتبع يوم العمل نشط';
+
+  @override
+  String get workdayNotificationText => 'تتبع الموقع قيد التشغيل حاليًا';
+
+  @override
+  String get workdayStarted => 'بدأ يوم العمل — يتم تسجيل مسارك';
+
+  @override
+  String get workdayEnded => 'انتهى يوم العمل';
+
+  @override
+  String get workdayEndQueued =>
+      'انتهى يوم العمل — ستتم المزامنة عند عودة الاتصال';
+
+  @override
+  String get workdayUnsupported => 'تتبع يوم العمل غير متاح على هذا الخادم';
+
+  @override
+  String get workdayLocationDenied =>
+      'يلزم الوصول إلى الموقع لتسجيل يوم العمل.';
+
+  @override
+  String get workdayLocationDeniedForever =>
+      'الوصول إلى الموقع محظور لهذا التطبيق. اسمح به من الإعدادات لبدء يوم العمل.';
+
+  @override
+  String get workdayLocationServiceOff => 'شغّل خدمات الموقع لبدء يوم العمل.';
+
+  @override
+  String get workdayOpenSettings => 'فتح الإعدادات';
+
+  @override
+  String get workdayPreciseOff =>
+      'الموقع الدقيق مغلق لهذا التطبيق، فلا يمكن تسجيل مسارك بدقة. فعّل الموقع الدقيق من الإعدادات لبدء يوم العمل.';
+
+  @override
+  String get workdayDisclosureTitle => 'تتبع الموقع أثناء يوم العمل';
+
+  @override
+  String get workdayDisclosureBody =>
+      'أثناء يوم العمل النشط يجمع تطبيق الزيارات الموقع الدقيق لهذا الجهاز — حتى عندما يكون التطبيق مغلقًا أو في الخلفية وأثناء قفل الشاشة — لتسجيل مسار يوم عملك وزياراتك للعملاء لصالح جهة عملك.';
+
+  @override
+  String get workdayDisclosureStops =>
+      'يبدأ التتبع فقط عند الضغط على بدء يوم العمل، ويتوقف عند الضغط على إنهاء يوم العمل أو تسجيل الخروج.';
+
+  @override
+  String get workdayDisclosureStorage =>
+      'تُحفَظ المواقع على هذا الهاتف حتى تصل إلى خادم شركتك. ولرسم المسارات على الطرق قد تُرسَل النقاط المسجّلة إلى خدمة مطابقة الطرق التابعة لشركتك.';
+
+  @override
+  String get workdayDisclosureAndroid => 'يظل إشعار ظاهرًا طوال مدة التتبع.';
+
+  @override
+  String get workdayDisclosureIos =>
+      'سيطلب iOS إذن الوصول إلى الموقع. اختيار \"دائمًا\" يتيح استمرار التسجيل إذا أغلق iOS التطبيق أثناء يوم عملك.';
+
+  @override
+  String get workdayDisclosureAgree => 'موافق ومتابعة';
+
+  @override
+  String get workdayDisclosureDecline => 'ليس الآن';
 }

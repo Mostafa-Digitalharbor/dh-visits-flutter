@@ -1,9 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/di/service_locator.dart';
+import '../../../core/network/connectivity_status.dart';
+import '../../../core/network/refresh_failure.dart';
+import '../../../shared/extensions/bloc_extensions.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../visits/bloc/visits_list_bloc.dart';
+
+/// Reloads the nearest [VisitsListBloc] over the whole team and completes when
+/// the reload does, so a pull-to-refresh spinner lasts exactly as long as the
+/// request.
+///
+/// The dashboard and analytics tabs had identical private copies of this. Both
+/// blocs are built once and kept alive by the shell's stack, so without an
+/// explicit reload stale figures could only be cleared by switching tabs.
+Future<void> reloadTeamVisits(BuildContext context) {
+  final bloc = context.read<VisitsListBloc>()
+    ..add(const VisitsListLoadRequested(scope: VisitListScope.team));
+  return bloc.untilSettled((s) => s.status == VisitsListStatus.loading);
+}
 
 /// Says so when a reload of the nearest [VisitsListBloc] fails while earlier
 /// data is still on screen.
@@ -28,15 +45,10 @@ class VisitsRefreshFailureListener extends StatelessWidget {
           shown &&
           next.status == VisitsListStatus.failure &&
           previous.status != VisitsListStatus.failure &&
-          next.items.isNotEmpty,
-      listener: (context, state) {
-        final s = context.s;
-        context.showSnack(
-          s.commonRefreshFailedStale(
-              state.error?.localize(context) ?? s.errUnknown),
-          kind: SnackKind.error,
-        );
-      },
+          next.items.isNotEmpty &&
+          (next.error?.worthAnnouncing(slMaybe<ConnectivityStatus>()) ?? true),
+      listener: (context, state) =>
+          context.showStaleRefreshSnack(state.error),
       child: child,
     );
   }

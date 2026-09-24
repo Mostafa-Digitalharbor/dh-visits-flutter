@@ -21,28 +21,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonRetry => 'Retry';
 
   @override
-  String get commonLoading => 'Loading…';
-
-  @override
   String get commonSearch => 'Search…';
 
   @override
   String get commonCancel => 'Cancel';
 
   @override
-  String get commonSave => 'Save';
-
-  @override
   String get commonClose => 'Close';
 
   @override
-  String get commonOptional => '(optional)';
-
-  @override
   String get commonLogout => 'Sign out';
-
-  @override
-  String get commonRefresh => 'Refresh';
 
   @override
   String get commonYes => 'Yes';
@@ -156,9 +144,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get unitMinShort => 'min';
-
-  @override
   String get relativeNow => 'Now';
 
   @override
@@ -210,17 +195,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonContinue => 'Continue';
 
   @override
-  String get commonOpenSettings => 'Open settings';
-
-  @override
   String get serverSetupTitle => 'Connect your server';
 
   @override
   String get serverSetupSubtitle =>
       'Enter your organization\'s server address to get started';
-
-  @override
-  String get serverSetupUrlLabel => 'Server URL';
 
   @override
   String get serverSetupUrlHint => 'https://your-company.odoo.com';
@@ -237,17 +216,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Ask your system administrator if you don\'t know your server address.';
 
   @override
-  String get serverSetupDatabaseLabel => 'Database name';
-
-  @override
   String get serverSetupDatabaseHint => 'e.g. company-main';
 
   @override
   String get serverSetupDatabasePrompt =>
       'This server doesn\'t list its databases, so the app can\'t detect yours. Enter your company\'s database name — your administrator can tell you.';
-
-  @override
-  String get serverSetupChecking => 'Connecting…';
 
   @override
   String get serverSetupDetectDb => 'Detect database';
@@ -259,10 +232,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String serverSetupDetected(String db) {
     return 'Database detected: $db';
   }
-
-  @override
-  String get serverSetupDetectFailed =>
-      'Couldn\'t detect the database automatically — enter its name manually.';
 
   @override
   String get serverSetupInsecureUrl =>
@@ -308,9 +277,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn\'t save the server settings on this device. Try again; if it keeps failing, restart the app.';
 
   @override
-  String get loginChangeServer => 'Change server';
-
-  @override
   String get loginTitle => 'Visits';
 
   @override
@@ -320,13 +286,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginWelcomeBack => 'Welcome back';
 
   @override
-  String get loginRoleLabel => 'Sign in as';
-
-  @override
   String get loginUsername => 'Email / Username';
 
   @override
   String get loginPassword => 'Password';
+
+  @override
+  String get authShowPassword => 'Show password';
+
+  @override
+  String get authHidePassword => 'Hide password';
+
+  @override
+  String get authSwitchToDarkTheme => 'Switch to dark theme';
+
+  @override
+  String get authSwitchToLightTheme => 'Switch to light theme';
 
   @override
   String get loginSubmit => 'Sign in';
@@ -489,10 +464,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Can\'t reach the server. Check your internet connection (Wi-Fi or mobile data) and try again.';
 
   @override
-  String get errNetworkUnknown =>
-      'A connection problem occurred. Check your internet connection and try again.';
-
-  @override
   String get errLocationPermission =>
       'The app can\'t access your location. Turn on location services, allow the app to use your location, then try again.';
 
@@ -562,9 +533,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pushEventUpdated => 'Visit updated';
-
-  @override
-  String get unitPercent => '%';
 
   @override
   String unitBytes(String size) {
@@ -647,9 +615,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get customerLastVisit => 'Last visit';
 
   @override
-  String get customerActionCheckIn => 'Start visit';
-
-  @override
   String get customerActionCall => 'Call';
 
   @override
@@ -668,12 +633,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get customerSectionInfo => 'Contact details';
 
   @override
-  String get customerFieldType => 'Type';
-
-  @override
-  String get customerFieldEmail => 'Email';
-
-  @override
   String get customerFieldJob => 'Job position';
 
   @override
@@ -681,9 +640,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get customerFieldTags => 'Tags';
-
-  @override
-  String get customerFieldWebsite => 'Website';
 
   @override
   String get customerFieldVat => 'Tax ID';
@@ -699,333 +655,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'This customer no longer exists, or you no longer have access to it. Go back and refresh the customer list.';
 
   @override
-  String get customerAlreadyCheckedIn => 'You have a visit in progress here';
-
-  @override
-  String get customerActiveVisitBadge => 'Visit in progress';
-
-  @override
-  String customerCheckInBlocked(String customer) {
-    return 'You have a visit in progress at $customer. End it before starting another.';
-  }
-
-  @override
-  String get customerCheckInBlockedShort => 'Visit in progress elsewhere';
-
-  @override
-  String get checkInSuccess => 'Checked-in successfully';
-
-  @override
-  String get visitActiveTitle => 'Visit in progress';
-
-  @override
-  String get visitActiveEmpty =>
-      'No visit in progress.\nPick a customer and start a visit.';
-
-  @override
-  String visitStartedAt(String time) {
-    return 'Started at $time';
-  }
-
-  @override
-  String get visitLiveIndicator => 'Live';
-
-  @override
-  String get mapZoomIn => 'Zoom in';
-
-  @override
-  String get mapZoomOut => 'Zoom out';
-
-  @override
-  String get mapRecenter => 'Centre the map';
-
-  @override
   String get mapOpenDirections => 'Open directions';
-
-  @override
-  String get visitNotesLabel => 'Notes (optional)';
-
-  @override
-  String get visitActionCheckOut => 'Check-out';
-
-  @override
-  String get checkOutSuccess => 'Checked-out successfully';
-
-  @override
-  String get employeesTitle => 'Employees';
-
-  @override
-  String get employeesEmpty => 'No employees set up yet';
 
   @override
   String get employeesSearchHint => 'Search employees…';
 
   @override
-  String get createVisitCustomerLabel => 'Customer';
-
-  @override
-  String get createVisitEmployeeLabel => 'Employee';
-
-  @override
-  String get createVisitDateLabel => 'Visit date';
-
-  @override
-  String get createVisitTypeLabel => 'Visit type (optional)';
-
-  @override
-  String get createVisitNotesLabel => 'Notes (optional)';
-
-  @override
-  String get createVisitStateLabel => 'Initial state';
-
-  @override
-  String get visitStateDraft => 'Draft';
-
-  @override
-  String get visitStateSubmit => 'Submit';
-
-  @override
-  String get visitStateUnderReview => 'Under review';
-
-  @override
-  String get visitStateDone => 'Done';
-
-  @override
-  String get visitStateCancel => 'Cancelled';
-
-  @override
-  String get visitDetailVisitTypeLabel => 'Visit type';
-
-  @override
-  String get visitDetailEditVisitType => 'Change visit type';
-
-  @override
-  String get visitDetailMarkAsDone => 'Mark as reviewed';
-
-  @override
-  String get visitDetailMarkAsDoneSuccess => 'Visit marked as reviewed';
-
-  @override
-  String get visitDetailSendToEmployee => 'Send to employee';
-
-  @override
-  String get visitDetailSentToEmployeeSuccess => 'Visit sent to employee';
-
-  @override
-  String get visitDetailEditState => 'Change state';
-
-  @override
-  String get visitDetailPickState => 'Select a status';
-
-  @override
-  String get createVisitSuccess => 'Visit created';
-
-  @override
-  String get createVisitCustomerRequired => 'Pick a customer';
-
-  @override
-  String get createVisitEmployeeRequired => 'Pick an employee';
-
-  @override
-  String get createVisitDateRequired => 'Pick a visit date';
-
-  @override
   String get createVisitTooltip => 'New visit';
-
-  @override
-  String get createVisitPickType => 'Pick visit type';
-
-  @override
-  String get createVisitPickCustomer => 'Pick customer';
-
-  @override
-  String get createVisitPickEmployee => 'Pick employee';
-
-  @override
-  String get visitsSearchHint => 'Search by customer name…';
-
-  @override
-  String get pickerSearchHint => 'Search…';
 
   @override
   String get pickerNoResults => 'No results';
 
   @override
-  String get groupToday => 'Today';
-
-  @override
-  String get groupYesterday => 'Yesterday';
-
-  @override
-  String get groupEarlierThisWeek => 'Earlier this week';
-
-  @override
-  String get groupEarlier => 'Earlier';
-
-  @override
-  String get groupTomorrow => 'Tomorrow';
-
-  @override
-  String get groupLaterThisWeek => 'Later this week';
-
-  @override
-  String get groupUpcoming => 'Upcoming';
-
-  @override
-  String get statsTotal => 'Total';
-
-  @override
-  String get statsActive => 'In progress';
-
-  @override
-  String get statsCompleted => 'Completed';
-
-  @override
-  String get statsPendingReview => 'Pending review';
-
-  @override
-  String get statsDone => 'Done';
-
-  @override
-  String get visitsHistoryTitle => 'History';
-
-  @override
-  String get visitsHistoryEmpty => 'No visits recorded yet';
-
-  @override
   String get visitsListTitle => 'Visits';
-
-  @override
-  String get visitsFilterToday => 'Today';
-
-  @override
-  String get visitsFilterAll => 'All';
-
-  @override
-  String get filterStatusLabel => 'Status';
-
-  @override
-  String get filterStatusAll => 'All';
-
-  @override
-  String get filterStatusCompleted => 'Completed';
-
-  @override
-  String get filterStatusPendingReview => 'Pending review';
-
-  @override
-  String get filterStatusIncomplete => 'Incomplete';
-
-  @override
-  String get filterTimingLabel => 'Timing';
-
-  @override
-  String get filterTimingAll => 'All';
-
-  @override
-  String get filterTimingOnTime => 'On schedule';
-
-  @override
-  String get filterTimingEarly => 'Early';
-
-  @override
-  String get filterTimingOverdue => 'Overdue';
-
-  @override
-  String get visitsTodayEmpty => 'No visits scheduled for today';
-
-  @override
-  String get visitDetailTitle => 'Visit details';
-
-  @override
-  String get visitDetailNotesSection => 'Notes';
-
-  @override
-  String get visitDetailNoNotes => 'No notes added';
-
-  @override
-  String get visitDetailEditNotes => 'Edit notes';
-
-  @override
-  String get visitDetailMetaSection => 'Visit info';
-
-  @override
-  String get visitDetailTimelineSection => 'Timeline';
-
-  @override
-  String get visitDetailVisitDate => 'Visit date';
-
-  @override
-  String get visitDetailVisitType => 'Visit type';
-
-  @override
-  String get visitDetailSaveChanges => 'Save changes';
-
-  @override
-  String get visitDetailReadOnlyHint =>
-      'Only your manager can edit these fields.';
-
-  @override
-  String get visitDetailNotesEditableHint =>
-      'You can add notes while you are checked-in.';
-
-  @override
-  String get visitDetailSaved => 'Changes saved';
-
-  @override
-  String get visitDetailDelete => 'Delete visit';
-
-  @override
-  String get visitDetailNotStartedYet => 'Not started yet';
-
-  @override
-  String get visitDetailNotEndedYet => 'Not ended yet';
-
-  @override
-  String get visitDetailOpenCheckInLocation => 'Show check-in location';
-
-  @override
-  String get visitDetailOpenCheckOutLocation => 'Show check-out location';
-
-  @override
-  String get visitDetailTimelineLocationsSection => 'Timeline & locations';
-
-  @override
-  String get visitDetailEditCustomer => 'Change customer';
-
-  @override
-  String get visitDetailEditEmployee => 'Change employee';
-
-  @override
-  String get visitDetailCustomer => 'Customer';
-
-  @override
-  String get visitDetailEmployee => 'Employee';
-
-  @override
-  String get visitDetailStatusLabel => 'Status';
-
-  @override
-  String get visitDetailStateBadgeDraft => 'Draft';
-
-  @override
-  String get visitDetailStateBadgeSubmitted => 'Submitted';
-
-  @override
-  String get visitDetailStateBadgeUnderReview => 'Under review';
-
-  @override
-  String get visitDetailStateBadgeDone => 'Done';
-
-  @override
-  String get confirmDeleteVisitTitle => 'Delete visit';
-
-  @override
-  String get confirmDeleteVisitMessage =>
-      'Are you sure you want to delete this visit? This action cannot be undone.';
-
-  @override
-  String get visitDeletedSuccess => 'Visit deleted';
 
   @override
   String get roleManager => 'Manager';
@@ -1055,12 +697,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get visitsHistoryActiveBadge => 'In progress';
 
   @override
-  String get visitsScheduledLabel => 'Scheduled';
-
-  @override
-  String get dashboardGreeting => 'Good morning';
-
-  @override
   String get dashboardTodayProgress => 'Today\'s progress';
 
   @override
@@ -1070,24 +706,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String dashboardFieldHoursValue(String hours) {
     return '$hours h';
   }
-
-  @override
-  String get dashboardDaySchedule => 'Your day\'s schedule';
-
-  @override
-  String get affordanceScheduled => 'Tap to start the visit';
-
-  @override
-  String get affordanceActive => 'Visit in progress';
-
-  @override
-  String get affordanceReview => 'Awaiting manager review';
-
-  @override
-  String get affordanceApproved => 'Approved';
-
-  @override
-  String get affordanceRejected => 'Rejected — redo the visit';
 
   @override
   String get analyticsTabTitle => 'Analytics';
@@ -1112,17 +730,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get analyticsByEmployee => 'By employee';
-
-  @override
-  String analyticsVisitsCount(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count visits',
-      one: '1 visit',
-    );
-    return '$_temp0';
-  }
 
   @override
   String get reviewTitle => 'Review visits';
@@ -1153,10 +760,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reviewRejected => 'Visit rejected';
-
-  @override
-  String get reviewOutOfRangeBanner =>
-      'Out of range · recorded outside the approved location';
 
   @override
   String get routeTabTitle => 'Today\'s route';
@@ -1196,224 +799,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get routeEmpty => 'No stops on today\'s route';
 
   @override
-  String get reportTitle => 'Visit report';
-
-  @override
-  String get reportOutcome => 'Visit outcome';
-
-  @override
-  String get reportOutcomeDone => 'Successful';
-
-  @override
-  String get reportOutcomePostponed => 'Postponed';
-
-  @override
-  String get reportOutcomeAbsent => 'Customer absent';
-
-  @override
-  String get reportNotes => 'Notes';
-
-  @override
-  String get reportNotesHint => 'Write a summary of the visit and key notes...';
-
-  @override
-  String get reportPhoto => 'Proof photo';
-
-  @override
-  String get reportAddPhoto => 'Add photo';
-
-  @override
-  String get reportSignature => 'Customer signature';
-
-  @override
-  String get reportSignHere => 'Sign here';
-
-  @override
-  String get reportClear => 'Clear';
-
-  @override
-  String get reportSubmit => 'Finish and save report';
-
-  @override
-  String get createVisitTitle => 'Create a new visit';
-
-  @override
-  String get createVisitSectionCustomer => 'Customer';
-
-  @override
-  String get createVisitSectionEmployee => 'Field rep';
-
-  @override
-  String get createVisitSectionType => 'Visit type';
-
-  @override
-  String get createVisitSectionDate => 'Visit date';
-
-  @override
-  String get createVisitChange => 'Change';
-
-  @override
   String get createVisitSubmit => 'Create visit';
 
   @override
   String get visitsHistoryCompletedBadge => 'Completed';
 
   @override
-  String get visitsHistoryIncompleteBadge => 'Incomplete';
-
-  @override
-  String get visitsHistoryOverdueBadge => 'Overdue';
-
-  @override
-  String get visitDetailOverdueHint =>
-      'The scheduled day has passed and the visit hasn\'t been completed yet. Reschedule or follow up.';
-
-  @override
-  String get visitExecutedOnTime => 'Completed on schedule';
-
-  @override
-  String visitExecutedEarly(int days) {
-    String _temp0 = intl.Intl.pluralLogic(
-      days,
-      locale: localeName,
-      other: 'Completed $days days earlier than scheduled',
-      one: 'Completed 1 day earlier than scheduled',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String visitExecutedLate(int days) {
-    String _temp0 = intl.Intl.pluralLogic(
-      days,
-      locale: localeName,
-      other: 'Completed $days days later than scheduled',
-      one: 'Completed 1 day later than scheduled',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get visitsHistoryRunning => 'Running';
-
-  @override
-  String get timelineCheckIn => 'Check-in';
-
-  @override
-  String get timelineCheckOut => 'Check-out';
-
-  @override
-  String timelineDuration(String value) {
-    return '$value min';
-  }
-
-  @override
-  String get visitRangeInRange => 'In range';
-
-  @override
-  String get visitRangeOutOfRange => 'Out of range';
-
-  @override
-  String get statusScheduled => 'Scheduled';
-
-  @override
-  String get statusActive => 'In progress';
-
-  @override
-  String get statusReview => 'Pending review';
-
-  @override
-  String get statusApproved => 'Approved';
-
-  @override
-  String get statusRejected => 'Rejected';
-
-  @override
-  String get visitDetailScheduledTimeLabel => 'Visit time';
-
-  @override
   String get visitDetailInRange => 'You\'re within the customer\'s range';
 
   @override
   String get visitDetailOutRange => 'You\'re outside the customer\'s range';
-
-  @override
-  String visitDetailRangeMeta(String distance, String radius) {
-    return '$distance m away · check-in range $radius m';
-  }
-
-  @override
-  String get visitDetailOutRangeHint =>
-      'Move closer to the customer\'s location to start the visit.';
-
-  @override
-  String get visitDetailCheckInTitle => 'Start the visit';
-
-  @override
-  String get visitDetailCheckInInRangeSub => 'You\'re in range';
-
-  @override
-  String get visitDetailCheckInLocatingSub => 'Locating you…';
-
-  @override
-  String get visitDetailCheckInOverride => 'Check in out of range';
-
-  @override
-  String get visitDetailElapsedLabel => 'Elapsed time';
-
-  @override
-  String visitDetailStartedAt(String time) {
-    return 'Started $time';
-  }
-
-  @override
-  String get visitDetailCheckOutTitle => 'End the visit';
-
-  @override
-  String get visitDetailCheckOutSub => 'Your location will be captured';
-
-  @override
-  String get visitDetailOnTime => 'Completed on time';
-
-  @override
-  String get visitDetailDurationLabel => 'Visit duration';
-
-  @override
-  String get timelineCreated => 'Visit created';
-
-  @override
-  String get visitShowLocation => 'Show customer location';
-
-  @override
-  String get visitDetailCustomerLocationSection => 'Customer location';
-
-  @override
-  String get visitDetailNavigate => 'Show customer location on map';
-
-  @override
-  String get visitDetailNoCustomerLocation =>
-      'This customer has no saved location. Ask your manager to add it.';
-
-  @override
-  String visitDetailCheckInStartedAt(String customer) {
-    return 'Visit at $customer started — your location was recorded';
-  }
-
-  @override
-  String get visitLocationDialogTitle => 'Check-in location';
-
-  @override
-  String get visitLocationCustomer => 'Customer office';
-
-  @override
-  String get visitLocationCheckIn => 'Check-in point';
-
-  @override
-  String get visitLocationCheckOut => 'Check-out point';
-
-  @override
-  String get visitLocationNotAvailable =>
-      'This customer has no saved location. Ask your manager to add it.';
 
   @override
   String get offlineNoQueue =>
@@ -1454,10 +849,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get offlineCheckInQueued =>
-      'Saved locally — will sync when you\'re back online';
-
-  @override
   String get dashboardTabTitle => 'Dashboard';
 
   @override
@@ -1496,21 +887,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get visitsTabTitle => 'Visits';
 
   @override
-  String get homeTabCustomers => 'Customers';
-
-  @override
-  String get homeTabActive => 'In progress';
-
-  @override
-  String get homeTabHistory => 'History';
-
-  @override
-  String get settingsTitle => 'Settings';
-
-  @override
-  String get settingsAppearance => 'Appearance';
-
-  @override
   String get settingsAccount => 'Account';
 
   @override
@@ -1523,9 +899,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAbout => 'About';
 
   @override
-  String get settingsVersion => 'Version';
-
-  @override
   String settingsVersionValue(String version) {
     return 'Version $version';
   }
@@ -1534,9 +907,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String profileBuildVersion(String version, String build) {
     return '$version ($build)';
   }
-
-  @override
-  String get settingsEditProfile => 'Edit profile';
 
   @override
   String get settingsNotifications => 'Notifications';
@@ -1566,9 +936,6 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
-
-  @override
-  String get settingsHelp => 'Help & support';
 
   @override
   String get confirmLogoutTitle => 'Sign out';
@@ -1769,9 +1136,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wfPlanForMyself => 'Plan it for myself';
 
   @override
-  String get wfPurposeRequired => 'Purpose is required';
-
-  @override
   String get wfOutcomeRequired => 'Outcome is required to end the visit';
 
   @override
@@ -1898,9 +1262,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wfParticipantRejectedState => 'Rejected';
 
   @override
-  String get wfNoParticipants => 'No additional participants';
-
-  @override
   String get wfUnknownEmployee => 'Unknown employee';
 
   @override
@@ -1925,7 +1286,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wfSearchHint => 'Search by customer, reference or purpose…';
 
   @override
-  String get wfSearchNoMatch => 'No visits match your search';
+  String get wfSearchNoMatch =>
+      'No visits in this list match your search. Try another list above, or pull down to refresh.';
 
   @override
   String get wfFilterNoMatch =>
@@ -1942,13 +1304,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Nothing has changed. Change the date, purpose or location before sending the request.';
 
   @override
-  String get wfListTitle => 'Visits';
-
-  @override
   String get wfDetailTitle => 'Visit';
-
-  @override
-  String get wfStartLocationCaptured => 'Your GPS location will be recorded';
 
   @override
   String get wfConfirmCancelTitle => 'Cancel visit';
@@ -1956,9 +1312,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get wfConfirmCancelMessage =>
       'Are you sure you want to cancel this visit?';
-
-  @override
-  String get wfScheduledLabel => 'Scheduled';
 
   @override
   String get wfStartedLabel => 'Started';
@@ -1999,15 +1352,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String wfRangeRadius(String radius) {
     return 'check-in range $radius';
   }
-
-  @override
-  String get wfHoursShort => 'h';
-
-  @override
-  String get wfMinutesShort => 'm';
-
-  @override
-  String get wfDaysShort => 'd';
 
   @override
   String get wfShortVisitHint => 'Short visit';
@@ -2051,9 +1395,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trailMapTitle => 'GPS trail';
 
   @override
-  String get trailEmpty => 'No points recorded yet';
-
-  @override
   String get trailEmptyRunning =>
       'Recording your route — the path appears as you move';
 
@@ -2079,23 +1420,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trailDistance => 'Distance';
 
   @override
-  String trailDistanceKm(String value) {
-    return '$value km';
-  }
-
-  @override
   String get trailAvgSpeed => 'Average speed';
 
   @override
-  String trailSpeedKmh(String value) {
-    return '$value km/h';
-  }
-
-  @override
   String get trailLastFix => 'Last position';
-
-  @override
-  String get trailFirstFix => 'First position';
 
   @override
   String get trailOpenFull => 'View full route';
@@ -2127,9 +1455,6 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
-
-  @override
-  String get trailUploadNow => 'Upload now';
 
   @override
   String get trailUploadDone => 'Recorded points uploaded';
@@ -2232,17 +1557,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get routeRecordedTrails => 'Routes recorded today';
 
   @override
-  String routeTrailSummary(int points, String km) {
-    String _temp0 = intl.Intl.pluralLogic(
-      points,
-      locale: localeName,
-      other: '$points points',
-      one: '1 point',
-    );
-    return '$_temp0 · $km km';
-  }
-
-  @override
   String routePointsCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2252,10 +1566,6 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
-
-  @override
-  String get routeTrailsPartial =>
-      'Some visit routes couldn\'t be loaded. Pull down to try again.';
 
   @override
   String routeTrailsLoadFailed(int count) {
@@ -2279,4 +1589,110 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get routeLineUnmatched => 'No road match — showing raw GPS';
+
+  @override
+  String get workdayNotStarted => 'Work day not started';
+
+  @override
+  String get workdayStart => 'Start work day';
+
+  @override
+  String get workdayEnd => 'End work day';
+
+  @override
+  String workdayActiveSince(String time) {
+    return 'Work day active since $time';
+  }
+
+  @override
+  String workdayPending(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count points waiting to upload',
+      one: '1 point waiting to upload',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get workdayCaptureOff =>
+      'Location tracking is paused — allow location access to resume';
+
+  @override
+  String get workdayEndConfirmTitle => 'End your work day?';
+
+  @override
+  String get workdayEndConfirmMessage =>
+      'Location tracking stops and today\'s route is closed.';
+
+  @override
+  String get workdayNotificationTitle => 'Workday tracking active';
+
+  @override
+  String get workdayNotificationText =>
+      'Location tracking is currently running';
+
+  @override
+  String get workdayStarted =>
+      'Work day started — your route is being recorded';
+
+  @override
+  String get workdayEnded => 'Work day ended';
+
+  @override
+  String get workdayEndQueued =>
+      'Work day ended — it will sync when you\'re back online';
+
+  @override
+  String get workdayUnsupported =>
+      'Work-day tracking isn\'t available on this server';
+
+  @override
+  String get workdayLocationDenied =>
+      'Location access is required to record your work day.';
+
+  @override
+  String get workdayLocationDeniedForever =>
+      'Location access is blocked for this app. Allow it in Settings to start your work day.';
+
+  @override
+  String get workdayLocationServiceOff =>
+      'Turn on location services to start your work day.';
+
+  @override
+  String get workdayOpenSettings => 'Open settings';
+
+  @override
+  String get workdayPreciseOff =>
+      'Precise location is off for this app, so your route can\'t be recorded accurately. Turn on Precise Location in Settings to start your work day.';
+
+  @override
+  String get workdayDisclosureTitle => 'Work-day location tracking';
+
+  @override
+  String get workdayDisclosureBody =>
+      'While your work day is active, Visits collects this device\'s precise location — also when the app is closed or in the background and while the screen is locked — to record your work-day route and your customer visits for your employer.';
+
+  @override
+  String get workdayDisclosureStops =>
+      'Tracking starts only when you tap Start work day, and stops when you tap End work day or sign out.';
+
+  @override
+  String get workdayDisclosureStorage =>
+      'Locations are kept on this phone until they reach your company\'s server. To draw routes along roads, recorded points may be sent to your company\'s map-matching service.';
+
+  @override
+  String get workdayDisclosureAndroid =>
+      'A notification stays visible for as long as tracking runs.';
+
+  @override
+  String get workdayDisclosureIos =>
+      'iOS will ask for location access. Choosing \"Always\" lets recording continue if iOS closes the app during your work day.';
+
+  @override
+  String get workdayDisclosureAgree => 'Agree and continue';
+
+  @override
+  String get workdayDisclosureDecline => 'Not now';
 }

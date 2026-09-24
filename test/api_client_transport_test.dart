@@ -127,6 +127,32 @@ void main() {
           _code(ApiErrorCode.invalidResponse));
     });
 
+    test('a refused POST means the server is not Odoo, whatever the body',
+        () async {
+      for (final body in [_html, '{"error": "method not allowed"}']) {
+        final c = _client((_) => _Reply(405, body));
+        await expectLater(c.api.jsonRpc(Endpoints.authenticate),
+            _code(ApiErrorCode.invalidResponse));
+      }
+    });
+
+    test('a web page with a status of no specific meaning is not Odoo',
+        () async {
+      for (final status in [400, 410, 415]) {
+        final c = _client((_) => _Reply(status, _html));
+        await expectLater(c.api.jsonRpc('/api/visit/my'),
+            _code(ApiErrorCode.invalidResponse));
+      }
+    });
+
+    test('the same status without a web page stays unexplained', () async {
+      final c = _client(
+        (_) => const _Reply(418, '{}', contentType: Headers.jsonContentType),
+      );
+      await expectLater(
+          c.api.jsonRpc('/api/visit/my'), _code(ApiErrorCode.unknown));
+    });
+
     test('a 200 without a JSON object is not a result', () async {
       final c = _client((_) => const _Reply(200, 'OK', contentType: 'text/plain'));
       await expectLater(

@@ -113,34 +113,46 @@ class GreetingHeader extends StatelessWidget {
             ],
           ),
           context.gapH(Insets.x4),
-          Row(
-            children: [
-              // The label yields; the count must not be truncated — it is the
-              // number the whole header exists to show. With 1200/1200 · 100%
-              // on a 320dp screen the two together do not fit.
-              Flexible(
-                child: Text(context.s.dashboardTodayProgress,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: muted,
-                        fontSize: FontSz.base,
-                        fontWeight: FontWeight.w600)),
-              ),
-              context.gapW(Insets.x2),
-              Text(
-                  context.joinFacts([
-                    context.s.commonFraction(
-                        AppNumber.whole(done), AppNumber.whole(total)),
-                    AppNumber.percent(context.s, (pct * 100).round()),
-                  ]),
-                  maxLines: 1,
-                  style: const TextStyle(
-                      color: _onBrand,
-                      fontSize: FontSz.base,
-                      fontWeight: FontWeight.w800,
-                      fontFeatures: [FontFeature.tabularFigures()])),
-            ],
+          // The label yields; the count must not be truncated — it is the
+          // number the whole header exists to show. With 1200/1200 · 100%
+          // on a 320dp screen the two together do not fit, and at the 1.25×
+          // text cap the count alone is wider than the card, so it overflowed.
+          // It now scales down only when it cannot fit, and is left alone
+          // otherwise. A Row gives an inflexible child unbounded width, so the
+          // LayoutBuilder supplies the bound.
+          LayoutBuilder(
+            builder: (context, box) {
+              final gap = context.r(Insets.x2);
+              return Row(
+                children: [
+                  Flexible(
+                    child: Text(context.s.dashboardTodayProgress,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: muted,
+                            fontSize: FontSz.base,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                  SizedBox(width: gap),
+                  _ScaleDownTo(
+                    maxWidth: box.maxWidth - gap,
+                    child: Text(
+                        context.joinFacts([
+                          context.s.commonFraction(
+                              AppNumber.whole(done), AppNumber.whole(total)),
+                          AppNumber.percent(context.s, (pct * 100).round()),
+                        ]),
+                        maxLines: 1,
+                        style: const TextStyle(
+                            color: _onBrand,
+                            fontSize: FontSz.base,
+                            fontWeight: FontWeight.w800,
+                            fontFeatures: [FontFeature.tabularFigures()])),
+                  ),
+                ],
+              );
+            },
           ),
           context.gapH(Insets.x2),
           ProgressTrack(
@@ -183,31 +195,59 @@ class _Stat extends StatelessWidget {
   Widget build(BuildContext context) {
     const onBrand = GreetingHeader._onBrand;
     final muted = onBrand.withValues(alpha: Alphas.onBrandMuted);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(stat.icon, size: context.r(IconSz.label), color: muted),
-        context.gapW(Insets.x1h),
-        Text(stat.value,
-            maxLines: 1,
-            style: const TextStyle(
-                color: onBrand,
-                fontSize: FontSz.lg,
-                fontWeight: FontWeight.w800,
-                fontFeatures: [FontFeature.tabularFigures()])),
-        context.gapW(Insets.x1),
-        Flexible(
-          child: Text(stat.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                  color: muted,
-                  fontSize: FontSz.sm,
-                  fontWeight: FontWeight.w500)),
-        ),
-      ],
+    final iconSize = context.r(IconSz.label);
+    final gapBefore = context.r(Insets.x1h);
+    final gapAfter = context.r(Insets.x1);
+    // Same rule as the count: the value is never cut. A normal full day
+    // ("12.5 h") on a 320dp screen at 1.25× is wider than this stat's share
+    // of the row and used to overflow. Now the value scales down and the
+    // label gives up its space.
+    return LayoutBuilder(
+      builder: (context, box) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(stat.icon, size: iconSize, color: muted),
+          SizedBox(width: gapBefore),
+          _ScaleDownTo(
+            maxWidth: box.maxWidth - iconSize - gapBefore - gapAfter,
+            child: Text(stat.value,
+                maxLines: 1,
+                style: const TextStyle(
+                    color: onBrand,
+                    fontSize: FontSz.lg,
+                    fontWeight: FontWeight.w800,
+                    fontFeatures: [FontFeature.tabularFigures()])),
+          ),
+          SizedBox(width: gapAfter),
+          Flexible(
+            child: Text(stat.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: muted,
+                    fontSize: FontSz.sm,
+                    fontWeight: FontWeight.w500)),
+          ),
+        ],
+      ),
     );
   }
+}
+
+/// Shows [child] at its natural size, or scaled down to [maxWidth] when it is
+/// wider. It is never clipped, ellipsized or allowed to overflow.
+class _ScaleDownTo extends StatelessWidget {
+  final double maxWidth;
+  final Widget child;
+  const _ScaleDownTo({required this.maxWidth, required this.child});
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: maxWidth.clamp(0.0, double.infinity),
+        ),
+        child: FittedBox(fit: BoxFit.scaleDown, child: child),
+      );
 }
 
 class _RoleChip extends StatelessWidget {

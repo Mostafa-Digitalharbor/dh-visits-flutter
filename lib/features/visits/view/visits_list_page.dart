@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +7,10 @@ import 'package:go_router/go_router.dart';
 import '../../../app/design/app_dimens.dart';
 import '../../../app/design/responsive.dart';
 import '../../../app/routes.dart';
+import '../../../core/api/api_error_messages.dart';
+import '../../../core/di/service_locator.dart';
+import '../../../core/network/connectivity_status.dart';
+import '../../../core/network/refresh_failure.dart';
 import '../../../shared/extensions/bloc_extensions.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/app_refresh_indicator.dart';
@@ -16,6 +22,7 @@ import '../../../shared/widgets/visit_card.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/data/models/user.dart';
 import '../bloc/visits_list_bloc.dart';
+import '../data/models/visit.dart';
 
 /// Primary visits screen. Field users see only their own visits (REST `/my`);
 /// managers get Pending / Team (and Escalated for project managers) tabs read
@@ -31,6 +38,9 @@ class _VisitsListPageState extends State<VisitsListPage> {
   /// Room under the last card for the floating create button and the running
   /// visit bar, so neither covers it.
   static const double _bottomClearance = 90;
+
+  /// Placeholder rows shown while the first page loads.
+  static const int _skeletonRows = 6;
 
   @override
   void initState() {
@@ -90,11 +100,18 @@ class _VisitsListPageState extends State<VisitsListPage> {
     return bloc.untilSettled((s) => s.status == VisitsListStatus.loading);
   }
 
+  /// Opening a visit must not leave the search field focused: returning to the
+  /// list would otherwise raise the keyboard over it again.
+  void _open(BuildContext context, Visit visit) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    context.push(AppRoutes.visitDetail(visit.id), extra: visit);
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.read<AuthBloc>().state.user;
     final scopes = _scopesFor(user);
-    final gutter = context.r(Insets.x3);
+    final bloc = context.read<VisitsListBloc>();
 
     return BlocListener<VisitsListBloc, VisitsListState>(
       // A refresh that fails over rows already on screen keeps them — but the
@@ -105,72 +122,71 @@ class _VisitsListPageState extends State<VisitsListPage> {
           c.items.isNotEmpty,
       listener: (context, state) {
         final error = state.error;
-        if (error != null) {
-          context.showSnack(error.localize(context), kind: SnackKind.error);
+        if (error == null ||
+            !error.worthAnnouncing(slMaybe<ConnectivityStatus>())) {
+          return;
         }
+        context.showSnack(error.localize(context), kind: SnackKind.error);
       },
-      child: Column(
-        children: [
-          // Outside the builder below: the chips only depend on `scope`, and
-          // the search box owns a `TextField` whose controller must not be
-          // rebuilt on every list emit.
-          if (scopes.length > 1)
-            BlocSelector<VisitsListBloc, VisitsListState, VisitListScope>(
-              selector: (s) => s.scope,
-              builder: (context, scope) => SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsetsDirectional.fromSTEB(
-                  gutter,
-                  context.r(Insets.x2),
-                  gutter,
-                  0,
-                ),
-                child: Row(
-                  children: [
-                    for (final s in scopes)
-                      Padding(
-                        padding: EdgeInsetsDirectional.only(
-                          end: context.r(Insets.x2),
-                        ),
-                        child: ChoiceChip(
-                          label: Text(_scopeLabel(context, s)),
-                          selected: scope == s,
-                          onSelected: (_) => context.read<VisitsListBloc>().add(
-                            VisitsListScopeChanged(s),
-                          ),
-                        ),
+      // One scroll view for the filters, the search box and the rows. They
+      // used to sit in a fixed column above the list, which took 40% of a
+      // landscape screen and overflowed it once the keyboard opened (measured:
+      // 59 px on a 2400×1080 emulator). Now they scroll away with the rows.
+      child: LayoutBuilder(
+        builder: (context, box) {
+          // Centred in a readable column on tablets and in landscape.
+          final gutter = math.max(
+            context.r(Insets.x3),
+            (box.maxWidth - CompSz.readableMaxWidth) / 2,
+          );
+          return AppRefreshIndicator(
+            onRefresh: () => _refresh(bloc),
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
+              slivers: [
+                if (scopes.length > 1)
+                  SliverToBoxAdapter(
+                    child: _ScopeChips(
+                      scopes: scopes,
+                      gutter: gutter,
+                      labelOf: (scope) => _scopeLabel(context, scope),
+                    ),
+                  ),
+                // Debounced like the customers screen. A raw `onChanged` fired
+                // a bloc event per keystroke, and each emit re-filtered every
+                // row and rebuilt the whole list.
+                SliverToBoxAdapter(
+                  child: Padding(
+                    // The gutter is already device-scaled; the field scales
+                    // the design-space padding it is given itself.
+                    padding: EdgeInsets.symmetric(horizontal: gutter),
+                    child: DebouncedSearchField(
+                      padding: const EdgeInsetsDirectional.only(
+                        top: Insets.x2,
+                        bottom: Insets.x1,
                       ),
-                  ],
+                      hintText: context.s.wfSearchHint,
+                      onChanged: (q) => bloc.add(VisitsListSearchChanged(q)),
+                    ),
+                  ),
                 ),
-              ),
+                SliverToBoxAdapter(child: _FocusChip(gutter: gutter)),
+                BlocBuilder<VisitsListBloc, VisitsListState>(
+                  builder: (context, state) =>
+                      _content(context, state, gutter),
+                ),
+              ],
             ),
-          // Debounced like the customers screen. A raw `onChanged` fired a
-          // bloc event per keystroke, and each emit re-filtered every row and
-          // rebuilt the whole list — the worst typing latency in the app on a
-          // slow phone.
-          DebouncedSearchField(
-            padding: EdgeInsetsDirectional.fromSTEB(
-              gutter,
-              context.r(Insets.x2),
-              gutter,
-              context.r(Insets.x1),
-            ),
-            hintText: context.s.wfSearchHint,
-            onChanged: (q) =>
-                context.read<VisitsListBloc>().add(VisitsListSearchChanged(q)),
-          ),
-          const _FocusChip(),
-          Expanded(
-            child: BlocBuilder<VisitsListBloc, VisitsListState>(
-              builder: (context, state) => _content(context, state),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 
-  Widget _content(BuildContext context, VisitsListState state) {
+  /// The rows, or the state standing in for them, as a sliver.
+  Widget _content(BuildContext context, VisitsListState state, double gutter) {
     final bloc = context.read<VisitsListBloc>();
     final visits = state.visible;
 
@@ -179,12 +195,24 @@ class _VisitsListPageState extends State<VisitsListPage> {
     // with a full-screen error — throwing away rows the user was reading. Now
     // only a first load (nothing to show yet) takes the screen over.
     if (state.status == VisitsListStatus.loading && state.items.isEmpty) {
-      return const SkeletonList(itemCount: 6);
+      return const SliverToBoxAdapter(
+        child: SizedBox(
+          height: SkeletonList.rowHeight * _skeletonRows,
+          child: SkeletonList(itemCount: _skeletonRows),
+        ),
+      );
     }
     if (state.status == VisitsListStatus.failure && state.items.isEmpty) {
-      return ErrorView(
-        message: state.error?.localize(context) ?? context.s.errUnknown,
-        onRetry: () => bloc.add(const VisitsListLoadRequested()),
+      // `hasScrollBody: true`: with `false` the sliver measures its child's
+      // intrinsic height, which the error and empty views (built on a
+      // LayoutBuilder) cannot report — the state threw instead of rendering.
+      return SliverFillRemaining(
+        hasScrollBody: true,
+        child: ErrorView(
+          message: state.error?.localize(context) ?? context.s.errUnknown,
+          reference: state.error?.supportReference,
+          onRetry: () => bloc.add(const VisitsListLoadRequested()),
+        ),
       );
     }
     if (visits.isEmpty) {
@@ -195,35 +223,22 @@ class _VisitsListPageState extends State<VisitsListPage> {
           : state.isFiltered
           ? context.s.wfFilterNoMatch
           : _emptyLabel(context, state.scope);
-      // Scrollable so the empty state can still be pulled to refresh — it is
-      // the screen where a user most wants to check again.
-      return AppRefreshIndicator(
-        onRefresh: () => _refresh(bloc),
-        child: LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: EmptyView(
-                icon: Icons.event_note_outlined,
-                message: message,
-              ),
-            ),
-          ),
-        ),
+      // Inside the refreshable scroll view, so the empty state can still be
+      // pulled to refresh — the screen where a user most wants to check again.
+      return SliverFillRemaining(
+        hasScrollBody: true,
+        child: EmptyView(icon: Icons.event_note_outlined, message: message),
       );
     }
     final showEmployee = state.scope != VisitListScope.mine;
-    final gutter = context.r(Insets.x3);
-    return AppRefreshIndicator(
-      onRefresh: () => _refresh(bloc),
-      child: ListView.builder(
-        padding: EdgeInsetsDirectional.fromSTEB(
-          gutter,
-          context.r(Insets.x1),
-          gutter,
-          context.fixedH(_bottomClearance),
-        ),
+    return SliverPadding(
+      padding: EdgeInsetsDirectional.fromSTEB(
+        gutter,
+        context.r(Insets.x1),
+        gutter,
+        context.fixedH(_bottomClearance),
+      ),
+      sliver: SliverList.builder(
         itemCount: visits.length,
         itemBuilder: (ctx, i) {
           final v = visits[i];
@@ -231,9 +246,56 @@ class _VisitsListPageState extends State<VisitsListPage> {
             key: ValueKey(v.id),
             visit: v,
             showEmployee: showEmployee,
-            onTap: () => ctx.push(AppRoutes.visitDetail(v.id), extra: v),
+            onTap: () => _open(ctx, v),
           );
         },
+      ),
+    );
+  }
+}
+
+/// The scope filter (pending / team / mine / escalated), scrollable sideways
+/// when the labels outgrow the screen.
+///
+/// Rebuilds only when the scope changes — not on every list emit.
+class _ScopeChips extends StatelessWidget {
+  final List<VisitListScope> scopes;
+  final double gutter;
+  final String Function(VisitListScope scope) labelOf;
+
+  const _ScopeChips({
+    required this.scopes,
+    required this.gutter,
+    required this.labelOf,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocSelector<VisitsListBloc, VisitsListState, VisitListScope>(
+      selector: (s) => s.scope,
+      builder: (context, scope) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsetsDirectional.fromSTEB(
+          gutter,
+          context.r(Insets.x2),
+          gutter,
+          0,
+        ),
+        child: Row(
+          children: [
+            for (final s in scopes)
+              Padding(
+                padding: EdgeInsetsDirectional.only(end: context.r(Insets.x2)),
+                child: ChoiceChip(
+                  label: Text(labelOf(s)),
+                  selected: scope == s,
+                  onSelected: (_) => context
+                      .read<VisitsListBloc>()
+                      .add(VisitsListScopeChanged(s)),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -243,7 +305,8 @@ class _VisitsListPageState extends State<VisitsListPage> {
 /// remove. Without it the list silently showed a subset, and a rep could not
 /// tell why visits they knew about were missing.
 class _FocusChip extends StatelessWidget {
-  const _FocusChip();
+  final double gutter;
+  const _FocusChip({required this.gutter});
 
   static String? _label(BuildContext context, VisitsListFocus focus) =>
       switch (focus) {
@@ -260,7 +323,6 @@ class _FocusChip extends StatelessWidget {
       builder: (context, focus) {
         final label = _label(context, focus);
         if (label == null) return const SizedBox.shrink();
-        final gutter = context.r(Insets.x3);
         return Padding(
           padding: EdgeInsetsDirectional.fromSTEB(
             gutter,

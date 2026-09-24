@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../app/design/app_dimens.dart';
@@ -36,51 +38,50 @@ class VisitDetailRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = context.colors;
     final tint = iconColor ?? cs.primary;
+    // A caller's own trailing widget wins; a tappable row without one gets a
+    // chevron so the tap target is visible rather than guessed at.
+    final Widget? after = trailing ??
+        (onTap == null
+            ? null
+            : Icon(
+                // Mirrors itself in RTL (`matchTextDirection`). Picking
+                // chevron_left for Arabic flipped it twice, so it pointed back.
+                Icons.chevron_right,
+                size: context.r(IconSz.sm),
+                color: cs.onSurfaceVariant,
+              ));
     final row = Padding(
       padding: EdgeInsets.symmetric(vertical: context.r(Insets.x2h)),
-      child: Row(
-        children: [
-          IconBadge(
-            icon: icon,
-            color: tint,
-            size: context.r(CompSz.badge),
-            iconSize: context.r(IconSz.label),
-          ),
-          context.gapW(Insets.x3),
-          // The value wraps rather than truncates: purpose, outcome and
-          // addresses are the content the manager opened the screen to read.
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.labelSmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-                context.gapH(Insets.hair),
-                Text(
-                  value,
-                  style: context.text.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: valueColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (trailing != null) ...[context.gapW(Insets.x2), trailing!],
-          if (onTap != null && trailing == null) ...[
-            context.gapW(Insets.x1),
-            Icon(
-              context.isRtl ? Icons.chevron_left : Icons.chevron_right,
-              size: context.r(IconSz.sm),
+      child: MediaRow(
+        leading: IconBadge(
+          icon: icon,
+          color: tint,
+          size: context.r(CompSz.badge),
+          iconSize: context.r(IconSz.label),
+        ),
+        trailing: after,
+        trailingGap: trailing != null ? Insets.x2 : Insets.x1,
+        // The value wraps rather than truncates: purpose, outcome and
+        // addresses are the content the manager opened the screen to read.
+        lines: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.text.labelSmall?.copyWith(
               color: cs.onSurfaceVariant,
             ),
-          ],
+          ),
+          context.gapH(Insets.hair),
+          // In its own direction: an English purpose on an Arabic screen, or
+          // an Arabic address on an English one.
+          AutoDirectionText(
+            value,
+            style: context.text.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: valueColor,
+            ),
+          ),
         ],
       ),
     );
@@ -111,7 +112,9 @@ class VisitMapsPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hit = context.r(IconSz.hit);
+    // Never under the 48dp minimum: `r()` shrinks with the screen, and on a
+    // 320dp phone the target came out at 41dp.
+    final hit = math.max(kMinInteractiveDimension, context.r(IconSz.hit));
     return Tooltip(
       message: context.s.wfOpenInMaps,
       child: InkWell(

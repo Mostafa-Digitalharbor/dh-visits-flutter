@@ -9,7 +9,7 @@ import '../../core/constants.dart';
 /// the same tiles, so the URL / user-agent / max-native-zoom live in one place
 /// ([AppConstants]) and are wrapped here. Use this instead of building a raw
 /// [TileLayer] so the call-sites can never drift apart.
-class AppMapTileLayer extends StatelessWidget {
+class AppMapTileLayer extends StatefulWidget {
   /// Upper bound the map will display. Defaults to [TileLayer]'s own
   /// (effectively unbounded) behavior; pass e.g. `22` for interactive maps
   /// that allow over-zooming past the native tile resolution.
@@ -34,15 +34,31 @@ class AppMapTileLayer extends StatelessWidget {
   });
 
   @override
+  State<AppMapTileLayer> createState() => _AppMapTileLayerState();
+}
+
+class _AppMapTileLayerState extends State<AppMapTileLayer> {
+  /// One provider for the layer's lifetime. [TileLayer] otherwise builds a new
+  /// one (with its own HTTP client) on every rebuild, and disposes only the
+  /// last. It also disposes this one, so this state must not.
+  ///
+  /// Silenced: a tile that fails to download (offline, a dead zone) is drawn
+  /// transparent instead of being reported as a Flutter error — dozens of them
+  /// per screen, on every pan, which buried real errors in the device log.
+  late final TileProvider _tiles =
+      NetworkTileProvider(silenceExceptions: true);
+
+  @override
   Widget build(BuildContext context) {
     return TileLayer(
+      tileProvider: _tiles,
       urlTemplate: AppConstants.mapTileUrl,
       userAgentPackageName: AppConstants.mapUserAgent,
       maxNativeZoom: AppConstants.mapMaxNativeZoom,
-      maxZoom: maxZoom ?? double.infinity,
-      panBuffer: panBuffer,
-      keepBuffer: keepBuffer,
-      tileBuilder: tileBuilder,
+      maxZoom: widget.maxZoom ?? double.infinity,
+      panBuffer: widget.panBuffer,
+      keepBuffer: widget.keepBuffer,
+      tileBuilder: widget.tileBuilder,
     );
   }
 }

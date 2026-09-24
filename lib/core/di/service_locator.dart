@@ -30,6 +30,8 @@ import '../../features/visits/data/visit_trail_tracker.dart';
 import '../../features/visits/domain/visit_action.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../features/visits/data/visits_repository.dart';
+import '../../features/workday/data/workday_repository.dart';
+import '../../features/workday/data/workday_tracker.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -95,7 +97,7 @@ Future<void> setupServiceLocator() async {
   sl.registerSingleton<CustomersRepository>(CustomersRepository(api: sl()));
   sl.registerSingleton<EmployeesRepository>(EmployeesRepository(api: sl()));
   sl.registerSingleton<VisitsRepository>(
-      VisitsRepository(api: sl(), session: sl()));
+      VisitsRepository(api: sl(), session: sl(), serverClock: sl()));
 
   // Push notifications: token registration goes through the same authenticated
   // ApiClient; the service owns the FCM lifecycle. See app.dart for the
@@ -148,6 +150,22 @@ Future<void> setupServiceLocator() async {
     },
   );
   sl.registerSingleton<VisitTrailTracker>(tracker);
+  // The whole work day, and the visit tracker's location feed: while a work
+  // day is open the work-day capture is the single GPS source for both the day
+  // route and the running visit's trail (see TrailFeed).
+  sl.registerSingleton<WorkdayRepository>(WorkdayRepository(api: sl()));
+  final workday = WorkdayTracker(
+    prefs: prefs,
+    repository: sl<WorkdayRepository>(),
+    sessionStorage: sl<SessionStorage>(),
+    locationService: sl<LocationService>(),
+    connectivity: connectivity,
+    serverClock: serverClock,
+    deviceId: () => sl<PushNotificationService>().deviceId(),
+    visitTracker: () => sl<VisitTrailTracker>(),
+  );
+  sl.registerSingleton<WorkdayTracker>(workday);
+  tracker.feed = workday;
   // A Start held offline reached the server: recording may begin now.
   queue.onSynced.listen((synced) {
     if (synced.action == VisitAction.start) {

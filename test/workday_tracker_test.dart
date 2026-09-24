@@ -294,6 +294,8 @@ _Rig _rig(SharedPreferences prefs, _Server server, _Channel channel) {
     repository: visitApi,
     locationService: location,
     connectivity: connectivity,
+    notificationLabels: () =>
+        (title: 'Visit tracking active', text: 'Recording'),
   );
   final day = WorkdayTracker(
     prefs: prefs,

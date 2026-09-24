@@ -1,9 +1,12 @@
 # Visit-only location tracking
 
-How the app collects location since 2026-09-16: **only for customer visits**.
-The former work-day route, live location sharing, the manager "nearby
-employees" radar and the hr.attendance mirror of Start/End are gone (see
-[WORKDAY_TRACKING.md](WORKDAY_TRACKING.md) — obsolete). Server contract:
+How the app collects location **for a customer visit**. Since 2026-09-21 the
+whole work-day route is recorded again alongside it
+([WORKDAY_TRACKING.md](WORKDAY_TRACKING.md)): while a work day is open, that
+capture is the single GPS source and hands this tracker the fixes taken during
+the visit, so the visit trail below is recorded exactly the same either way.
+Live location sharing, the manager "nearby employees" radar and the
+hr.attendance mirror of Start/End remain gone. Server contract:
 [API.md](API.md) §4.6–4.7. User-facing wording:
 [PRIVACY_POLICY.md](PRIVACY_POLICY.md) and
 [store/play/location-and-foreground-service-declarations.md](../store/play/location-and-foreground-service-declarations.md).
@@ -84,6 +87,20 @@ The same rules run on Android and iOS:
 While moving that is roughly one fix every 5 s; standing still records
 nothing. The last kept fix is persisted, so a restarted capture does not
 record the cached position again.
+
+**Start/End fix** (`LocationService.getCurrent`). It listens for up to 10 s,
+asking for a fix every second on Android. It takes the first fix that is
+≤ 50 m and live, meaning either of these holds:
+- the fix is at most 2 s from the device clock;
+- when that clock is wrong, it is the second of two fixes in a row that move
+  forward in time at the same offset.
+
+This skips remembered positions that Android's fused provider can return
+first. On the emulator, one such position was minutes old and about 600 m
+away, and it had been recorded as a visit's start. Another, a few seconds old,
+put a visit's End behind its last trail point. If time runs out, the
+best fix seen is used, and a live fix wins over a precise one. With no fix at
+all, the action tells the user that location is unavailable.
 
 ## 4. Buffer and upload (Dart, `VisitTrailTracker`)
 
@@ -219,15 +236,41 @@ or on a Flutter engine.
 - Matched lines are cached on the device for up to 30 days and deleted on
   logout. Release builds refuse public demo OSRM servers.
 
-## 10. Upgrade from a work-day build
+## 10. Relationship to the work-day capture
 
-On start-up `VisitTrailTracker` deletes every key in
-`StorageKeys.legacyLocationKeys` (the `workday_*` preferences, including queued
-work-day points, and the retired active-visit key). None of that data is read
-or uploaded. The app never calls `/api/workday/*` and never writes
-`x_dh_work_*` / `dh.work.*` models.
+While a work day is open (`WorkdayTracker`, [WORKDAY_TRACKING.md](WORKDAY_TRACKING.md))
+it is wired into this tracker as its `TrailFeed`: **one** GPS subscription and
+one ongoing notification serve both. This tracker then starts neither its
+native capture nor its foreground fallback, and receives the running visit's
+fixes through `ingest()`, which buffers and flushes them exactly as its own.
+Outside a work day nothing changes — a visit in progress is captured by
+`VisitLocationService` on its own, as described above.
 
-## 11. Manual verification (per release)
+Each fix taken during a visit is therefore stored twice on the server, once per
+route it belongs to: on the visit trail (`dh.visit.location.log`, via
+`/api/visit/log_locations`) and on the work day (`dh.work.location`, via
+`/api/workday/log_locations`, carrying that visit's id in `visit_id`).
+
+On start-up `VisitTrailTracker` still deletes `StorageKeys.legacyLocationKeys`
+— now only the retired active-visit marker. The `workday_*` preferences are
+live state again and are never purged.
+
+## 11. Known backend limitation: queued End time
+
+`/api/visit/end` takes no timestamp, so the server stamps `end_datetime` when
+the request *arrives*. An End queued offline therefore records the time the
+connection came back, not the moment the rep tapped End. Measured on the
+Android emulator (2026-09-17): the tap was at 07:43:05 server time, the queued
+End replayed at 07:43:58, and `end_datetime` reads 07:43:58. The trail itself
+is unaffected: every point keeps its own `logged_at`, and the offline points
+landed before the End point.
+
+The start has the same limitation for a Start queued offline. The fix is on
+the backend: accept an optional `ended_at` / `started_at` (UTC, validated
+against the server clock like `logged_at`), which the app would send from the
+queued payload.
+
+## 12. Manual verification (per release)
 
 - [ ] Android device: Start an approved visit → disclosure → permission →
       notification appears only after the server confirms → Home + lock +

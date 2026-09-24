@@ -12,9 +12,32 @@ class VisitHeroHeader extends StatelessWidget {
   final Visit visit;
   const VisitHeroHeader({super.key, required this.visit});
 
-  /// How far the state tone is lifted toward white so muted tones stay legible
-  /// on navy.
-  static const double _badgeLift = 0.25;
+  /// The first and the largest step a state tone is lifted toward white on the
+  /// navy gradient, and the contrast that stops the lift (WCAG AA for text).
+  static const double _minLift = 0.25;
+  static const double _maxLift = 0.9;
+  static const double _liftStep = 0.05;
+  static const double _minContrast = 4.5;
+
+  /// [base] lifted toward white just far enough to read on [background].
+  ///
+  /// A fixed lift was not enough for every state: "Done" is the success
+  /// container's dark green, and at 25% it still sank into the navy (seen on
+  /// the emulator, 2026-09-17).
+  static Color legibleOn(Color base, Color background) {
+    for (var t = _minLift; t < _maxLift; t += _liftStep) {
+      final lifted = Color.lerp(base, AppColors.onMap, t)!;
+      if (_contrast(lifted, background) >= _minContrast) return lifted;
+    }
+    return Color.lerp(base, AppColors.onMap, _maxLift)!;
+  }
+
+  static double _contrast(Color a, Color b) {
+    final la = a.computeLuminance();
+    final lb = b.computeLuminance();
+    final (hi, lo) = la > lb ? (la, lb) : (lb, la);
+    return (hi + 0.05) / (lo + 0.05);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,54 +64,50 @@ class VisitHeroHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              IconBadge(
-                icon: visit.isOpportunity
-                    ? Icons.emoji_events_outlined
-                    : Icons.storefront_outlined,
-                color: onDark,
-                iconColor: AppColors.cyan400,
-                size: context.r(CompSz.avatar),
-                iconSize: context.r(IconSz.md),
-                radius: Radii.sm,
-                tintAlpha: Alphas.tintStrong,
-              ),
-              context.gapW(Insets.x3),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.text.titleLarge?.copyWith(
-                        color: onDark,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    if (reference != null) ...[
-                      context.gapH(Insets.x1),
-                      Text(
-                        reference,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.text.bodySmall?.copyWith(
-                          color: onDark.withValues(alpha: Alphas.subdued),
-                        ),
-                      ),
-                    ],
-                  ],
+          MediaRow(
+            // Start-aligned: the title may run to two lines and the badge
+            // stays level with the first of them.
+            alignment: CrossAxisAlignment.start,
+            leading: IconBadge(
+              icon: visit.isOpportunity
+                  ? Icons.emoji_events_outlined
+                  : Icons.storefront_outlined,
+              color: onDark,
+              iconColor: AppColors.cyan400,
+              size: context.r(CompSz.avatar),
+              iconSize: context.r(IconSz.md),
+              radius: Radii.sm,
+              tintAlpha: Alphas.tintStrong,
+            ),
+            lines: [
+              AutoDirectionText(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: context.text.titleLarge?.copyWith(
+                  color: onDark,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
+              if (reference != null) ...[
+                context.gapH(Insets.x1),
+                Text(
+                  reference,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.bodySmall?.copyWith(
+                    color: onDark.withValues(alpha: Alphas.subdued),
+                  ),
+                ),
+              ],
             ],
           ),
           context.gapH(Insets.x3h),
           Row(
             children: [
               Expanded(
+                // Composed by joinFacts, which isolates the foreign part, so
+                // the line follows the screen's direction.
                 child: Text(
                   typeText,
                   maxLines: 2,
@@ -117,11 +136,12 @@ class _HeroStateBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     // Lift muted state tones so they stay legible on navy, and carry an
     // outline the flat list badge doesn't need — a faint tint alone would sink
-    // into the gradient behind it.
+    // into the gradient behind it. Measured against the gradient's lighter
+    // end, where contrast is lowest.
     final base = visitStateColor(context, state);
     return TonePill(
       label: visitStateLabel(context, state),
-      color: Color.lerp(base, AppColors.onMap, VisitHeroHeader._badgeLift)!,
+      color: VisitHeroHeader.legibleOn(base, AppColors.navy700),
       tintAlpha: Alphas.halo,
       borderAlpha: Alphas.disabled,
       padding: context.padSym(h: Insets.x3, v: Insets.x1h),

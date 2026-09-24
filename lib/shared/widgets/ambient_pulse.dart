@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
+import '../../app/design/app_dimens.dart';
+
 /// A decorative pulse that **rests between beats** instead of animating
 /// forever.
 ///
@@ -52,8 +54,8 @@ class AmbientPulse extends StatefulWidget {
   const AmbientPulse({
     super.key,
     required this.builder,
-    this.period = const Duration(milliseconds: 1100),
-    this.rest = const Duration(milliseconds: 1900),
+    this.period = AppDurations.pulseBeat,
+    this.rest = AppDurations.pulseRest,
     this.curve = Curves.easeOut,
   });
 

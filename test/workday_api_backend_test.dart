@@ -45,7 +45,11 @@ class _Module implements ApiClient {
   int get callKwCalls => calls.where((c) => c == Endpoints.callKw).length;
 
   @override
-  Future<dynamic> jsonRpc(String path, {Map<String, dynamic>? params}) async {
+  Future<dynamic> jsonRpc(
+    String path, {
+    Map<String, dynamic>? params,
+    bool reportUnauthorized = true,
+  }) async {
     calls.add(path);
     paramsSeen.add(params ?? const {});
     if (offline) throw ApiException.network();
@@ -362,6 +366,8 @@ void main() {
         repository: visitApi,
         locationService: _Location(),
         connectivity: connectivity,
+        notificationLabels: () =>
+            (title: 'Visit tracking active', text: 'Recording'),
       );
       day = WorkdayTracker(
         prefs: prefs,

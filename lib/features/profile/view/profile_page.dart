@@ -68,6 +68,9 @@ class _ProfileViewState extends State<ProfileView> {
       title: context.s.confirmLogoutTitle,
       message: context.s.confirmLogoutMessage,
       icon: Symbols.logout,
+      // The buttons name the outcome, not "yes" / "no".
+      confirmLabel: context.s.commonLogout,
+      cancelLabel: context.s.commonCancel,
     );
     if (confirmed && context.mounted) {
       context.read<AuthBloc>().add(const AuthLogoutRequested());

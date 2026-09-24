@@ -22,6 +22,7 @@ import '../data/visit_trail_tracker.dart';
 import '../domain/visit_action.dart';
 import 'visit_labels.dart';
 import 'visit_tracking_disclosure_dialog.dart';
+import '../../../shared/widgets/auto_direction_text.dart';
 
 /// Slim banner that lives just above the bottom navigation while a visit is
 /// active. Shows the running timer and the customer name; tapping it
@@ -117,7 +118,7 @@ class _BarContent extends StatelessWidget {
                         ),
                       ),
                       if (visit.customerName != null)
-                        Text(
+                        AutoDirectionText(
                           visit.customerName!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -130,7 +131,10 @@ class _BarContent extends StatelessWidget {
                   ),
                 ),
                 Icon(
-                  context.isRtl ? Icons.chevron_left : Icons.chevron_right,
+                  // Mirrors itself in RTL (`matchTextDirection`). Picking
+                  // chevron_left for Arabic flipped it twice, so it pointed
+                  // back.
+                  Icons.chevron_right,
                   color: colors.onSurfaceVariant,
                 ),
               ],

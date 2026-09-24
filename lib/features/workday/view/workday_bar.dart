@@ -162,7 +162,7 @@ class _WorkdayBarBody extends StatelessWidget {
               );
               if (ok) await cubit.end();
             },
-            icon: const Icon(Symbols.stop_circle, size: 18),
+            icon: Icon(Symbols.stop_circle, size: context.r(IconSz.label)),
             label: Text(s.workdayEnd),
             style: OutlinedButton.styleFrom(
               visualDensity: VisualDensity.compact,
@@ -182,7 +182,7 @@ class _WorkdayBarBody extends StatelessWidget {
                 notificationText: s.workdayNotificationText,
               );
             },
-            icon: const Icon(Symbols.play_arrow, size: 18),
+            icon: Icon(Symbols.play_arrow, size: context.r(IconSz.label)),
             label: Text(s.workdayStart),
             style: FilledButton.styleFrom(
               visualDensity: VisualDensity.compact,
@@ -194,14 +194,16 @@ class _WorkdayBarBody extends StatelessWidget {
         return Material(
           color: cs.surface,
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+            padding: context.padSym(v: Insets.x1h, h: Insets.x3),
             decoration: BoxDecoration(
               border: Border(bottom: BorderSide(color: cs.outlineVariant)),
             ),
             child: Row(
               children: [
                 Icon(active ? Symbols.share_location : Symbols.work_history,
-                    color: accent, size: 22, fill: active ? 1 : 0),
+                    color: accent,
+                    size: context.r(IconSz.tile),
+                    fill: active ? 1 : 0),
                 context.gapW(Insets.x2h),
                 Expanded(
                   child: Column(

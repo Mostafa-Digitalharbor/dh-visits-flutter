@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/design/app_dimens.dart';
 import '../../app/design/responsive.dart';
 import '../extensions/context_extensions.dart';
+import 'auto_direction_text.dart';
 
 class InfoRow extends StatelessWidget {
   final IconData icon;
@@ -41,7 +42,7 @@ class InfoRow extends StatelessWidget {
           ),
           context.gapW(Insets.x2h),
           Expanded(
-            child: Text(
+            child: AutoDirectionText(
               text,
               style: textStyle ?? context.text.bodyMedium,
             ),

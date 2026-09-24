@@ -51,6 +51,18 @@ class Endpoints {
   static const String visitLogLocations = '/api/visit/log_locations';
   static const String visitTrack = '/api/visit/track';
 
+  // ---- Whole work day (dh_workday_tracking) -------------------------------
+  // The route of a whole work day, including the travel between visits. Points
+  // taken while a visit is running carry that visit's id, which is what links
+  // the continuous route to the visit form. Servers without the module answer
+  // 404 and `WorkdayRepository` falls back to the `x_dh_work_*` models.
+  static const String workdayStart = '/api/workday/start';
+  static const String workdayActive = '/api/workday/active';
+  static const String workdayGet = '/api/workday/get';
+  static const String workdayLogLocations = '/api/workday/log_locations';
+  static const String workdayEnd = '/api/workday/end';
+  static const String workdayTrack = '/api/workday/track';
+
   // ---- Push notifications (device token registration) ---------------------
   // The app registers its FCM token after login so the backend can push visit
   // workflow events. See docs/BACKEND_PUSH_NOTIFICATIONS.md.

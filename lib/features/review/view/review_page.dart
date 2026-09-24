@@ -298,56 +298,53 @@ class _ReviewCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    InitialAvatar(
-                      name: visit.customerName,
-                      icon: Symbols.business,
-                      size: context.r(CompSz.avatar),
-                    ),
-                    context.gapW(Insets.x3),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(visit.displayTitle(context),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppType.cardTitle
-                                  .copyWith(color: cs.onSurface)),
-                          context.gapH(Insets.hair),
-                          Text(
-                            context.joinFacts([
-                              visit.displayReference(context),
-                              visit.visitTypeName,
-                            ]),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: metaStyle,
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (duration != null) ...[
-                      context.gapW(Insets.x1),
-                      TonePill(
-                        label: duration.clock,
-                        icon: Symbols.timer,
-                        color: cs.onSurfaceVariant,
-                        tintAlpha: Alphas.tint,
-                        fontSize: FontSz.sm,
-                        iconSize: IconSz.meta,
-                        padding: context.padSym(h: Insets.x2, v: Insets.x1),
-                      ),
-                    ],
-                    context.gapW(Insets.x1),
-                    // Mirrors itself in RTL.
-                    Icon(
-                      Icons.chevron_right,
-                      size: context.r(IconSz.label),
-                      color: x.textTertiary,
+                MediaRow(
+                  trailingGap: Insets.x1,
+                  leading: InitialAvatar(
+                    name: visit.customerName,
+                    icon: Symbols.business,
+                    size: context.r(CompSz.avatar),
+                  ),
+                  lines: [
+                    Text(visit.displayTitle(context),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            AppType.cardTitle.copyWith(color: cs.onSurface)),
+                    context.gapH(Insets.hair),
+                    Text(
+                      context.joinFacts([
+                        visit.displayReference(context),
+                        visit.visitTypeName,
+                      ]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: metaStyle,
                     ),
                   ],
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (duration != null) ...[
+                        TonePill(
+                          label: duration.clock,
+                          icon: Symbols.timer,
+                          color: cs.onSurfaceVariant,
+                          tintAlpha: Alphas.tint,
+                          fontSize: FontSz.sm,
+                          iconSize: IconSz.meta,
+                          padding: context.padSym(h: Insets.x2, v: Insets.x1),
+                        ),
+                        context.gapW(Insets.x1),
+                      ],
+                      // Mirrors itself in RTL.
+                      Icon(
+                        Icons.chevron_right,
+                        size: context.r(IconSz.label),
+                        color: x.textTertiary,
+                      ),
+                    ],
+                  ),
                 ),
                 context.gapH(Insets.x3),
                 // Meta strip

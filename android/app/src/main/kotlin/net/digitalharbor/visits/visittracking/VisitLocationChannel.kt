@@ -16,7 +16,6 @@ object VisitLocationChannel {
 
     fun register(context: Context, messenger: BinaryMessenger) {
         val app = context.applicationContext
-        VisitLocationStore.purgeLegacy(app)
         MethodChannel(messenger, NAME).setMethodCallHandler { call, result ->
             try {
                 when (call.method) {

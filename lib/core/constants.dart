@@ -55,6 +55,43 @@ class AppConstants {
   /// across several requests instead of one that times out.
   static const int trailMaxBatchSize = 100;
 
+  // ---- Whole work day -----------------------------------------------------
+  // Sampling is denser than the visit trail's: the drawn day route is matched
+  // to roads and needs the turns to be in the data.
+
+  /// Server models holding the work day and its points, used only where the
+  /// `/api/workday/*` routes are missing. See [WorkdayRepository].
+  static const String workSessionModel = 'x_dh_work_session';
+  static const String workLocationModel = 'x_dh_work_location';
+
+  /// Minimum movement between two recorded work-day fixes. Below it a fix is
+  /// standing still (or GPS jitter), not movement.
+  static const double workdayMinDistanceMeters = 5.0;
+
+  /// Minimum time between two recorded fixes. Just under the native service's
+  /// 5 s request interval, so delivery jitter never skips a sample: while
+  /// moving, about one fix every 5 s is recorded.
+  static const Duration workdayMinInterval = Duration(seconds: 4);
+
+  /// A fix within [workdayMinInterval] of the last is still kept when it is at
+  /// least this far away. Mirrors `BURST_DISTANCE_M` in WorkdayLocationService.
+  static const double workdayBurstDistanceMeters = 15.0;
+
+  /// Fixes less certain than this are skipped: at road-matching scale a 50 m
+  /// error already puts a fix on the wrong street.
+  static const double workdayMaxAccuracyMeters = 50.0;
+
+  /// How often fixes captured by the native service are moved into the upload
+  /// queue while the app process is alive (foreground or background).
+  static const Duration workdayDrainInterval = Duration(seconds: 15);
+
+  /// How often the work-day queue is pushed to the server.
+  static const Duration workdayFlushInterval = Duration(minutes: 1);
+
+  /// Hard ceiling on the on-device work-day queue: about 11 hours of
+  /// continuous movement offline at the sampling rate above.
+  static const int workdayMaxBufferedPoints = 8000;
+
   /// Most fixes moved from the native journal in one drain.
   static const int trailMaxDrain = 500;
 
@@ -93,6 +130,10 @@ class AppConstants {
   /// Target of the on-map credit badge ([AppMapAttribution]). OSM's ODbL
   /// licence requires the credit to be visible and to link back here.
   static const String osmCopyrightUrl = 'https://www.openstreetmap.org/copyright';
+
+  /// The credit OSM's licence requires on every map. A brand name and a
+  /// legal notice, identical in every language, so it is not translated.
+  static const String osmAttribution = '© OpenStreetMap';
 
   /// OSM tiles only exist up to zoom 19; beyond that flutter_map upscales the
   /// last available tile instead of showing blank squares.
@@ -214,9 +255,6 @@ class AppConstants {
   static const String groupVisitProjectManagerXmlName =
       'group_visit_project_manager';
   static const String groupVisitAdminXmlName = 'group_visit_admin';
-
-  /// Employees (the participant picker, the signed-in user's employee).
-  static const String hrEmployeeModel = 'hr.employee';
 
   /// Chatter messages (a record's history and notes).
   static const String mailMessageModel = 'mail.message';

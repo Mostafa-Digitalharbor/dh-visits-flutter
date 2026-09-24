@@ -7,7 +7,6 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../app/routes.dart';
 import '../../../app/theme.dart';
 import '../../../core/utils/app_number.dart';
-import '../../../shared/extensions/bloc_extensions.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../auth/bloc/auth_bloc.dart';
@@ -33,13 +32,6 @@ class DashboardPage extends StatelessWidget {
 
   const DashboardPage({super.key, this.onOpenVisits});
 
-  /// The spinner lasts as long as the reload does.
-  static Future<void> _refresh(BuildContext context) {
-    final bloc = context.read<VisitsListBloc>()
-      ..add(const VisitsListLoadRequested(scope: VisitListScope.team));
-    return bloc.untilSettled((s) => s.status == VisitsListStatus.loading);
-  }
-
   @override
   Widget build(BuildContext context) {
     return VisitsRefreshFailureListener(
@@ -61,7 +53,7 @@ class DashboardPage extends StatelessWidget {
           if (state.status == VisitsListStatus.failure && state.items.isEmpty) {
             return ErrorView(
               message: state.error?.localize(context) ?? context.s.errUnknown,
-              onRetry: () => _refresh(context),
+              onRetry: () => reloadTeamVisits(context),
             );
           }
           final visits = state.items;
@@ -70,7 +62,7 @@ class DashboardPage extends StatelessWidget {
           // [DashboardSummary].
           final summary = DashboardSummary.from(visits);
           return AppRefreshIndicator(
-            onRefresh: () => _refresh(context),
+            onRefresh: () => reloadTeamVisits(context),
             child: ListView(
               padding: _pagePadding(context),
               children: [

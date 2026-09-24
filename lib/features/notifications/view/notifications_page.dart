@@ -40,14 +40,8 @@ class _NotificationsView extends StatelessWidget {
             next.status == NotificationsStatus.failure &&
             previous.status != NotificationsStatus.failure &&
             next.activities.isNotEmpty,
-        listener: (context, state) {
-          final s = context.s;
-          context.showSnack(
-            s.commonRefreshFailedStale(
-                state.error?.localize(context) ?? s.errUnknown),
-            kind: SnackKind.error,
-          );
-        },
+        listener: (context, state) =>
+            context.showStaleRefreshSnack(state.error),
         builder: (context, state) => AsyncListView<VisitActivity>(
           items: state.activities,
           isLoading: state.status == NotificationsStatus.loading ||

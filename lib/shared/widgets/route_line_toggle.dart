@@ -27,6 +27,12 @@ class RouteLineToggle extends StatelessWidget {
   /// Nothing drawn could be matched to roads (and matching is finished).
   final bool unmatched;
 
+  /// Inset between the pill track and its segments.
+  static const double _trackInset = 3;
+
+  /// The small spinner beside "matching…".
+  static const double _spinnerSize = 10;
+
   const RouteLineToggle({
     super.key,
     required this.mode,
@@ -37,7 +43,8 @@ class RouteLineToggle extends StatelessWidget {
 
   /// Combined state of several geometries drawn on one map.
   static ({bool pending, bool unmatched}) stateOf(
-      Iterable<RouteGeometry> geometries) {
+    Iterable<RouteGeometry> geometries,
+  ) {
     final drawn = geometries.where((g) => g.edges.isNotEmpty).toList();
     final pending = drawn.any((g) => g.pending);
     return (
@@ -63,7 +70,7 @@ class RouteLineToggle extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Container(
-          padding: const EdgeInsets.all(3),
+          padding: const EdgeInsets.all(_trackInset),
           decoration: BoxDecoration(
             color: AppColors.ink,
             borderRadius: BorderRadius.circular(Radii.pill),
@@ -88,12 +95,17 @@ class RouteLineToggle extends StatelessWidget {
         ),
         if (note != null)
           Padding(
-            padding: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.only(top: Insets.x1),
             child: Container(
-              constraints: const BoxConstraints(maxWidth: 220),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              constraints: const BoxConstraints(
+                maxWidth: CompSz.mapNoteMaxWidth,
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: Insets.x2,
+                vertical: Insets.x1,
+              ),
               decoration: BoxDecoration(
-                color: AppColors.ink.withValues(alpha: 0.85),
+                color: AppColors.ink.withValues(alpha: Alphas.scrim),
                 borderRadius: BorderRadius.circular(Radii.pill),
               ),
               child: Row(
@@ -101,12 +113,14 @@ class RouteLineToggle extends StatelessWidget {
                 children: [
                   if (pending)
                     const Padding(
-                      padding: EdgeInsetsDirectional.only(end: 6),
+                      padding: EdgeInsetsDirectional.only(end: Insets.x1h),
                       child: SizedBox(
-                        width: 10,
-                        height: 10,
+                        width: _spinnerSize,
+                        height: _spinnerSize,
                         child: CircularProgressIndicator(
-                            strokeWidth: 1.5, color: Colors.white),
+                          strokeWidth: CompSz.outlineWidth,
+                          color: AppColors.onMap,
+                        ),
                       ),
                     ),
                   Flexible(
@@ -115,9 +129,10 @@ class RouteLineToggle extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: FontSz.xs,
-                          fontWeight: FontWeight.w600),
+                        color: AppColors.onMap,
+                        fontSize: FontSz.xs,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -143,32 +158,41 @@ class _Segment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = selected ? AppColors.ink : Colors.white;
+    final fg = selected ? AppColors.ink : AppColors.onMap;
     return Semantics(
       button: true,
       selected: selected,
       label: label,
+      // excludeSemantics also drops the InkWell's tap action, which left a
+      // screen reader unable to switch lines; re-expose it here.
+      onTap: selected ? null : onTap,
       excludeSemantics: true,
       child: InkWell(
         borderRadius: BorderRadius.circular(Radii.pill),
         onTap: selected ? null : onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          duration: AppDurations.segmentSwitch,
+          padding: const EdgeInsets.symmetric(
+            horizontal: Insets.x2h,
+            vertical: Insets.x1h,
+          ),
           decoration: BoxDecoration(
-            color: selected ? Colors.white : Colors.transparent,
+            color: selected ? AppColors.onMap : Colors.transparent,
             borderRadius: BorderRadius.circular(Radii.pill),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 14, color: fg),
+              Icon(icon, size: IconSz.inline, color: fg),
               context.gapW(Insets.x1),
-              Text(label,
-                  style: TextStyle(
-                      color: fg,
-                      fontSize: FontSz.xs,
-                      fontWeight: FontWeight.w700)),
+              Text(
+                label,
+                style: TextStyle(
+                  color: fg,
+                  fontSize: FontSz.xs,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
         ),

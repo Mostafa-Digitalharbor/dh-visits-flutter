@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/api/api_exceptions.dart';
 import '../../../core/constants.dart';
 import '../../../core/location/location_service.dart';
+import '../../../core/location/tracker_plumbing.dart';
 import '../../../core/location/visit_location_channel.dart';
 import '../../../core/network/connectivity_status.dart';
 import '../../../core/network/pending_actions_queue.dart';
@@ -88,7 +89,27 @@ class TrailCaptureStatus extends Equatable {
 /// It is deliberately *not* a bloc: the trail UI reads the server's copy
 /// through `VisitTrailCubit`; this class only feeds it. [status], [pendingCount]
 /// and [revision] let a screen show what is happening.
-class VisitTrailTracker with WidgetsBindingObserver {
+/// A location source outside [VisitTrailTracker] that takes over sampling
+/// while it is active — the work-day capture.
+///
+/// While a work day runs it is the **single** GPS subscription on the device:
+/// this tracker opens neither its native capture nor its foreground fallback,
+/// and receives the running visit's fixes through [VisitTrailTracker.ingest]
+/// instead. Two subscriptions for the same movement would otherwise drain the
+/// battery twice and show two ongoing notifications.
+abstract class TrailFeed {
+  /// True while the feed is capturing; this tracker's own capture stays shut.
+  bool get isActive;
+
+  /// Tells the feed which visit is running (null: none), so the fixes it takes
+  /// from now on are attributed to it.
+  void activeVisitChanged(int? visitId);
+
+  /// Delivers every fix captured but not yet handed over.
+  Future<void> drain();
+}
+
+class VisitTrailTracker with WidgetsBindingObserver, TrackerPlumbing {
   final SharedPreferences prefs;
   final VisitsRepository repository;
   final LocationService locationService;
@@ -110,16 +131,22 @@ class VisitTrailTracker with WidgetsBindingObserver {
   /// Re-expresses each fix's device-clock timestamp on the server's clock, so
   /// `logged_at` is comparable with the `start_datetime`/`end_datetime` the
   /// server stamps. Null (in tests) sends the device time unchanged.
+  @override
   final ServerClock? serverClock;
 
   /// Stable per-install id sent as each point's `device_id`, the same one the
   /// FCM registration uses.
+  @override
   final Future<String?> Function()? deviceId;
 
   /// Who is signed in, as `server|uid`. Buffered points and the active-visit
   /// marker carry it, so one account's points are never sent — or tracking
   /// resumed — under another. Null resolver (tests): unscoped.
   final Future<String?> Function()? ownerResolver;
+
+  /// The work-day capture, when one is wired in. Assigned after construction:
+  /// the work-day tracker is built on top of this one.
+  TrailFeed? feed;
 
   VisitTrailTracker({
     required this.prefs,
@@ -152,14 +179,6 @@ class VisitTrailTracker with WidgetsBindingObserver {
   /// in the first moments are left out rather than refused and reported.
   static const Duration _startSlack = Duration(seconds: 2);
 
-  /// Refusals that say the *session* is unusable, not the points.
-  static const _sessionProblems = {
-    ApiErrorCode.unauthorized,
-    ApiErrorCode.invalidCredentials,
-    ApiErrorCode.sessionRestoreFailed,
-    ApiErrorCode.databaseNotFound,
-  };
-
   final ValueNotifier<TrailCaptureStatus> _status =
       ValueNotifier<TrailCaptureStatus>(const TrailCaptureStatus());
   ValueListenable<TrailCaptureStatus> get status => _status;
@@ -181,7 +200,9 @@ class VisitTrailTracker with WidgetsBindingObserver {
 
   int? _visitId;
   TrailPause? _paused;
-  String? _deviceIdValue;
+  @override
+  String get logTag => '[VisitTrailTracker]';
+
   bool _disposed = false;
 
   /// Tracking was restored from the local marker while the server could not
@@ -237,7 +258,7 @@ class VisitTrailTracker with WidgetsBindingObserver {
       await stop();
     }
     final same = current?.visitId == visitId ? current : null;
-    final since = _deviceTimeOf(startedAt)?.add(_startSlack) ??
+    final since = deviceTimeOf(startedAt)?.add(_startSlack) ??
         same?.since ??
         DateTime.now();
     await _writeMarker(_Marker(
@@ -249,10 +270,11 @@ class VisitTrailTracker with WidgetsBindingObserver {
     ));
     await _forgetEnded(visitId);
     _visitId = visitId;
+    feed?.activeVisitChanged(visitId);
     _needsServerCheck = false;
     _settled = true;
     appLog('[VisitTrailTracker] recording visit $visitId');
-    await _resolveDeviceId();
+    await resolveDeviceId();
     await _ensureCapture();
     _syncTimers();
     _publish();
@@ -270,12 +292,16 @@ class VisitTrailTracker with WidgetsBindingObserver {
     final marker = _readMarker();
     final visitId = marker?.visitId ?? _visitId;
     await _stopCapture();
+    feed?.activeVisitChanged(null);
     if (visitId != null) {
       final now = DateTime.now().toUtc();
       final end = endedAt == null || endedAt.isAfter(now) ? now : endedAt;
       await _rememberEnded(visitId, end);
-      if (endedAt != null) await _discardAfter(visitId, _serverTime(end));
+      if (endedAt != null) await _discardAfter(visitId, serverTimeOf(end));
     }
+    // Under a work day the fixes are captured outside this class: pull in the
+    // ones not handed over yet, so End's flush carries the tail of the route.
+    if (feed?.isActive ?? false) await feed!.drain();
     await drain();
     await _clearMarker();
     if (visitId != null) {
@@ -328,7 +354,7 @@ class VisitTrailTracker with WidgetsBindingObserver {
   Future<DateTime?> _serverEnd(int visitId) async {
     try {
       final visit = await repository.getVisit(visitId);
-      return _deviceTimeOf(visit?.endDatetime);
+      return deviceTimeOf(visit?.endDatetime);
     } catch (e) {
       appLog('[VisitTrailTracker] end of visit $visitId unknown: $e');
       return null;
@@ -353,7 +379,7 @@ class VisitTrailTracker with WidgetsBindingObserver {
     }
     _visitId = marker.visitId;
     _needsServerCheck = true;
-    await _resolveDeviceId();
+    await resolveDeviceId();
     await _ensureCapture();
     _syncTimers();
     _publish();
@@ -397,7 +423,7 @@ class VisitTrailTracker with WidgetsBindingObserver {
     if (visit == null || !visit.isInProgress) {
       appLog('[VisitTrailTracker] visit $id is ${visit?.state.name ?? 'gone'} '
           'on the server; stopping');
-      await stop(endedAt: _deviceTimeOf(visit?.endDatetime));
+      await stop(endedAt: deviceTimeOf(visit?.endDatetime));
     }
   }
 
@@ -478,11 +504,6 @@ class VisitTrailTracker with WidgetsBindingObserver {
   // Capture
   // ---------------------------------------------------------------------------
 
-  bool get _foreground {
-    final state = WidgetsBinding.instance.lifecycleState;
-    return state == null || state == AppLifecycleState.resumed;
-  }
-
   /// Makes sure the visit in the marker is being captured, or records why it
   /// cannot be. Never throws.
   Future<void> _ensureCapture() async {
@@ -491,6 +512,13 @@ class VisitTrailTracker with WidgetsBindingObserver {
     if (!consent.accepted) {
       await _stopCapture();
       _paused = TrailPause.consent;
+      return;
+    }
+    if (feed?.isActive ?? false) {
+      // The work-day capture is already sampling and hands this tracker the
+      // running visit's fixes through [ingest]; see [TrailFeed].
+      await _stopCapture();
+      _paused = null;
       return;
     }
     if (channel.isAvailable) {
@@ -528,7 +556,7 @@ class VisitTrailTracker with WidgetsBindingObserver {
       return;
     }
     _paused = null;
-    if (_foreground) _subscribeFallback();
+    if (isForeground) _subscribeFallback();
   }
 
   Future<void> _stopCapture() async {
@@ -594,14 +622,14 @@ class VisitTrailTracker with WidgetsBindingObserver {
       longitude: pos.longitude,
       // The fix's own time, not the upload time: this is the field the server
       // orders and measures the trail by.
-      loggedAt: _serverTime(pos.timestamp),
+      loggedAt: serverTimeOf(pos.timestamp),
       accuracy: accuracy > 0 ? accuracy : null,
       altitude: pos.altitude,
       speed: pos.speed >= 0 ? pos.speed : null,
       heading: pos.heading >= 0 ? pos.heading : null,
-      deviceId: _deviceIdValue,
+      deviceId: deviceIdValue,
     );
-    unawaited(_guard('buffer fix', () async {
+    unawaited(guard('buffer fix', () async {
       await _bufferAll([
         _BufferedPoint(visitId: marker.visitId, owner: marker.owner, point: point),
       ]);
@@ -615,11 +643,49 @@ class VisitTrailTracker with WidgetsBindingObserver {
   /// Moves every fix the native capture journalled into the upload buffer.
   /// Waits for a drain already running and then drains again, so a caller
   /// that needs "everything up to now" (ending a visit) gets it. Never throws.
+  /// Re-evaluates who samples after the work-day capture started or stopped:
+  /// shuts this tracker's own capture when the feed took over, and brings it
+  /// back for a visit still running after the feed went away.
+  void feedChanged() {
+    if (feed?.isActive ?? false) {
+      unawaited(_stopCapture());
+      return;
+    }
+    if (_visitId != null) {
+      unawaited(guard('restart capture', _ensureCapture).then((_) {
+        _syncTimers();
+        _publish();
+      }));
+    }
+  }
+
+  /// Buffers a fix the work-day capture took while [visitId] was running.
+  ///
+  /// Same buffer and same flush as a fix from this tracker's own capture: the
+  /// visit trail is recorded once, no matter which source sampled it. A fix
+  /// already buffered (a drain replayed after a crash) is ignored by
+  /// [_bufferAll], and one taken after the visit ended is dropped here rather
+  /// than sent to be refused.
+  Future<void> ingest(int visitId, TrailPoint point) async {
+    if (_disposed) return;
+    final endedAt = _readEnded()[visitId];
+    if (endedAt != null && _postdates(point.loggedAt, serverTimeOf(endedAt))) {
+      return;
+    }
+    await _bufferAll([
+      _BufferedPoint(
+        visitId: visitId,
+        owner: await _resolveOwner(),
+        point: point,
+      ),
+    ]);
+  }
+
   Future<void> drain() async {
     while (_draining != null) {
       await _draining;
     }
-    final run = _guard('drain capture journal', _takeCapturedFixes);
+    final run = guard('drain capture journal', _takeCapturedFixes);
     _draining = run;
     try {
       await run;
@@ -652,7 +718,7 @@ class VisitTrailTracker with WidgetsBindingObserver {
         if (f.seq > maxSeq) maxSeq = f.seq;
         if (f.seq <= lastSeq) continue;
         final endedAt = ended[f.visitId];
-        if (endedAt != null && f.deviceTime.isAfter(endedAt)) {
+        if (endedAt != null && _postdates(f.deviceTime, endedAt)) {
           appLog('[VisitTrailTracker] fix #${f.seq} postdates the end of '
               'visit ${f.visitId}; discarded');
           continue;
@@ -664,12 +730,12 @@ class VisitTrailTracker with WidgetsBindingObserver {
             latitude: f.latitude,
             longitude: f.longitude,
             // The fix's own time, only re-read against the server's clock.
-            loggedAt: _serverTime(f.deviceTime),
+            loggedAt: serverTimeOf(f.deviceTime),
             accuracy: (f.accuracy ?? 0) > 0 ? f.accuracy : null,
             altitude: f.altitude,
             speed: (f.speed ?? -1) >= 0 ? f.speed : null,
             heading: (f.heading ?? -1) >= 0 ? f.heading : null,
-            deviceId: _deviceIdValue,
+            deviceId: deviceIdValue,
           ),
         ));
       }
@@ -869,7 +935,7 @@ class VisitTrailTracker with WidgetsBindingObserver {
         landed = landed || result.created > 0;
         remaining = rest;
       } on ApiException catch (e) {
-        if (e.isTransient || _sessionProblems.contains(e.code)) {
+        if (e.isRetryable) {
           // Unreachable again mid-drain, or the session needs a new sign-in:
           // nothing is wrong with the points. Keep what is left, retry later.
           return _FlushOutcome([...keep, ...remaining], landed, dropped, refused);
@@ -906,29 +972,12 @@ class VisitTrailTracker with WidgetsBindingObserver {
     }
   }
 
-  List<_BufferedPoint> _readBuffer() {
-    final String? raw;
-    try {
-      raw = prefs.getString(_bufferKey);
-    } catch (_) {
-      return [];
-    }
-    if (raw == null || raw.isEmpty) return [];
-    final List<dynamic> list;
-    try {
-      list = jsonDecode(raw) as List;
-    } catch (_) {
-      return [];
-    }
-    // Entry by entry: one unreadable record must not discard a whole visit's
-    // worth of collected path.
-    final out = <_BufferedPoint>[];
-    for (final m in list.whereType<Map>()) {
-      final p = _BufferedPoint.tryFromJson(Map<String, dynamic>.from(m));
-      if (p != null) out.add(p);
-    }
-    return out;
-  }
+  List<_BufferedPoint> _readBuffer() => [
+        // Entry by entry: one unreadable record must not discard a whole
+        // visit's worth of collected path.
+        for (final m in decodeStoredJsonList(() => prefs.getString(_bufferKey)))
+          ?_BufferedPoint.tryFromJson(m),
+      ];
 
   Future<void> _writeBuffer(List<_BufferedPoint> points) async {
     if (points.isEmpty) {
@@ -1050,32 +1099,18 @@ class VisitTrailTracker with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _resolveDeviceId() async {
-    if (_deviceIdValue != null || deviceId == null) return;
-    try {
-      _deviceIdValue = await deviceId!();
-    } catch (e) {
-      appLog('[VisitTrailTracker] device id unavailable: $e');
-    }
-  }
-
   /// A device-clock instant expressed on the server's clock.
-  DateTime _serverTime(DateTime deviceTime) =>
-      serverClock?.toServer(deviceTime) ?? deviceTime.toUtc();
-
-  /// A server-clock instant expressed on the device's clock.
-  DateTime? _deviceTimeOf(DateTime? serverTime) {
-    if (serverTime == null) return null;
-    return serverClock?.toDevice(serverTime) ?? serverTime.toUtc();
-  }
-
-  Future<void> _guard(String what, Future<void> Function() body) async {
-    try {
-      await body();
-    } catch (e) {
-      appLog('[VisitTrailTracker] $what failed: $e');
-    }
-  }
+  /// Whether [fix] was really taken after the visit ended at [end].
+  ///
+  /// The end time survives a round trip through the preferences as whole
+  /// milliseconds, while a fix keeps the microseconds the platform gave it.
+  /// Compared as they are, the last fix of a visit — taken microseconds
+  /// *before* End, inside the same millisecond — reads as postdating the end
+  /// and was thrown away: a visit's trail lost its final point, and with it
+  /// the arrival at the customer. Both sides are therefore compared at the
+  /// precision the end is actually stored with.
+  static bool _postdates(DateTime fix, DateTime end) =>
+      fix.millisecondsSinceEpoch > end.millisecondsSinceEpoch;
 
   void dispose() {
     _disposed = true;

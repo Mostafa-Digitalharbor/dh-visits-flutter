@@ -15,6 +15,11 @@ class Insets {
       x12 = 48.0,
       x16 = 64.0;
 
+  /// 0 — no gap at all. For a slot whose own widget already carries the
+  /// spacing (an [IconButton]'s 48dp hit area), where adding a gap on top
+  /// pushes it off a narrow screen.
+  static const none = 0.0;
+
   /// 2 — a hairline nudge: the gap between a title and the caption directly
   /// under it, where anything larger reads as two separate blocks.
   static const hair = 2.0;
@@ -135,9 +140,6 @@ class CompSz {
   /// 16 — the width of a single bar in that chart.
   static const chartBar = 16.0;
 
-  /// 200 — the customer-detail [SliverAppBar]'s expanded height.
-  static const heroExpanded = 200.0;
-
   /// 6 — a [ProgressTrack]'s bar.
   static const trackHeight = 6.0;
 
@@ -152,6 +154,11 @@ class CompSz {
   /// 560 — the widest a dialog grows on tablets and in landscape, so its
   /// paragraphs stay a readable measure.
   static const dialogMaxWidth = 560.0;
+
+  /// 720 — the widest a single column of cards grows. On a tablet or a phone
+  /// on its side, a card stretched across 2000 px puts its title and its
+  /// status badge a head-turn apart; the column is centred instead.
+  static const readableMaxWidth = 720.0;
 
   /// 600 — the width from which a screen counts as a tablet.
   static const tabletBreakpoint = 600.0;
@@ -182,9 +189,11 @@ class CompSz {
   /// 8 — the progress bar in the greeting header.
   static const headerTrackHeight = 8.0;
 
-  /// 130 / 78 — the empty state's halo and the disc inside it.
+  /// 130 / 78 / 36 — the empty state's halo, the disc inside it, and the
+  /// glyph on the disc.
   static const emptyHalo = 130.0;
   static const emptyDisc = 78.0;
+  static const emptyGlyph = 36.0;
 
   /// 56 — the glyph of a full-screen error.
   static const errorGlyph = 56.0;
@@ -193,7 +202,8 @@ class CompSz {
   static const buttonSpinner = 18.0;
   static const buttonSpinnerStroke = 2.2;
 
-  /// 220 — the widest a note on a map (the road-matching status) may grow.
+  /// 220 — the widest a note on a map (the road-matching status) may grow
+  /// before it wraps, so it never spans the map on a tablet.
   static const mapNoteMaxWidth = 220.0;
 }
 
@@ -259,7 +269,6 @@ class AppDurations {
   static const fast = Duration(milliseconds: 120);
   static const base = Duration(milliseconds: 200);
   static const slow = Duration(milliseconds: 320);
-  static const navSlide = Duration(milliseconds: 340);
 
   /// How long a search field waits after the last keystroke before querying.
   static const searchDebounce = Duration(milliseconds: 350);

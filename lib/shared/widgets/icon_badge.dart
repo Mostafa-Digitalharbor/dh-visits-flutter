@@ -67,7 +67,10 @@ class IconBadge extends StatelessWidget {
       width: padding == null ? size : null,
       height: padding == null ? size : null,
       padding: padding,
-      alignment: Alignment.center,
+      // Only the fixed square needs an alignment. With [padding], an
+      // alignment makes the Container fill a bounded parent, so the badge
+      // stretched to the full height of its row instead of hugging its icon.
+      alignment: padding == null ? Alignment.center : null,
       decoration: BoxDecoration(
         color: background ?? color.withValues(alpha: tintAlpha),
         borderRadius: BorderRadius.circular(radius),

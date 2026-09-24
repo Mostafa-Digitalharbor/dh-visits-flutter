@@ -25,14 +25,17 @@ class EmptyView extends StatelessWidget {
     this.action,
   });
 
+  /// Where the halo's colour sits between primary and tertiary.
+  static const double _haloHueMix = 0.5;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     // The halo/icon scale with the device so the block doesn't dominate a
     // small phone, and AdaptiveCenter lets the whole thing scroll rather
     // than overflow when the viewport is short (landscape).
-    final haloSize = context.r(130);
-    final iconBox = context.r(78);
+    final haloSize = context.r(CompSz.emptyHalo);
+    final iconBox = context.r(CompSz.emptyDisc);
 
     // Built once and passed through as AnimatedBuilder's `child`, so the beat
     // rebuilds only the halo's gradient — never the icon inside it.
@@ -50,9 +53,16 @@ class EmptyView extends StatelessWidget {
               colors.surfaceContainerHigh,
             ],
           ),
-          border: Border.all(color: colors.outlineVariant, width: 1),
+          border: Border.all(
+            color: colors.outlineVariant,
+            width: CompSz.hairline,
+          ),
         ),
-        child: Icon(icon, size: context.r(36), color: colors.primary),
+        child: Icon(
+          icon,
+          size: context.r(CompSz.emptyGlyph),
+          color: colors.primary,
+        ),
       ),
     );
 
@@ -65,8 +75,8 @@ class EmptyView extends StatelessWidget {
           // *dimmest* when the beat completes — otherwise it would sit lit
           // through every gap instead of fading away.
           AmbientPulse(
-            period: const Duration(milliseconds: 1200),
-            rest: const Duration(milliseconds: 1200),
+            period: AppDurations.emptyPulse,
+            rest: AppDurations.emptyPulse,
             curve: Curves.easeInOut,
             builder: (_, beat) => AnimatedBuilder(
               animation: beat,
@@ -78,8 +88,11 @@ class EmptyView extends StatelessWidget {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      Color.lerp(colors.primary, colors.tertiary, 0.5)!
-                          .withValues(alpha: 0.22 + 0.10 * (1 - beat.value)),
+                      Color.lerp(colors.primary, colors.tertiary, _haloHueMix)!
+                          .withValues(
+                        alpha:
+                            Alphas.halo + Alphas.haloPulse * (1 - beat.value),
+                      ),
                       Colors.transparent,
                     ],
                   ),
@@ -94,7 +107,6 @@ class EmptyView extends StatelessWidget {
             textAlign: TextAlign.center,
             style: context.text.bodyLarge?.copyWith(
               color: colors.onSurfaceVariant,
-              height: 1.45,
               fontWeight: FontWeight.w500,
             ),
           ),

@@ -89,7 +89,7 @@ class AuthScrollBody extends StatelessWidget {
 
 // ─── Hero ────────────────────────────────────────────────────────────────────
 
-class AuthHero extends StatelessWidget {
+class AuthHero extends StatefulWidget {
   /// When non-null, a back chip is pinned to the visual start of the hero's
   /// top row. Login passes this to step back to the server-setup screen; the
   /// setup screen passes it only when it was pushed (from Profile), since as
@@ -99,12 +99,56 @@ class AuthHero extends StatelessWidget {
   const AuthHero({super.key, this.onBack});
 
   @override
+  State<AuthHero> createState() => _AuthHeroState();
+}
+
+/// Stateful only to follow the keyboard.
+///
+/// Both auth screens host the hero in a `Scaffold` body, and a Scaffold that
+/// resizes for the keyboard strips the inset from its body's `MediaQuery`. So
+/// `context.keyboardInset` always read 0 in here and the compact layout never
+/// engaged with the keyboard up. The inset is read off the view instead, and
+/// the hero rebuilds when the keyboard opens or closes.
+class _AuthHeroState extends State<AuthHero> with WidgetsBindingObserver {
+  bool _keyboardUp = false;
+
+  bool _readKeyboard() => View.of(context).viewInsets.bottom > 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _keyboardUp = _readKeyboard();
+  }
+
+  @override
+  void didChangeMetrics() {
+    // Called on every frame of the keyboard animation: rebuild only when it
+    // actually opens or closes.
+    if (!mounted) return;
+    final up = _readKeyboard();
+    if (up != _keyboardUp) setState(() => _keyboardUp = up);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final onBack = widget.onBack;
     final topPad = MediaQuery.paddingOf(context).top;
     // With the keyboard up, or a phone on its side, the logo and tagline would
     // push the very field being typed into off screen. The wordmark alone
     // keeps the brand.
-    final compact = context.keyboardInset > 0 || context.isLandscape;
+    final compact = _keyboardUp || context.isLandscape;
     return Stack(
       children: [
         Positioned.fill(
@@ -301,6 +345,11 @@ class _HeroChips extends StatelessWidget {
                     _nextThemeMode(state.themeMode, MediaQuery.platformBrightnessOf(context)),
                   ),
               circular: true,
+              // Icon-only: without a name a screen reader announced nothing
+              // but "button". Named for what a tap does.
+              tooltip: isDark
+                  ? context.s.authSwitchToLightTheme
+                  : context.s.authSwitchToDarkTheme,
               child: Icon(
                 isDark ? Symbols.light_mode : Symbols.dark_mode,
                 size: glyph,
@@ -507,6 +556,11 @@ class _AuthFieldState extends State<AuthField> {
         suffixIcon: widget.isPassword
             ? IconButton(
                 onPressed: () => setState(() => _obscure = !_obscure),
+                // Icon-only: named for what a tap does, so a screen reader
+                // (and a long-press) says more than "button".
+                tooltip: _obscure
+                    ? context.s.authShowPassword
+                    : context.s.authHidePassword,
                 icon: Icon(
                   _obscure ? Symbols.visibility : Symbols.visibility_off,
                   size: glyph,

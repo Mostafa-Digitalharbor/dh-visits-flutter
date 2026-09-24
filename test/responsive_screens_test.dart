@@ -35,6 +35,7 @@ import 'package:location_gps/features/review/view/review_page.dart';
 import 'package:location_gps/features/route/view/route_page.dart';
 import 'package:location_gps/features/profile/view/profile_page.dart';
 import 'package:location_gps/core/api/api_client.dart';
+import 'package:location_gps/core/api/api_exceptions.dart';
 import 'package:location_gps/core/config/server_config.dart';
 import 'package:location_gps/core/config/server_config_cubit.dart';
 import 'package:location_gps/core/config/server_config_repository.dart';
@@ -80,9 +81,21 @@ class _StubAuthBloc extends AuthBloc {
 /// A list bloc holding [items] in `success`, so the pages render real content
 /// rather than a skeleton.
 class _StubListBloc extends VisitsListBloc {
-  _StubListBloc(List<Visit> items) : super(repository: _FakeVisitsRepo()) {
-    emit(VisitsListState(status: VisitsListStatus.success, items: items));
+  _StubListBloc(
+    List<Visit> items, {
+    VisitsListStatus status = VisitsListStatus.success,
+  }) : super(repository: _FakeVisitsRepo()) {
+    emit(VisitsListState(
+      status: status,
+      items: items,
+      error: status == VisitsListStatus.failure
+          ? ApiException(code: ApiErrorCode.network)
+          : null,
+    ));
   }
+
+  @override
+  void add(VisitsListEvent event) {}
 }
 
 /// The review queue builds its own pending-scoped bloc and asks it to load.
@@ -231,6 +244,9 @@ Future<List<FlutterErrorDetails>> _layoutErrors(
   required double textScale,
   required List<Visit> items,
   List<Customer> customers = const [],
+  // Height the software keyboard covers, in logical pixels.
+  double keyboard = 0,
+  VisitsListStatus listStatus = VisitsListStatus.success,
   // Tab bodies (Dashboard, Analytics, the two lists) are hosted by the shell's
   // Scaffold and need one supplied here. Full pages (Route, Review) build their
   // own, and nesting them changes the very constraints this test measures —
@@ -253,6 +269,7 @@ Future<List<FlutterErrorDetails>> _layoutErrors(
 
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
+  tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
   // Resetting the view relays the tree out at the default size. Anything that
   // overflows only at that size is an artefact of the teardown, not of the
   // screen under test, so it is swallowed rather than failing the next test.
@@ -267,7 +284,8 @@ Future<List<FlutterErrorDetails>> _layoutErrors(
     MultiBlocProvider(
       providers: [
         BlocProvider<AuthBloc>(create: (_) => _StubAuthBloc(_manager)),
-        BlocProvider<VisitsListBloc>(create: (_) => _StubListBloc(items)),
+        BlocProvider<VisitsListBloc>(
+            create: (_) => _StubListBloc(items, status: listStatus)),
         BlocProvider<CustomersBloc>(
             create: (_) => _StubCustomersBloc(customers)),
         BlocProvider<SettingsCubit>(
@@ -383,6 +401,21 @@ void main() {
               size: vp.size, locale: locale, textScale: scale, items: items));
         });
 
+        // Searching with the keyboard up: the filters and the search box used
+        // to be a fixed column above the list, which overflowed a landscape
+        // screen by 59 px once the keyboard took its share (emulator,
+        // 2026-09-17).
+        testWidgets('Visits list fits with the keyboard open — $tag',
+            (tester) async {
+          _expectNoLayoutErrors(await _layoutErrors(
+              tester, const VisitsListPage(),
+              size: vp.size,
+              locale: locale,
+              textScale: scale,
+              items: items,
+              keyboard: vp.size.height * 0.7));
+        });
+
         // The manager's other everyday tab. Its card packs a name, an address,
         // a phone, a "last visit" badge and a chevron onto one line — and the
         // badge sits in the unbounded slot of that row, where a widget that
@@ -395,6 +428,18 @@ void main() {
               textScale: scale,
               items: items,
               customers: customers));
+        });
+
+        testWidgets('Customers list fits with the keyboard open — $tag',
+            (tester) async {
+          _expectNoLayoutErrors(await _layoutErrors(
+              tester, const CustomersListPage(),
+              size: vp.size,
+              locale: locale,
+              textScale: scale,
+              items: items,
+              customers: customers,
+              keyboard: vp.size.height * 0.7));
         });
 
         // Route and Review read the same bloc as the visits list but lay it out
@@ -435,6 +480,32 @@ void main() {
     // by zero or overflowing an empty chart.
     testWidgets('Dashboard renders an empty team', (tester) async {
       _expectNoLayoutErrors(await _layoutErrors(tester, const DashboardPage(),
+          size: const Size(320, 640),
+          locale: const Locale('ar'),
+          textScale: 1.25,
+          items: const []));
+    });
+
+    // The list's empty and failed states are slivers under the search box;
+    // built with the wrong fill mode they threw instead of rendering.
+    for (final status in [VisitsListStatus.success, VisitsListStatus.failure]) {
+      testWidgets('Visits list renders no rows — ${status.name}',
+          (tester) async {
+        _expectNoLayoutErrors(await _layoutErrors(
+            tester, const VisitsListPage(),
+            size: const Size(720, 360),
+            locale: const Locale('ar'),
+            textScale: 1.25,
+            items: const [],
+            listStatus: status,
+            keyboard: 200));
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('Customers list renders no customers', (tester) async {
+      _expectNoLayoutErrors(await _layoutErrors(
+          tester, const CustomersListPage(),
           size: const Size(320, 640),
           locale: const Locale('ar'),
           textScale: 1.25,

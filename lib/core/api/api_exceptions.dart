@@ -102,6 +102,30 @@ class ApiException implements Exception {
         _ => false,
       };
 
+  /// A failure that says the *session* is unusable rather than anything about
+  /// the request: the user has to sign in again, and nothing they sent is at
+  /// fault. Callers that queue work keep it and replay after the next
+  /// sign-in, without counting the failure as one of the item's attempts.
+  bool get isSessionProblem => switch (code) {
+        ApiErrorCode.unauthorized ||
+        ApiErrorCode.invalidCredentials ||
+        ApiErrorCode.sessionRestoreFailed ||
+        ApiErrorCode.databaseNotFound =>
+          true,
+        _ => false,
+      };
+
+  /// The union the offline trackers branch on: the same call may succeed
+  /// later, either once the network/server recovers ([isTransient]) or once
+  /// the user signs in again ([isSessionProblem]). Anything else is a verdict
+  /// on the data, and resending it unchanged will be refused again.
+  ///
+  /// This exists as one predicate because three call sites each carried their
+  /// own list, and the narrowest of them omitted 502/503/504, 429 and 500 —
+  /// so a maintenance window read as "these GPS points are bad", bisected the
+  /// batch and dropped a work day's recorded path after five attempts.
+  bool get isRetryable => isTransient || isSessionProblem;
+
   /// The traceback key inside Odoo's `error.data`.
   static const String _debugKey = 'debug';
 

@@ -38,59 +38,49 @@ class _CustomersListPageState extends State<CustomersListPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        BlocBuilder<CustomersBloc, CustomersState>(
-          buildWhen: (p, n) => p.items != n.items,
-          builder: (context, state) => _CustomerStatsRow(
-            total: state.items.length,
-            active: state.items.where((c) => c.hasActiveVisit).length,
-          ),
-        ),
-        DebouncedSearchField(
-          padding: EdgeInsetsDirectional.fromSTEB(
-            context.r(Insets.x4),
-            context.rh(Insets.x1),
-            context.r(Insets.x4),
-            context.rh(Insets.x2),
-          ),
-          hintText: context.s.customersSearchHint,
-          onChanged: (q) =>
-              context.read<CustomersBloc>().add(ListSearchChanged(q)),
-        ),
-        Expanded(
-          // Listener as well as builder: when a refresh fails while a list is
-          // already on screen, the error view can't take over (items aren't
-          // empty) and the failure would pass in complete silence — spinner
-          // retracts, stale data stays, no explanation.
-          child: BlocConsumer<CustomersBloc, CustomersState>(
-            listenWhen: (prev, curr) =>
-                prev.status != curr.status &&
-                curr.hasError &&
-                curr.items.isNotEmpty,
-            listener: (context, state) {
-              final s = context.s;
-              context.showSnack(
-                s.commonRefreshFailedStale(
-                    state.error?.localize(context) ?? s.errUnknown),
-                kind: SnackKind.error,
-              );
-            },
-            builder: (context, state) => AsyncListView<Customer>(
-              items: state.items,
-              isLoading: state.isLoading,
-              hasError: state.hasError,
-              errorMessage: state.error?.localize(context),
-              error: state.error,
-              onRefresh: _refresh,
-              emptyIcon: Symbols.groups,
-              emptyMessage: context.s.customersEmpty,
-              itemBuilder: (_, customer, __) =>
-                  _CustomerTile(customer: customer),
+    // Listener as well as builder: when a refresh fails while a list is
+    // already on screen, the error view can't take over (items aren't empty)
+    // and the failure would pass in complete silence — spinner retracts,
+    // stale data stays, no explanation.
+    return BlocConsumer<CustomersBloc, CustomersState>(
+      listenWhen: (prev, curr) =>
+          prev.status != curr.status && curr.hasError && curr.items.isNotEmpty,
+      listener: (context, state) =>
+          context.showStaleRefreshSnack(state.error),
+      builder: (context, state) => AsyncListView<Customer>(
+        items: state.items,
+        isLoading: state.isLoading,
+        hasError: state.hasError,
+        errorMessage: state.error?.localize(context),
+        error: state.error,
+        onRefresh: _refresh,
+        emptyIcon: Symbols.groups,
+        emptyMessage: context.s.customersEmpty,
+        // The summary and the search box scroll with the rows, so a short
+        // screen with the keyboard up still has room for the list.
+        header: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _CustomerStatsRow(
+              total: state.items.length,
+              active: state.items.where((c) => c.hasActiveVisit).length,
             ),
-          ),
+            DebouncedSearchField(
+              // Design-space: the field scales its own padding.
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                Insets.x4,
+                Insets.x1,
+                Insets.x4,
+                Insets.x2,
+              ),
+              hintText: context.s.customersSearchHint,
+              onChanged: (q) =>
+                  context.read<CustomersBloc>().add(ListSearchChanged(q)),
+            ),
+          ],
         ),
-      ],
+        itemBuilder: (_, customer, __) => _CustomerTile(customer: customer),
+      ),
     );
   }
 }
@@ -274,7 +264,7 @@ class _CustomerTile extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        AutoDirectionText(
                           customer.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -292,7 +282,7 @@ class _CustomerTile extends StatelessWidget {
                             ),
                             context.gapW(Insets.x1),
                             Expanded(
-                              child: Text(
+                              child: AutoDirectionText(
                                 addressText,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,

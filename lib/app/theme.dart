@@ -143,6 +143,11 @@ extension AppXContext on BuildContext {
 class AppTheme {
   AppTheme._();
 
+  /// 15 — a text field's vertical padding. With the 16dp body text and its
+  /// line height, it makes a field about as tall as a [CompSz.buttonHeight]
+  /// button.
+  static const double _inputPadV = 15;
+
   // Built once, on first use. `MaterialApp.router(theme: …, darkTheme: …)` sits
   // inside a `BlocBuilder<SettingsCubit>`, so these were re-running on every
   // settings emit — and `_build` is not cheap: a full `ThemeData` fills in
@@ -196,7 +201,7 @@ class AppTheme {
         shadowColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(Radii.lg),
-          side: BorderSide(color: x.outlineVariant, width: 1),
+          side: BorderSide(color: x.outlineVariant, width: CompSz.hairline),
         ),
       ),
       // ── Inputs ───────────────────────────────────────────────────────────
@@ -207,26 +212,26 @@ class AppTheme {
         hintStyle: AppType.bodyMd.copyWith(color: x.textTertiary),
         prefixIconColor: x.textTertiary,
         suffixIconColor: x.textTertiary,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        contentPadding: const EdgeInsets.symmetric(horizontal: Insets.x4, vertical: _inputPadV),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(Radii.md),
-          borderSide: BorderSide(color: x.outlineVariant, width: 1.5),
+          borderSide: BorderSide(color: x.outlineVariant, width: CompSz.outlineWidth),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(Radii.md),
-          borderSide: BorderSide(color: x.outlineVariant, width: 1.5),
+          borderSide: BorderSide(color: x.outlineVariant, width: CompSz.outlineWidth),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(Radii.md),
-          borderSide: BorderSide(color: scheme.primary, width: 1.5),
+          borderSide: BorderSide(color: scheme.primary, width: CompSz.outlineWidth),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(Radii.md),
-          borderSide: BorderSide(color: scheme.error, width: 1.5),
+          borderSide: BorderSide(color: scheme.error, width: CompSz.outlineWidth),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(Radii.md),
-          borderSide: BorderSide(color: scheme.error, width: 1.5),
+          borderSide: BorderSide(color: scheme.error, width: CompSz.outlineWidth),
         ),
       ),
       // ── Buttons ──────────────────────────────────────────────────────────
@@ -234,8 +239,8 @@ class AppTheme {
         style: FilledButton.styleFrom(
           backgroundColor: scheme.primary,
           foregroundColor: scheme.onPrimary,
-          minimumSize: const Size(0, 52),
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+          minimumSize: const Size(0, CompSz.buttonHeight),
+          padding: const EdgeInsets.symmetric(vertical: Insets.x3h, horizontal: Insets.x5),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.btn)),
           textStyle: AppType.button.copyWith(fontWeight: FontWeight.w800),
         ),
@@ -243,9 +248,9 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: scheme.onSurfaceVariant,
-          minimumSize: const Size(0, 52),
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-          side: BorderSide(color: x.outlineVariant, width: 1.5),
+          minimumSize: const Size(0, CompSz.buttonHeight),
+          padding: const EdgeInsets.symmetric(vertical: Insets.x3h, horizontal: Insets.x5),
+          side: BorderSide(color: x.outlineVariant, width: CompSz.outlineWidth),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.btn)),
           textStyle: AppType.button.copyWith(fontWeight: FontWeight.w800),
         ),
@@ -253,7 +258,7 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: scheme.primary,
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: Insets.x3, horizontal: Insets.x4),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.btn)),
           textStyle: AppType.button,
         ),
@@ -263,14 +268,14 @@ class AppTheme {
         backgroundColor: scheme.surfaceContainerLowest,
         indicatorColor: scheme.primaryContainer,
         elevation: 0,
-        height: 64,
+        height: CompSz.navBarHeight,
         // Pin the icon color to the design tokens (mirrors labelTextStyle).
         // Without this the unselected icon color is unspecified and collapses
         // into the nav background, so only the *selected* destination's icon
         // was visible (dashboard showed only when active; analytics never).
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
-            size: 24,
+            size: IconSz.md,
             color: states.contains(WidgetState.selected)
                 ? scheme.primary
                 : x.textTertiary,
@@ -292,7 +297,7 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.sm)),
       ),
       // ── Dividers ─────────────────────────────────────────────────────────
-      dividerTheme: DividerThemeData(color: x.divider, thickness: 1, space: 1),
+      dividerTheme: DividerThemeData(color: x.divider, thickness: CompSz.hairline, space: CompSz.hairline),
       // ── FAB ──────────────────────────────────────────────────────────────
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: scheme.primary,
@@ -334,7 +339,7 @@ class AppTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: scheme.surfaceContainerLowest,
-        side: BorderSide(color: x.outlineVariant, width: 1.5),
+        side: BorderSide(color: x.outlineVariant, width: CompSz.outlineWidth),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.pill)),
         labelStyle: AppType.labelMd.copyWith(color: scheme.onSurfaceVariant),
       ),

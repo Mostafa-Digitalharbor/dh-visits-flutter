@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/design/app_colors.dart';
+import '../../app/design/app_dimens.dart';
 
 /// Circular marker for a `flutter_map` layer: a filled disc with a white ring
 /// and a drop shadow, holding an icon, an initial or a number.
@@ -24,14 +25,26 @@ class MapPin extends StatelessWidget {
   /// whose name doesn't fit on the map.
   final String? tooltip;
 
+  /// How much of the disc a glyph fills.
+  static const _glyphShare = 0.45;
+
+  /// The drop shadow that lifts a pin off the tiles.
+  static const _shadow = [
+    BoxShadow(
+      color: AppColors.shadowStrong,
+      blurRadius: 8,
+      offset: Offset(0, 3),
+    ),
+  ];
+
   const MapPin({
     super.key,
     required this.child,
     this.color,
     this.gradient,
-    this.size = 42,
+    this.size = CompSz.mapPin,
     this.borderColor = Colors.white,
-    this.borderWidth = 2.5,
+    this.borderWidth = CompSz.mapPinRing,
     this.tooltip,
   });
 
@@ -41,8 +54,8 @@ class MapPin extends StatelessWidget {
     required IconData icon,
     Color? color,
     Gradient? gradient,
-    double size = 42,
-    double borderWidth = 2.5,
+    double size = CompSz.mapPin,
+    double borderWidth = CompSz.mapPinRing,
     Color iconColor = Colors.white,
     String? tooltip,
   }) : this(
@@ -52,7 +65,7 @@ class MapPin extends StatelessWidget {
           size: size,
           borderWidth: borderWidth,
           tooltip: tooltip,
-          child: Icon(icon, color: iconColor, size: size * 0.45),
+          child: Icon(icon, color: iconColor, size: size * _glyphShare),
         );
 
   /// Pin showing short text — an initial, or a stop number on the route.
@@ -61,8 +74,8 @@ class MapPin extends StatelessWidget {
     required String text,
     Color? color,
     Gradient? gradient,
-    double size = 42,
-    double borderWidth = 2.5,
+    double size = CompSz.mapPin,
+    double borderWidth = CompSz.mapPinRing,
     Color textColor = Colors.white,
     String? tooltip,
   }) : this(
@@ -72,12 +85,20 @@ class MapPin extends StatelessWidget {
           size: size,
           borderWidth: borderWidth,
           tooltip: tooltip,
-          child: Text(
-            text,
-            style: TextStyle(
-              color: textColor,
-              fontWeight: FontWeight.w800,
-              fontSize: size * 0.36,
+          // One line, shrunk to fit: the disc is a fixed-size map marker but
+          // the text follows the OS text size, so at 1.25x a stop number
+          // like "12" wrapped onto a second line and the disc cut it off.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              text,
+              maxLines: 1,
+              softWrap: false,
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.w800,
+                fontSize: size * 0.36,
+              ),
             ),
           ),
         );
@@ -93,13 +114,7 @@ class MapPin extends StatelessWidget {
         color: gradient == null ? color : null,
         gradient: gradient,
         border: Border.all(color: borderColor, width: borderWidth),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadowStrong,
-            blurRadius: 8,
-            offset: Offset(0, 3),
-          ),
-        ],
+        boxShadow: _shadow,
       ),
       child: child,
     );

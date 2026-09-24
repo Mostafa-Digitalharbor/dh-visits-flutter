@@ -3,6 +3,8 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'journal_entry.dart';
+
 /// One position captured by the native work-day location service and not yet
 /// taken over by the Flutter upload queue.
 class CapturedFix {
@@ -39,27 +41,20 @@ class CapturedFix {
   });
 
   static CapturedFix? tryParse(Map<dynamic, dynamic> raw) {
-    double? d(Object? v) => v is num ? v.toDouble() : null;
-    final seq = raw['seq'];
-    final t = raw['t'];
-    final lat = d(raw['lat']);
-    final lng = d(raw['lng']);
+    final geo = JournalGeo.tryParse(raw);
     final session = raw['s'];
-    if (seq is! num || t is! num || lat == null || lng == null || session is! String) {
-      return null;
-    }
+    if (geo == null || session is! String) return null;
     return CapturedFix(
-      seq: seq.toInt(),
-      deviceTime:
-          DateTime.fromMillisecondsSinceEpoch(t.toInt(), isUtc: true),
-      latitude: lat,
-      longitude: lng,
-      accuracy: d(raw['acc']),
-      altitude: d(raw['alt']),
-      speed: d(raw['spd']),
-      heading: d(raw['hdg']),
+      seq: geo.seq,
+      deviceTime: geo.deviceTime,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
+      accuracy: geo.accuracy,
+      altitude: geo.altitude,
+      speed: geo.speed,
+      heading: geo.heading,
       sessionUid: session,
-      visitId: (raw['v'] as num?)?.toInt(),
+      visitId: JournalGeo.number(raw['v'])?.toInt(),
     );
   }
 }
@@ -160,7 +155,7 @@ class WorkdayLocationChannel {
     );
   }
 
-  Future<List<CapturedFix>> read({int max = 500}) async {
+  Future<List<CapturedFix>> read({int max = journalReadBatch}) async {
     final raw = await _channel.invokeListMethod<dynamic>('read', {'max': max});
     return [
       for (final m in raw ?? const [])

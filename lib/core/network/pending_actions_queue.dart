@@ -8,6 +8,7 @@ import '../../features/visits/data/models/visit.dart';
 import '../../features/visits/data/visits_repository.dart';
 import '../../features/visits/domain/visit_action.dart';
 import '../api/api_exceptions.dart';
+import '../location/tracker_plumbing.dart';
 import '../constants.dart';
 import '../utils/app_log.dart';
 import 'connectivity_status.dart';
@@ -154,15 +155,6 @@ class PendingActionsQueue {
     ApiErrorCode.conflict,
     ApiErrorCode.notFound,
     ApiErrorCode.permissionDenied,
-  };
-
-  /// Codes that say the *session* is unusable. Nothing can be replayed until
-  /// the user signs in again, and the action is not at fault.
-  static const _sessionProblems = {
-    ApiErrorCode.unauthorized,
-    ApiErrorCode.invalidCredentials,
-    ApiErrorCode.sessionRestoreFailed,
-    ApiErrorCode.databaseNotFound,
   };
 
   final SharedPreferences prefs;
@@ -400,7 +392,7 @@ class PendingActionsQueue {
       await _replay(action, a);
       return const _Synced();
     } on ApiException catch (e) {
-      if (_sessionProblems.contains(e.code)) {
+      if (e.isSessionProblem) {
         // The user signs in again and the action goes then; not its fault.
         return const _Retry(countsAsAttempt: false);
       }
@@ -520,28 +512,13 @@ class PendingActionsQueue {
   }
 
   List<PendingAction> _readAll() {
-    final String? raw;
-    try {
-      raw = prefs.getString(_prefsKey);
-    } catch (_) {
-      // A value of another type under this key: nothing readable to salvage.
-      return [];
-    }
-    if (raw == null || raw.isEmpty) return [];
-    final List<dynamic> list;
-    try {
-      list = jsonDecode(raw) as List;
-    } catch (_) {
-      // The whole blob is unreadable — start fresh rather than crash on read.
-      return [];
-    }
     // Entry by entry: one malformed record (a null visitId from a partial
     // write) must not discard every other queued check-in.
     final actions = <PendingAction>[];
     var skipped = 0;
-    for (final m in list.whereType<Map>()) {
+    for (final m in decodeStoredJsonList(() => prefs.getString(_prefsKey))) {
       try {
-        actions.add(PendingAction.fromJson(Map<String, dynamic>.from(m)));
+        actions.add(PendingAction.fromJson(m));
       } catch (e) {
         skipped++;
         appLog('[PendingActionsQueue] skipping unreadable queue entry: $e');

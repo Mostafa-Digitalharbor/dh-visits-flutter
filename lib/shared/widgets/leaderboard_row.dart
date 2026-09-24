@@ -5,6 +5,7 @@ import '../../core/utils/app_number.dart';
 import '../extensions/context_extensions.dart';
 import 'initial_avatar.dart';
 import 'progress_track.dart';
+import 'auto_direction_text.dart';
 
 /// Where a row's figure sits.
 ///
@@ -74,7 +75,7 @@ class LeaderboardRow extends StatelessWidget {
       ),
     );
 
-    final nameText = Text(
+    final nameText = AutoDirectionText(
       name,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
@@ -175,16 +176,23 @@ class RankMedalAvatar extends StatelessWidget {
                 width: _medalOverhang,
               ),
             ),
-            child: Text(
-              AppNumber.whole(rank),
-              maxLines: 1,
-              // The disc can't grow with the OS text size, so neither may the
-              // numeral: at a large setting a two-digit rank spilled out of it.
-              textScaler: TextScaler.noScaling,
-              style: TextStyle(
-                color: medalText,
-                fontSize: FontSz.micro,
-                fontWeight: FontWeight.w800,
+            // Scale down, never clip: the disc is ~11dp inside its ring on a
+            // small phone, so "10" and up were laid out at that width and cut
+            // to "1" (a board of 100+ employees showed wrong ranks).
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                AppNumber.whole(rank),
+                maxLines: 1,
+                // The disc can't grow with the OS text size, so neither may
+                // the numeral: at a large setting a two-digit rank spilled
+                // out of it.
+                textScaler: TextScaler.noScaling,
+                style: TextStyle(
+                  color: medalText,
+                  fontSize: FontSz.micro,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ),

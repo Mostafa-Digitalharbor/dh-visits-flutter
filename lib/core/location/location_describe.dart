@@ -86,12 +86,23 @@ class LocationDescriber {
         if (_has(p.country)) p.country!,
       ],
     ];
-    // De-duplicate: Android often repeats the locality in two fields.
-    final seen = <String>{};
+    // De-duplicate. Android repeats fields, and its `street` is often the
+    // whole formatted address ("PM7F+GW4، الورود، الرياض 12215، السعودية") with
+    // the district and city then repeated on their own — measured on an
+    // Android 16 emulator, 2026-09-17. A part already contained in an earlier
+    // one adds nothing; an earlier part contained in a later one is dropped for
+    // the fuller text.
+    final kept = <String>[];
+    for (final part in parts.map((s) => s.trim())) {
+      if (kept.any((k) => k.contains(part))) continue;
+      kept
+        ..removeWhere(part.contains)
+        ..add(part);
+    }
     final separator = locale != null && AppLocales.isArabicTag(locale)
         ? _arabicSeparator
         : _latinSeparator;
-    return parts.where((s) => seen.add(s)).join(separator);
+    return kept.join(separator);
   }
 
   bool _has(String? s) => s != null && s.trim().isNotEmpty;

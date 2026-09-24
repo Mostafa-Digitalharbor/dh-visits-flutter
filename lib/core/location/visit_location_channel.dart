@@ -3,6 +3,8 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'journal_entry.dart';
+
 /// One position the native visit capture recorded and Flutter has not taken
 /// over yet.
 class CapturedFix {
@@ -38,24 +40,18 @@ class CapturedFix {
   /// native side never writes: a fix that cannot be attributed to a visit is
   /// not recorded at all.
   static CapturedFix? tryParse(Map<dynamic, dynamic> raw) {
-    double? d(Object? v) => v is num ? v.toDouble() : null;
-    final seq = raw['seq'];
-    final t = raw['t'];
-    final lat = d(raw['lat']);
-    final lng = d(raw['lng']);
+    final geo = JournalGeo.tryParse(raw);
     final visit = raw['v'];
-    if (seq is! num || t is! num || lat == null || lng == null || visit is! num) {
-      return null;
-    }
+    if (geo == null || visit is! num) return null;
     return CapturedFix(
-      seq: seq.toInt(),
-      deviceTime: DateTime.fromMillisecondsSinceEpoch(t.toInt(), isUtc: true),
-      latitude: lat,
-      longitude: lng,
-      accuracy: d(raw['acc']),
-      altitude: d(raw['alt']),
-      speed: d(raw['spd']),
-      heading: d(raw['hdg']),
+      seq: geo.seq,
+      deviceTime: geo.deviceTime,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
+      accuracy: geo.accuracy,
+      altitude: geo.altitude,
+      speed: geo.speed,
+      heading: geo.heading,
       visitId: visit.toInt(),
     );
   }
@@ -120,10 +116,7 @@ class VisitLocationChannel {
     );
   }
 
-  /// Most fixes taken from the native journal in one [read].
-  static const int defaultReadBatch = 500;
-
-  Future<List<CapturedFix>> read({int max = defaultReadBatch}) async {
+  Future<List<CapturedFix>> read({int max = journalReadBatch}) async {
     final raw = await _channel.invokeListMethod<dynamic>('read', {'max': max});
     return [
       for (final m in raw ?? const [])

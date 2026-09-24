@@ -16,6 +16,13 @@ import UIKit
     }
     VisitLocation.shared.resumeIfActive(
       relaunchedForLocation: launchOptions?[.location] != nil)
+    // Work-day route capture (WorkdayLocation.swift). Resumed here too, so a
+    // background relaunch for a location event keeps an open work day
+    // recording; nothing runs when no work day is open.
+    if let registrar = self.registrar(forPlugin: "WorkdayLocation") {
+      WorkdayLocation.shared.register(messenger: registrar.messenger())
+    }
+    WorkdayLocation.shared.resumeIfActive()
     // Route APNs callbacks through UNUserNotificationCenter so firebase_messaging
     // can map the APNs token to an FCM token and display foreground banners.
     if #available(iOS 10.0, *) {

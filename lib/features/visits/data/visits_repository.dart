@@ -9,6 +9,7 @@ import '../../../core/api/endpoints.dart';
 import '../../../core/api/odoo_parse.dart';
 import '../../../core/api/odoo_rpc.dart';
 import '../../../core/constants.dart';
+import '../../../core/network/server_clock.dart';
 import '../../../core/storage/session_storage.dart';
 import '../visit_constants.dart';
 import 'mock_location_note.dart';
@@ -49,10 +50,19 @@ class VisitsRepository {
   final ApiClient api;
   final SessionStorage session;
 
-  VisitsRepository({required this.api, required this.session});
+  /// The server's clock. The server judges a fix's `logged_at` against its own
+  /// time, so a default "now" must be read off this rather than the device
+  /// clock: a phone running 90 s fast otherwise files a point after the end
+  /// of a visit that is still running (measured live on 2026-09-17).
+  final ServerClock? serverClock;
+
+  VisitsRepository({
+    required this.api,
+    required this.session,
+    this.serverClock,
+  });
 
   // Odoo names this repository calls by string. Each is used only here.
-  static const _mailMessageModel = 'mail.message';
   static const _messagePost = 'message_post';
   static const _messageTypeComment = 'comment';
 
@@ -324,7 +334,7 @@ class VisitsRepository {
         // Formatting only — the note above is already complete without it.
         try {
           await api.writeRecord(
-            _mailMessageModel,
+            AppConstants.mailMessageModel,
             [messageId],
             {'body': note.html},
           );
@@ -412,7 +422,9 @@ class VisitsRepository {
         // Always sent, never left to the server's "now" default: a fix that
         // waited out a dead zone has to keep the time it was actually taken or
         // it lands in the wrong place in the path.
-        'logged_at': formatOdooUtc(loggedAt ?? DateTime.now()),
+        'logged_at': formatOdooUtc(
+          loggedAt ?? serverClock?.now() ?? DateTime.now(),
+        ),
         if (accuracy != null) 'accuracy': accuracy,
         if (altitude != null) 'altitude': altitude,
         if (speed != null) 'speed': speed,
@@ -543,7 +555,7 @@ class VisitsRepository {
   Future<bool> hasMockLocationFlag(int visitId) async {
     try {
       final rows = await api.searchRead(
-        _mailMessageModel,
+        AppConstants.mailMessageModel,
         domain: [
           ['model', '=', AppConstants.visitModel],
           ['res_id', '=', visitId],

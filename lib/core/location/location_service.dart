@@ -1,14 +1,47 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../constants.dart';
+import '../utils/app_log.dart';
 import 'location_outcome.dart';
 
 enum LocationAccess { granted, denied, deniedForever, serviceDisabled }
 
 class LocationService {
+  /// [platform] and [clock] exist for tests; the app uses the real ones.
+  LocationService({
+    GeolocatorPlatform? platform,
+    DateTime Function()? clock,
+    this.timeLimit = fixTimeout,
+  })  : _platform = platform,
+        _clock = clock ?? DateTime.now;
+
+  final GeolocatorPlatform? _platform;
+  final DateTime Function() _clock;
+
+  /// How long [getCurrent] waits. Always [fixTimeout] outside tests.
+  final Duration timeLimit;
+
+  GeolocatorPlatform get _geo => _platform ?? GeolocatorPlatform.instance;
+
   /// Longest a one-off fix may take before the caller is told it's
   /// unavailable (indoors, a basement) rather than left waiting.
   static const Duration fixTimeout = Duration(seconds: 10);
+
+  /// A fix older than this when it arrives is a remembered position, not a
+  /// reading taken now. Android's fused provider can hand one out first: on
+  /// the emulator one was minutes old and about 600 m away and became a
+  /// visit's start, and during a visit one a few seconds old put the End
+  /// behind the last trail point. The next live fix follows within a second
+  /// (see [_fixInterval]), so waiting for it costs little.
+  static const Duration fixMaxAge = Duration(seconds: 2);
+
+  /// A Start/End fix less certain than this keeps [getCurrent] waiting for a
+  /// better one. The same bar the trail applies to its points.
+  static const double fixMaxAccuracyMeters =
+      AppConstants.trailMaxAccuracyMeters;
 
   /// The `NSLocationTemporaryUsageDescriptionDictionary` key in Info.plist
   /// that explains why an active visit's trail needs precise location.
@@ -121,16 +154,56 @@ class LocationService {
     }
   }
 
+  /// Where the user is now: the evidence recorded on a Start or End.
+  ///
+  /// Listens until a fix is both live and within [fixMaxAccuracyMeters],
+  /// rather than taking the first one delivered, which can be the platform's
+  /// cached position (see [fixMaxAge]). When [timeLimit] runs out, the best
+  /// fix seen wins, a live coarse one over a precise stale one. With no fix
+  /// at all it throws [TimeoutException].
   Future<Position> getCurrent({
     LocationAccuracy accuracy = LocationAccuracy.high,
   }) {
-    return Geolocator.getCurrentPosition(
-      locationSettings: LocationSettings(
-        accuracy: accuracy,
-        timeLimit: fixTimeout,
-      ),
+    final done = Completer<Position>();
+    final picker = _FixPicker(_clock);
+    StreamSubscription<Position>? sub;
+    Timer? timer;
+
+    void finish([Object? error]) {
+      if (done.isCompleted) return;
+      timer?.cancel();
+      unawaited(sub?.cancel());
+      final fix = picker.best;
+      if (fix != null) {
+        done.complete(fix);
+      } else {
+        done.completeError(
+          error ?? TimeoutException('No position fix', timeLimit),
+        );
+      }
+    }
+
+    timer = Timer(timeLimit, finish);
+    sub = _geo
+        .getPositionStream(locationSettings: _oneOffSettings(accuracy))
+        .listen(
+      (fix) {
+        if (picker.offer(fix)) finish();
+      },
+      onError: finish,
+      onDone: finish,
     );
+    return done.future;
   }
+
+  /// Android otherwise asks for a fix every 5 s, so a skipped fix would cost
+  /// up to 5 s of waiting.
+  static LocationSettings _oneOffSettings(LocationAccuracy accuracy) =>
+      defaultTargetPlatform == TargetPlatform.android
+          ? AndroidSettings(accuracy: accuracy, intervalDuration: _fixInterval)
+          : LocationSettings(accuracy: accuracy);
+
+  static const Duration _fixInterval = Duration(seconds: 1);
 
   Stream<Position> watch({
     LocationAccuracy accuracy = LocationAccuracy.high,
@@ -143,4 +216,65 @@ class LocationService {
       ),
     );
   }
+}
+
+/// Picks the Start/End fix out of a position stream, for
+/// [LocationService.getCurrent].
+class _FixPicker {
+  _FixPicker(this._clock);
+
+  final DateTime Function() _clock;
+
+  /// The fix to use if listening stops now.
+  Position? best;
+  bool _bestLive = false;
+
+  Position? _last;
+  Duration _lastSkew = Duration.zero;
+
+  /// Takes one fix; true when it is good enough to stop listening.
+  bool offer(Position fix) {
+    final skew = _clock().difference(fix.timestamp);
+    final live =
+        skew.abs() <= LocationService.fixMaxAge || _continuesStream(fix, skew);
+    _last = fix;
+    _lastSkew = skew;
+
+    final precise = _isPrecise(fix);
+    appLog(
+      '[LocationService] fix age=${skew.inMilliseconds}ms '
+      'accuracy=${fix.accuracy}m live=$live precise=$precise',
+    );
+    final held = best;
+    final rank = _rank(live: live, precise: precise);
+    final heldRank =
+        held == null ? -1 : _rank(live: _bestLive, precise: _isPrecise(held));
+    if (rank > heldRank ||
+        (rank == heldRank && fix.timestamp.isAfter(held!.timestamp))) {
+      best = fix;
+      _bestLive = live;
+    }
+    return live && precise;
+  }
+
+  /// A device clock that is wrong makes every fix look old. A live stream
+  /// still shows through it: each fix is newer than the one before, and both
+  /// sit the same distance from the clock. A remembered fix followed by a
+  /// live one does not, so the remembered one is never taken for live.
+  bool _continuesStream(Position fix, Duration skew) {
+    final last = _last;
+    return last != null &&
+        fix.timestamp.isAfter(last.timestamp) &&
+        (skew - _lastSkew).abs() <= LocationService.fixMaxAge;
+  }
+
+  /// Android reports 0 when a fix carries no accuracy; that is not a reason
+  /// to keep waiting.
+  static bool _isPrecise(Position fix) =>
+      fix.accuracy <= LocationService.fixMaxAccuracyMeters;
+
+  /// Live matters more than precise: a coarse fix from now beats an exact
+  /// one from minutes ago.
+  static int _rank({required bool live, required bool precise}) =>
+      (live ? 2 : 0) + (precise ? 1 : 0);
 }

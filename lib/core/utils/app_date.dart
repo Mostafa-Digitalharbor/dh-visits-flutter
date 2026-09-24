@@ -73,19 +73,45 @@ class AppDate {
     );
   }
 
+  // ---- Symbolic patterns, per language ----
+  // intl localizes the *words* of a pattern but not its order or punctuation:
+  // 'MMM d, HH:mm' in Arabic renders "سبتمبر 16, 20:55" — English order and an
+  // English comma inside an Arabic sentence (seen on the emulator,
+  // 2026-09-17). Arabic writes the day first and uses the Arabic comma.
+  static const _weekdayDateTimeLatin = 'EEE, MMM d • HH:mm';
+  static const _weekdayDateTimeArabic = 'EEEE، d MMMM • HH:mm';
+  static const _dateTimeLatin = 'MMM d, HH:mm';
+  static const _dateTimeArabic = 'd MMMM، HH:mm';
+  static const _dayMonthLatin = 'MMM d';
+  static const _dayMonthArabic = 'd MMMM';
+
+  static AppDateFormat _localized(
+    BuildContext context, {
+    required String latin,
+    required String arabic,
+  }) =>
+      _fmt(
+        AppLocales.isArabic(Localizations.localeOf(context)) ? arabic : latin,
+        context,
+      );
+
   // ---- Formatters (reuse across several values in one build) ----
 
   /// "Wed, Jul 15 • 14:30" / "الأربعاء، 15 يوليو • 14:30"
   static AppDateFormat weekdayDateTimeFormat(BuildContext context) =>
-      _fmt('EEE, MMM d • HH:mm', context);
+      _localized(
+        context,
+        latin: _weekdayDateTimeLatin,
+        arabic: _weekdayDateTimeArabic,
+      );
 
   /// "Jul 15, 14:30" / "15 يوليو، 14:30"
   static AppDateFormat dateTimeFormat(BuildContext context) =>
-      _fmt('MMM d, HH:mm', context);
+      _localized(context, latin: _dateTimeLatin, arabic: _dateTimeArabic);
 
   /// "Jul 15" / "15 يوليو"
   static AppDateFormat dayMonthFormat(BuildContext context) =>
-      _fmt('MMM d', context);
+      _localized(context, latin: _dayMonthLatin, arabic: _dayMonthArabic);
 
   /// "14:30" — 24h clock.
   static AppDateFormat timeFormat(BuildContext context) =>

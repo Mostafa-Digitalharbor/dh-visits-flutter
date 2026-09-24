@@ -7,6 +7,7 @@ import '../../core/utils/user_time.dart';
 import '../../features/visits/data/models/visit.dart';
 import '../../features/visits/view/visit_labels.dart';
 import '../extensions/context_extensions.dart';
+import 'auto_direction_text.dart';
 
 /// A compact card summarising a visit: customer + reference, type, schedule,
 /// workflow-state badge and (optionally) the responsible employee.
@@ -37,6 +38,12 @@ class VisitCard extends StatelessWidget {
     // The reference is its own line only when the title is the customer —
     // otherwise the title already *is* the reference.
     final reference = visit.partnerName != null ? visit.name : null;
+    // Empty when Odoo sent no visit_type and no linked record; the line is
+    // then skipped rather than drawn as a lone folder icon.
+    final linked = context.joinFacts([
+      visitTypeLabel(context, visit.visitType),
+      visit.linkedRecordName,
+    ]);
 
     return Card(
       margin: EdgeInsets.symmetric(vertical: context.rh(Insets.x1)),
@@ -55,7 +62,7 @@ class VisitCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        AutoDirectionText(
                           visit.displayTitle(context),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -90,16 +97,14 @@ class VisitCard extends StatelessWidget {
                 runSpacing: context.rh(Insets.x1),
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  _meta(
-                    context,
-                    icon: visit.isOpportunity
-                        ? Icons.emoji_events_outlined
-                        : Icons.folder_open_outlined,
-                    text: context.joinFacts([
-                      visitTypeLabel(context, visit.visitType),
-                      visit.linkedRecordName,
-                    ]),
-                  ),
+                  if (linked.isNotEmpty)
+                    _meta(
+                      context,
+                      icon: visit.isOpportunity
+                          ? Icons.emoji_events_outlined
+                          : Icons.folder_open_outlined,
+                      text: linked,
+                    ),
                   if (schedule != null)
                     _meta(
                       context,
@@ -113,6 +118,7 @@ class VisitCard extends StatelessWidget {
                       context,
                       icon: Icons.person_outline,
                       text: visit.employeeName!,
+                      authored: true,
                     ),
                   if (visit.isEscalated)
                     _meta(
@@ -125,7 +131,7 @@ class VisitCard extends StatelessWidget {
               ),
               if (visit.purpose != null) ...[
                 context.gapH(Insets.x2),
-                Text(
+                AutoDirectionText(
                   visit.purpose!,
                   maxLines: _purposeLines,
                   overflow: TextOverflow.ellipsis,
@@ -140,11 +146,14 @@ class VisitCard extends StatelessWidget {
     );
   }
 
+  /// [authored]: [text] is someone's name rather than a line this card
+  /// composed, and is laid out in its own direction.
   Widget _meta(
     BuildContext context, {
     required IconData icon,
     required String text,
     Color? color,
+    bool authored = false,
   }) {
     final c = color ?? context.colors.onSurfaceVariant;
     return Row(
@@ -158,12 +167,19 @@ class VisitCard extends StatelessWidget {
         // opportunity and employee names, longer in Arabic) and do overflow.
         // Loose fit keeps short labels at their natural width.
         Flexible(
-          child: Text(
-            text,
-            style: context.text.bodySmall?.copyWith(color: c),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          child: authored
+              ? AutoDirectionText(
+                  text,
+                  style: context.text.bodySmall?.copyWith(color: c),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                )
+              : Text(
+                  text,
+                  style: context.text.bodySmall?.copyWith(color: c),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
         ),
       ],
     );

@@ -53,6 +53,11 @@ class AsyncListView<T> extends StatelessWidget {
   /// margins, so it passes zero.
   final double separatorHeight;
 
+  /// Content above the rows that scrolls away with them — a search box, a
+  /// summary. A fixed column above the list instead overflowed short screens
+  /// once the keyboard was up (a phone on its side while searching).
+  final Widget? header;
+
   const AsyncListView({
     super.key,
     required this.items,
@@ -72,6 +77,7 @@ class AsyncListView<T> extends StatelessWidget {
       Insets.x4,
     ),
     this.separatorHeight = Insets.x2,
+    this.header,
   });
 
   /// Placeholder rows while the first page loads — about a phone screen's worth.
@@ -79,6 +85,8 @@ class AsyncListView<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final header = this.header;
+    if (header != null) return _withHeader(context, header);
     // Only a failure with nothing to show takes over the screen. A refresh that
     // fails over existing rows keeps them — the caller reports that case with a
     // snackbar rather than throwing away data the user is reading.
@@ -99,9 +107,21 @@ class AsyncListView<T> extends StatelessWidget {
         itemCount: skeletonCount,
       );
     } else if (items.isEmpty) {
-      body = ScaleFadeIn(
+      // EmptyView centres through AdaptiveCenter, whose scroll view only takes
+      // a drag when its content overflows — so "nothing here" could not be
+      // pulled to refresh, which is exactly when users pull. Always-scrollable
+      // physics (over the platform's own) let the pull reach the indicator.
+      final scroll = ScrollConfiguration.of(context);
+      body = ScrollConfiguration(
         key: WidgetKeys.listEmpty,
-        child: EmptyView(icon: emptyIcon, message: emptyMessage),
+        behavior: scroll.copyWith(
+          physics: AlwaysScrollableScrollPhysics(
+            parent: scroll.getScrollPhysics(context),
+          ),
+        ),
+        child: ScaleFadeIn(
+          child: EmptyView(icon: emptyIcon, message: emptyMessage),
+        ),
       );
     } else {
       final direction = Directionality.of(context);
@@ -130,6 +150,72 @@ class AsyncListView<T> extends StatelessWidget {
         switchInCurve: Curves.easeOut,
         switchOutCurve: Curves.easeIn,
         child: body,
+      ),
+    );
+  }
+
+  /// The same ladder with [header] scrolling above it, all in one scroll view.
+  Widget _withHeader(BuildContext context, Widget header) {
+    final Widget state;
+    if (hasError && items.isEmpty) {
+      // `hasScrollBody: true`: with `false` the sliver measures its child's
+      // intrinsic height, which the error and empty views (built on a
+      // LayoutBuilder) cannot report — the state threw instead of rendering.
+      state = SliverFillRemaining(
+        hasScrollBody: true,
+        child: ErrorView(
+          message: errorMessage ??
+              error?.messageFor(context.s) ??
+              context.s.errUnknown,
+          reference: error?.supportReference,
+          onRetry: onRefresh,
+        ),
+      );
+    } else if (isLoading && items.isEmpty) {
+      state = SliverToBoxAdapter(
+        child: SizedBox(
+          height: SkeletonList.rowHeight * skeletonCount,
+          child: SkeletonList(
+            key: WidgetKeys.listSkeleton,
+            itemCount: skeletonCount,
+          ),
+        ),
+      );
+    } else if (items.isEmpty) {
+      state = SliverFillRemaining(
+        key: WidgetKeys.listEmpty,
+        hasScrollBody: true,
+        child: ScaleFadeIn(
+          child: EmptyView(icon: emptyIcon, message: emptyMessage),
+        ),
+      );
+    } else {
+      final resolved = padding.resolve(Directionality.of(context));
+      state = SliverPadding(
+        key: WidgetKeys.listContent,
+        padding: EdgeInsets.fromLTRB(
+          context.r(resolved.left),
+          context.rh(resolved.top),
+          context.r(resolved.right),
+          context.rh(resolved.bottom),
+        ),
+        sliver: SliverList.separated(
+          itemCount: items.length,
+          separatorBuilder: (_, __) => context.gapH(separatorHeight),
+          itemBuilder: (context, i) => AnimatedListItem(
+            index: i,
+            child: itemBuilder(context, items[i], i),
+          ),
+        ),
+      );
+    }
+
+    return AppRefreshIndicator(
+      onRefresh: onRefresh,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        slivers: [SliverToBoxAdapter(child: header), state],
       ),
     );
   }

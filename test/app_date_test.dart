@@ -74,6 +74,20 @@ void main() {
         contains('يوليو'));
   });
 
+  testWidgets('Arabic dates read day-first with the Arabic comma', (t) async {
+    // intl translates the words of a pattern but keeps its order and
+    // punctuation; the emulator showed "سبتمبر 16, 20:55" before this.
+    expect(await formatIn(t, ar, (c) => AppDate.dateTime(c, when)),
+        '15 يوليو، 14:30');
+    expect(await formatIn(t, ar, (c) => AppDate.weekdayDateTime(c, when)),
+        'الأربعاء، 15 يوليو • 14:30');
+    expect(await formatIn(t, ar, (c) => AppDate.dayMonth(c, when)), '15 يوليو');
+    expect(await formatIn(t, en, (c) => AppDate.dateTime(c, when)),
+        'Jul 15, 14:30');
+    expect(await formatIn(t, en, (c) => AppDate.weekdayDateTime(c, when)),
+        'Wed, Jul 15 • 14:30');
+  });
+
   testWidgets('the 24h clock stays stable across locales', (t) async {
     // Numeric-only patterns carry no month/weekday words, so both languages
     // should agree — no AM/PM creeping in from a locale default.

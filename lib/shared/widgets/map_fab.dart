@@ -12,17 +12,20 @@ class MapFab extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  /// Optional accessibility label — map glyphs carry no text of their own.
-  final String? semanticLabel;
+  /// Accessibility label. Required: map glyphs carry no text of their own, so
+  /// without it a screen reader announces an unnamed button.
+  final String semanticLabel;
 
-  static const double _size = 44;
+  /// The minimum touch target (Android accessibility guideline). Was 44,
+  /// which the tap-target check flags.
+  static const double _size = IconSz.hit;
   static const double _elevation = 3;
 
   const MapFab.rounded({
     super.key,
     required this.icon,
     required this.onTap,
-    this.semanticLabel,
+    required this.semanticLabel,
   });
 
   @override
@@ -44,8 +47,6 @@ class MapFab extends StatelessWidget {
         ),
       ),
     );
-    return semanticLabel == null
-        ? button
-        : Semantics(button: true, label: semanticLabel, child: button);
+    return Semantics(button: true, label: semanticLabel, child: button);
   }
 }

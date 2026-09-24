@@ -38,6 +38,12 @@ class CvSubAppBar extends StatelessWidget implements PreferredSizeWidget {
   /// The title and eyebrow sit as a tight pair.
   static const double _lineHeight = 1.15;
 
+  /// Space above and below the row. Everything in the row is centred, so this
+  /// does not move anything. It only sets how much height the row gets. With
+  /// 10dp (`Insets.x2h`) the row was 39dp tall, less than the chip's 48dp
+  /// touch target, and a tablet's 48dp chip was squashed to 48×39.
+  static const double _padV = Insets.x1;
+
   @override
   Size get preferredSize => Size.fromHeight(_barHeight + topInset);
 
@@ -53,9 +59,9 @@ class CvSubAppBar extends StatelessWidget implements PreferredSizeWidget {
         height: _barHeight + topInset,
         padding: EdgeInsetsDirectional.fromSTEB(
           Insets.x3h,
-          Insets.x2h + topInset,
+          _padV + topInset,
           Insets.x3h,
-          Insets.x2h,
+          _padV,
         ),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: x.outlineVariant)),
@@ -66,8 +72,13 @@ class CvSubAppBar extends StatelessWidget implements PreferredSizeWidget {
               icon: rtl ? Symbols.arrow_forward_ios : Symbols.arrow_back_ios_new,
               tooltip: MaterialLocalizations.of(context).backButtonTooltip,
               onTap: () {
-                if (context.canPop()) {
-                  context.pop();
+                // maybeOf, not `context.canPop()`: that calls GoRouter.of,
+                // which throws when there is no GoRouter above the bar (a
+                // route pushed with a plain Navigator), so the Navigator
+                // fallback below was never reached.
+                final router = GoRouter.maybeOf(context);
+                if (router != null && router.canPop()) {
+                  router.pop();
                 } else {
                   Navigator.of(context).maybePop();
                 }

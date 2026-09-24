@@ -67,7 +67,13 @@ class _LazyIndexedStackState extends State<LazyIndexedStack> {
       // `children`; it costs nothing until the tab is first opened.
       children: [
         for (var i = 0; i < widget.children.length; i++)
-          _mounted[i] ? widget.children[i] : const SizedBox.shrink(),
+          _mounted[i]
+              // A hidden tab keeps its state but not its clock: pulses,
+              // shimmers and count-ups pause until it is shown again,
+              // instead of drawing offscreen frames on a field phone's
+              // battery all day.
+              ? TickerMode(enabled: i == widget.index, child: widget.children[i])
+              : const SizedBox.shrink(),
       ],
     );
   }

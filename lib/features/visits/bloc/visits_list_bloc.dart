@@ -35,6 +35,13 @@ class VisitsListBloc extends Bloc<VisitsListEvent, VisitsListState> {
     on<VisitsListFocusChanged>(
       (e, emit) => emit(state.copyWith(focus: e.focus, clearStateFilter: true)),
     );
+    on<VisitsListVisitChanged>((e, emit) {
+      final index = state.items.indexWhere((v) => v.id == e.visit.id);
+      if (index < 0) return;
+      emit(state.copyWith(
+        items: [...state.items]..[index] = e.visit,
+      ));
+    });
     on<VisitsListReset>((_, emit) => emit(VisitsListState.initial));
   }
 

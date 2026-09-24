@@ -159,24 +159,24 @@ class WorkdayPoint extends Equatable {
   WorkdayPoint markMaybeSent() => _copy(maybeSent: true);
 
   WorkdayPoint _copy({int? attempts, bool? maybeSent}) => WorkdayPoint(
-        uid: uid,
-        sessionUid: sessionUid,
-        visitId: visitId,
-        source: source,
-        point: point,
-        attempts: attempts ?? this.attempts,
-        maybeSent: maybeSent ?? this.maybeSent,
-      );
+    uid: uid,
+    sessionUid: sessionUid,
+    visitId: visitId,
+    source: source,
+    point: point,
+    attempts: attempts ?? this.attempts,
+    maybeSent: maybeSent ?? this.maybeSent,
+  );
 
   Map<String, dynamic> toJson() => {
-        'u': uid,
-        's': sessionUid,
-        if (visitId != null) 'v': visitId,
-        'src': source.name,
-        'n': attempts,
-        if (maybeSent) 'ms': true,
-        'p': point.toJson(),
-      };
+    'u': uid,
+    's': sessionUid,
+    if (visitId != null) 'v': visitId,
+    'src': source.name,
+    'n': attempts,
+    if (maybeSent) 'ms': true,
+    'p': point.toJson(),
+  };
 
   static WorkdayPoint? tryFromJson(Map<String, dynamic> j) {
     final uid = j['u'];
@@ -210,7 +210,11 @@ class RouteSegment extends Equatable {
   final int? visitId;
   final int start;
   final int end;
-  const RouteSegment({required this.visitId, required this.start, required this.end});
+  const RouteSegment({
+    required this.visitId,
+    required this.start,
+    required this.end,
+  });
 
   bool get isVisit => visitId != null;
   int get length => end - start + 1;
@@ -250,7 +254,10 @@ class WorkdayRoute extends Equatable {
     'x_source',
   ];
 
-  factory WorkdayRoute.fromApi(WorkSession session, List<Map<String, dynamic>> rows) {
+  factory WorkdayRoute.fromApi(
+    WorkSession session,
+    List<Map<String, dynamic>> rows,
+  ) {
     final logs = <VisitLocationLog>[];
     final refs = <int, String>{};
     for (final r in rows) {
@@ -261,26 +268,31 @@ class WorkdayRoute extends Equatable {
       if (lat.abs() > 90 || lng.abs() > 180) continue;
       final (visitId, visitRef) = _m2o(r['x_visit_id']);
       if (visitId != null && visitRef != null) refs[visitId] = visitRef;
-      logs.add(VisitLocationLog(
-        id: (r['id'] as num?)?.toInt() ?? 0,
-        visitId: visitId,
-        loggedAt: at,
-        latitude: lat,
-        longitude: lng,
-        accuracy: _num(r['x_accuracy']),
-        altitude: _num(r['x_altitude']),
-        speed: _num(r['x_speed']),
-        heading: _num(r['x_heading']),
-        deviceId: _str(r['x_device_id']),
-        source: trailSourceFromWire(_str(r['x_source'])),
-      ));
+      logs.add(
+        VisitLocationLog(
+          id: (r['id'] as num?)?.toInt() ?? 0,
+          visitId: visitId,
+          loggedAt: at,
+          latitude: lat,
+          longitude: lng,
+          accuracy: _num(r['x_accuracy']),
+          altitude: _num(r['x_altitude']),
+          speed: _num(r['x_speed']),
+          heading: _num(r['x_heading']),
+          deviceId: _str(r['x_device_id']),
+          source: trailSourceFromWire(_str(r['x_source'])),
+        ),
+      );
     }
     // Kept in the server's order (`x_logged_at asc, id asc`), like a visit trail.
     return WorkdayRoute(session: session, logs: logs, visitRefs: refs);
   }
 
   /// A work day's `points` as `/api/workday/track` returns them, oldest first.
-  factory WorkdayRoute.fromWorkdayApi(WorkSession session, List<dynamic> points) {
+  factory WorkdayRoute.fromWorkdayApi(
+    WorkSession session,
+    List<dynamic> points,
+  ) {
     final logs = <VisitLocationLog>[];
     final refs = <int, String>{};
     for (final raw in points.whereType<Map>()) {
@@ -290,22 +302,26 @@ class WorkdayRoute extends Equatable {
       final at = parseOdooUtc(p['logged_at']);
       if (lat == null || lng == null || at == null) continue;
       if (lat.abs() > 90 || lng.abs() > 180) continue;
-      final visitId = (p['visit_id'] is num) ? (p['visit_id'] as num).toInt() : null;
+      final visitId = (p['visit_id'] is num)
+          ? (p['visit_id'] as num).toInt()
+          : null;
       final visitRef = _str(p['visit_name']);
       if (visitId != null && visitRef != null) refs[visitId] = visitRef;
-      logs.add(VisitLocationLog(
-        id: (p['id'] as num?)?.toInt() ?? 0,
-        visitId: visitId,
-        loggedAt: at,
-        latitude: lat,
-        longitude: lng,
-        accuracy: _num(p['accuracy']),
-        altitude: _num(p['altitude']),
-        speed: _num(p['speed']),
-        heading: _num(p['heading']),
-        deviceId: _str(p['device_id']),
-        source: trailSourceFromWire(_str(p['source'])),
-      ));
+      logs.add(
+        VisitLocationLog(
+          id: (p['id'] as num?)?.toInt() ?? 0,
+          visitId: visitId,
+          loggedAt: at,
+          latitude: lat,
+          longitude: lng,
+          accuracy: _num(p['accuracy']),
+          altitude: _num(p['altitude']),
+          speed: _num(p['speed']),
+          heading: _num(p['heading']),
+          deviceId: _str(p['device_id']),
+          source: trailSourceFromWire(_str(p['source'])),
+        ),
+      );
     }
     return WorkdayRoute(session: session, logs: logs, visitRefs: refs);
   }
@@ -316,22 +332,30 @@ class WorkdayRoute extends Equatable {
     var from = 0;
     for (var i = 1; i <= logs.length; i++) {
       if (i == logs.length || logs[i].visitId != logs[from].visitId) {
-        out.add(RouteSegment(visitId: logs[from].visitId, start: from, end: i - 1));
+        out.add(
+          RouteSegment(visitId: logs[from].visitId, start: from, end: i - 1),
+        );
         from = i;
       }
     }
     return out;
   }
 
-  List<RouteSegment> get visitSegments =>
-      [for (final s in segments) if (s.isVisit) s];
+  List<RouteSegment> get visitSegments => [
+    for (final s in segments)
+      if (s.isVisit) s,
+  ];
 
   /// Path length through every point, in km.
   double get distanceKm {
     var m = 0.0;
     for (var i = 1; i < logs.length; i++) {
-      m += haversineMeters(logs[i - 1].latitude, logs[i - 1].longitude,
-          logs[i].latitude, logs[i].longitude);
+      m += haversineMeters(
+        logs[i - 1].latitude,
+        logs[i - 1].longitude,
+        logs[i].latitude,
+        logs[i].longitude,
+      );
     }
     return m / 1000;
   }

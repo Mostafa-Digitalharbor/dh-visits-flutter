@@ -12,6 +12,18 @@ import '../../app/theme.dart' show AppX;
 /// switches to `success` / `error` for explicit results.
 enum SnackKind { info, success, error }
 
+const _firstStrongIsolate = '\u2068';
+const _popDirectionalIsolate = '\u2069';
+final _latinLetter = RegExp('[A-Za-z]');
+final _arabicLetter = RegExp('[\u0600-\u06FF]');
+
+/// [text] inside a first-strong directional isolate when it contains letters
+/// of the script that runs against the screen ([rtl]); unchanged otherwise.
+String bidiIsolateIfForeign(String text, {required bool rtl}) =>
+    (rtl ? _latinLetter : _arabicLetter).hasMatch(text)
+        ? '$_firstStrongIsolate$text$_popDirectionalIsolate'
+        : text;
+
 extension AppContext on BuildContext {
   AppLocalizations get s => AppLocalizations.of(this);
   ThemeData get theme => Theme.of(this);
@@ -23,11 +35,21 @@ extension AppContext on BuildContext {
   /// Joins the non-empty [parts] with the localized list separator —
   /// "VIS/0012 · Project Alpha". Null and blank parts are skipped, so a line
   /// never starts or ends with a dangling separator.
-  String joinFacts(Iterable<String?> parts) => parts
-      .whereType<String>()
-      .map((p) => p.trim())
-      .where((p) => p.isNotEmpty)
-      .join(s.commonListSeparator);
+  ///
+  /// A part written in the other script ("Acme Rollout" on an Arabic screen)
+  /// is wrapped in Unicode directional isolates. The line then reads in the
+  /// screen's direction — label first — while the part keeps its own order;
+  /// without them the bidi algorithm reordered the pieces around the
+  /// separator.
+  String joinFacts(Iterable<String?> parts) {
+    final rtl = isRtl;
+    return parts
+        .whereType<String>()
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .map((p) => bidiIsolateIfForeign(p, rtl: rtl))
+        .join(s.commonListSeparator);
+  }
 
   /// Runs an external-launch action (dial / mail / maps) and, if it fails
   /// (no handler app, or the launch threw), shows a clear localized message
@@ -43,6 +65,22 @@ extension AppContext on BuildContext {
       showSnack(s.errCannotLaunchApp, kind: SnackKind.error);
     }
   }
+
+  /// Announces that a reload failed while stale content stays on screen.
+  ///
+  /// Three screens (visits, customers, notifications) each hit the same case:
+  /// the list is not empty, so the error view cannot take over, and without
+  /// this the failure passed in complete silence — the spinner retracted, the
+  /// stale rows stayed, and nothing said they were no longer current. Each
+  /// screen still decides *when* to announce (its own `listenWhen`); what a
+  /// user reads is written once, here.
+  ///
+  /// [error] null — a failure with no classified cause — still gets the
+  /// generic sentence rather than an empty parenthesis.
+  void showStaleRefreshSnack(ApiException? error) => showSnack(
+        s.commonRefreshFailedStale(error?.localize(this) ?? s.errUnknown),
+        kind: SnackKind.error,
+      );
 
   /// Shows [message] as the app's floating snackbar.
   ///

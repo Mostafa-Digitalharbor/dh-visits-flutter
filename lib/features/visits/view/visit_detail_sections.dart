@@ -359,59 +359,58 @@ class _ParticipantTile extends StatelessWidget {
     final cubit = context.read<VisitDetailCubit>();
     return Padding(
       padding: EdgeInsets.symmetric(vertical: context.r(Insets.x2)),
-      child: Row(
-        children: [
-          IconBadge(
-            icon: Icons.person_outline,
-            color: tone,
-            size: context.r(CompSz.badge),
-            iconSize: context.r(IconSz.label),
-          ),
-          context.gapW(Insets.x3),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  participant.employeeName ?? context.s.wfUnknownEmployee,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                context.gapH(Insets.hair),
-                Text(
-                  participantStateLabel(context, participant.approvalState),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.labelMedium?.copyWith(
-                    color: tone,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+      child: MediaRow(
+        // The buttons' own hit areas supply the spacing.
+        trailingGap: Insets.none,
+        leading: IconBadge(
+          icon: Icons.person_outline,
+          color: tone,
+          size: context.r(CompSz.badge),
+          iconSize: context.r(IconSz.label),
+        ),
+        lines: [
+          AutoDirectionText(
+            participant.employeeName ?? context.s.wfUnknownEmployee,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: context.text.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
             ),
           ),
-          if (_canAct) ...[
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              icon: Icon(Icons.check_circle, color: context.visitSuccess),
-              tooltip: context.s.wfApproveParticipant,
-              onPressed: () => cubit.approveParticipant(participant.id),
+          context.gapH(Insets.hair),
+          Text(
+            participantStateLabel(context, participant.approvalState),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.text.labelMedium?.copyWith(
+              color: tone,
+              fontWeight: FontWeight.w700,
             ),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              icon: Icon(Icons.cancel, color: context.colors.error),
-              tooltip: context.s.wfRejectParticipant,
-              onPressed: () async {
-                final reason = await showRejectReasonSheet(context);
-                if (reason == null) return;
-                await cubit.rejectParticipant(participant.id, reason);
-              },
-            ),
-          ],
+          ),
         ],
+        trailing: !_canAct
+            ? null
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Default density: compact shrank these to 40dp, and a
+                  // mis-tap between them rejects instead of approving.
+                  IconButton(
+                    icon: Icon(Icons.check_circle, color: context.visitSuccess),
+                    tooltip: context.s.wfApproveParticipant,
+                    onPressed: () => cubit.approveParticipant(participant.id),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.cancel, color: context.colors.error),
+                    tooltip: context.s.wfRejectParticipant,
+                    onPressed: () async {
+                      final reason = await showRejectReasonSheet(context);
+                      if (reason == null) return;
+                      await cubit.rejectParticipant(participant.id, reason);
+                    },
+                  ),
+                ],
+              ),
       ),
     );
   }

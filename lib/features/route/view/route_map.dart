@@ -126,29 +126,14 @@ class RouteMap extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, box) {
-          // The summary chip and the line toggle share the top edge; with
-          // both present each gets half of it, so neither covers the other.
-          final chipMaxWidth = math.max(
-            0.0,
-            showToggle
-                ? box.maxWidth / 2 - margin * 1.5
-                : box.maxWidth - margin * 2,
-          );
           return AppMap(
             key: _frameKey,
             initialCenter:
                 allPoints.isNotEmpty ? allPoints.first : AppMap.fallbackCenter,
             initialZoom: AppConstants.mapZoomRoute,
-            // Extra room at the top: the summary chip overlays it, and a
-            // trail end dot there was drawn underneath.
             initialCameraFit: AppMap.fitOrNull(
               allPoints,
-              padding: EdgeInsets.fromLTRB(
-                context.r(Insets.x12),
-                context.r(Insets.x16 + Insets.x2),
-                context.r(Insets.x12),
-                context.r(Insets.x10),
-              ),
+              padding: _fitPadding(context, box.biggest),
             ),
             layers: [
               if (points.length > 1)
@@ -168,11 +153,15 @@ class RouteMap extends StatelessWidget {
                     _recorded(trailLines[i], AppColors.routePaletteAt(i)),
               ]),
               MarkerLayer(markers: [
-                for (var i = 0; i < trails.length; i++) ...[
-                  _dot(trailPoints[i].first, AppColors.routeStart),
-                  if (trailPoints[i].length > 1)
-                    _dot(trailPoints[i].last, AppColors.routePaletteAt(i)),
-                ],
+                for (var i = 0; i < trails.length; i++)
+                  // A trail with no fixes has no ends to cap (`.first` on it
+                  // threw). The route cubit filters those out, but the list
+                  // this widget takes does not promise it.
+                  if (trailPoints[i].isNotEmpty) ...[
+                    _dot(trailPoints[i].first, AppColors.routeStart),
+                    if (trailPoints[i].length > 1)
+                      _dot(trailPoints[i].last, AppColors.routePaletteAt(i)),
+                  ],
                 for (var i = 0; i < points.length; i++)
                   Marker(
                     point: points[i],
@@ -183,30 +172,99 @@ class RouteMap extends StatelessWidget {
               ]),
             ],
             overlays: [
-              if (showToggle)
-                PositionedDirectional(
-                  top: margin,
-                  end: margin,
-                  child: RouteLineToggle(
-                    mode: lineMode,
-                    onChanged: onLineMode,
-                    pending: matching.pending,
-                    unmatched: matching.unmatched,
-                  ),
-                ),
-              if (summary != null)
+              if (showToggle || summary != null)
                 PositionedDirectional(
                   top: margin,
                   start: margin,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: chipMaxWidth),
-                    child: _SummaryChip(text: summary),
+                  end: margin,
+                  // One row: the chip ellipsizes into whatever the toggle
+                  // leaves. Capping the chip at half the width was not enough
+                  // — on a 320dp phone at the largest text size the toggle
+                  // alone is wider than half, and the two overlapped (in
+                  // Arabic the toggle also ran off the map's edge). The toggle
+                  // now scales down only where even a minimal chip would not
+                  // fit beside it. The row's empty space takes no touches.
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: summary == null
+                        ? MainAxisAlignment.end
+                        : MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (summary != null)
+                        Flexible(child: _SummaryChip(text: summary)),
+                      if (summary != null && showToggle)
+                        SizedBox(width: margin),
+                      if (showToggle)
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: _toggleMaxWidth(
+                              box.maxWidth - margin * 2,
+                              gap: margin,
+                              besideSummary: summary != null,
+                            ),
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: AlignmentDirectional.topEnd,
+                            child: RouteLineToggle(
+                              mode: lineMode,
+                              onChanged: onLineMode,
+                              pending: matching.pending,
+                              unmatched: matching.unmatched,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
             ],
           );
         },
       ),
+    );
+  }
+
+  /// The narrowest the summary chip gets beside the line toggle: its glyph
+  /// and a few characters before the ellipsis.
+  static const double _summaryMinWidth = 72.0;
+
+  /// How wide the line toggle may be in a top bar [barWidth] wide.
+  static double _toggleMaxWidth(
+    double barWidth, {
+    required double gap,
+    required bool besideSummary,
+  }) =>
+      math.max(
+        0.0,
+        besideSummary ? barWidth - gap - _summaryMinWidth : barWidth,
+      );
+
+  /// Most of the map's width or height the camera-fit padding may take.
+  static const double _maxFitPaddingShare = 0.5;
+
+  /// The camera-fit padding: extra room at the top, where the summary chip
+  /// overlays the map and a trail end dot was drawn underneath it.
+  ///
+  /// Shrunk where the map is too small for it. On a landscape phone the map is
+  /// about 120dp tall and the padding was taller than that: flutter_map fitted
+  /// the route into no space at all and zoomed out to the whole world.
+  static EdgeInsets _fitPadding(BuildContext context, Size map) {
+    final padding = EdgeInsets.fromLTRB(
+      context.r(Insets.x12),
+      context.r(Insets.x16 + Insets.x2),
+      context.r(Insets.x12),
+      context.r(Insets.x10),
+    );
+    double shrink(double total, double side) => side.isFinite
+        ? math.min(1.0, side * _maxFitPaddingShare / total)
+        : 1.0;
+    final h = shrink(padding.horizontal, map.width);
+    final v = shrink(padding.vertical, map.height);
+    return EdgeInsets.fromLTRB(
+      padding.left * h,
+      padding.top * v,
+      padding.right * h,
+      padding.bottom * v,
     );
   }
 

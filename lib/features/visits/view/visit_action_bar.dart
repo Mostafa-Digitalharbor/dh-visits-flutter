@@ -17,6 +17,7 @@ import '../../../core/location/location_outcome.dart';
 import '../../../core/location/location_service.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/app_tool_button.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../bloc/visit_detail_cubit.dart';
@@ -60,6 +61,10 @@ class _VisitActionBarState extends State<VisitActionBar> {
   /// a fix can take ten seconds, and taps during it used to start parallel GPS
   /// requests and a second End.
   _BarAction? _preparing;
+
+  /// How a wide bar shares its row between the decision and the tools.
+  static const int _primaryFlex = 3;
+  static const int _toolFlex = 2;
 
   Visit get _visit => widget.visit;
   VisitDetailCubit get _cubit => context.read<VisitDetailCubit>();
@@ -357,6 +362,24 @@ class _VisitActionBarState extends State<VisitActionBar> {
     };
   }
 
+  /// A secondary action, drawn as a compact tool.
+  Widget _tool(
+    _BarAction action, {
+    required String label,
+    required IconData icon,
+    required Future<void> Function() run,
+    bool destructive = false,
+  }) =>
+      AppToolButton(
+        label: label,
+        icon: icon,
+        destructive: destructive,
+        loading: _preparing == action,
+        onPressed: _preparing == null
+            ? () => unawaited(_guard(action, run))
+            : null,
+      );
+
   @override
   Widget build(BuildContext context) {
     final s = context.s;
@@ -375,7 +398,18 @@ class _VisitActionBarState extends State<VisitActionBar> {
         !visit.isCancelled &&
         !visit.isRejected;
 
-    final buttons = <Widget>[
+    // The screen's decision — submit, approve or reject, start, end — keeps
+    // full-width buttons. Everything else is a compact tool in one row: as
+    // stacked buttons they took half the screen (measured on a 2400×1080
+    // emulator), leaving the visit a sliver above them.
+    final attendeesNote = waitsForAttendees
+        ? Text(
+            s.wfApproveWaitsForAttendees,
+            style: context.text.bodySmall
+                ?.copyWith(color: context.colors.onSurfaceVariant),
+          )
+        : null;
+    final primaries = <Widget>[
       if (isOwner && visit.canSubmit)
         _button(
           _BarAction.submit,
@@ -383,27 +417,20 @@ class _VisitActionBarState extends State<VisitActionBar> {
           icon: Icons.send_outlined,
           run: _cubit.submit,
         ),
-      if (canDecide) ...[
-        if (waitsForAttendees)
-          Text(
-            s.wfApproveWaitsForAttendees,
-            style: context.text.bodySmall
-                ?.copyWith(color: context.colors.onSurfaceVariant),
-          )
-        else
-          _button(
-            _BarAction.approve,
-            label: s.wfActionApprove,
-            icon: Icons.check_circle_outline,
-            run: _cubit.approve,
-          ),
+      if (canDecide && !waitsForAttendees)
+        _button(
+          _BarAction.approve,
+          label: s.wfActionApprove,
+          icon: Icons.check_circle_outline,
+          run: _cubit.approve,
+        ),
+      if (canDecide)
         _button(
           _BarAction.reject,
           label: s.wfActionReject,
           run: _reject,
           variant: AppButtonVariant.destructive,
         ),
-      ],
       if (isOwner && visit.canStart)
         _button(
           _BarAction.start,
@@ -418,82 +445,117 @@ class _VisitActionBarState extends State<VisitActionBar> {
           icon: Icons.stop_circle_outlined,
           run: _end,
         ),
+    ];
+    final tools = <Widget>[
       if (isOwner && (visit.isApproved || visit.isAwaitingApproval))
-        _button(
+        _tool(
           _BarAction.reschedule,
           label: s.wfActionReschedule,
           icon: Icons.event_repeat,
           run: _reschedule,
-          variant: AppButtonVariant.secondary,
         ),
       if (canHandleFiles) ...[
-        _button(
+        _tool(
           _BarAction.photo,
           label: s.wfActionTakePhoto,
           icon: Icons.photo_camera_outlined,
           run: _takePhoto,
-          variant: AppButtonVariant.secondary,
         ),
-        _button(
+        _tool(
           _BarAction.file,
           label: visit.attachmentCount > 0
               ? s.wfActionAddAttachmentCount(visit.attachmentCount)
               : s.wfActionAddAttachment,
           icon: Icons.attach_file,
           run: _attachFile,
-          variant: AppButtonVariant.secondary,
         ),
       ],
       if ((isOwner || isApprover) && visit.canCancel)
-        _button(
+        _tool(
           _BarAction.cancel,
           label: s.wfActionCancel,
           icon: Icons.block,
           run: _cancel,
-          variant: AppButtonVariant.secondary,
+          destructive: true,
         ),
     ];
 
-    if (buttons.isEmpty) return const SizedBox.shrink();
+    if (primaries.isEmpty && tools.isEmpty && attendeesNote == null) {
+      return const SizedBox.shrink();
+    }
 
-    // Two columns where the screen is wide: five stacked buttons would eat a
-    // landscape phone's whole height.
-    final columns = context.isLandscape || context.isTablet ? 2 : 1;
-    return Container(
-      padding: EdgeInsetsDirectional.fromSTEB(
-        context.r(Insets.x4),
-        context.r(Insets.x2h),
-        context.r(Insets.x4),
-        context.r(Insets.x2),
+    final gap = context.r(Insets.x2);
+    final primaryRow = primaries.isEmpty
+        ? null
+        : Row(
+            children: [
+              for (var i = 0; i < primaries.length; i++) ...[
+                if (i > 0) SizedBox(width: gap),
+                Expanded(child: primaries[i]),
+              ],
+            ],
+          );
+    final toolRow = tools.isEmpty
+        ? null
+        : Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [for (final t in tools) Expanded(child: t)],
+          );
+    // Side by side where the screen is wide, so the bar stays one row tall on
+    // a phone held sideways.
+    final wide = context.isLandscape || context.isTablet;
+    final Widget actions = wide && primaryRow != null && toolRow != null
+        ? Row(
+            children: [
+              Expanded(flex: _primaryFlex, child: primaryRow),
+              SizedBox(width: gap * 2),
+              Expanded(flex: _toolFlex, child: toolRow),
+            ],
+          )
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (primaryRow != null) primaryRow,
+              if (primaryRow != null && toolRow != null) SizedBox(height: gap),
+              if (toolRow != null) toolRow,
+            ],
+          );
+
+    // This bar is mounted in a `Positioned` at the bottom of a Stack, which
+    // caps its height with no escape — in landscape at a large text scale the
+    // actions exceed it and the ones the screen exists for get clipped away.
+    // Cap it against the viewport and let it scroll. The cap covers the whole
+    // bar: on the scroll area alone, the padding and border took the bar past
+    // its share (53% of a 320×568 phone).
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: context.hp(VisitConstants.actionBarMaxHeightFraction),
       ),
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        border: Border(top: BorderSide(color: context.colors.outlineVariant)),
-      ),
-      child: SafeArea(
-        top: false,
-        // This bar is mounted in a `Positioned` at the bottom of a Stack, which
-        // caps its height with no escape — in landscape at a large text scale
-        // the buttons exceed it and the workflow actions the screen exists for
-        // get clipped away. Cap it against the viewport and let it scroll.
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: context.hp(VisitConstants.actionBarMaxHeightFraction),
-          ),
+      child: Container(
+        padding: EdgeInsetsDirectional.fromSTEB(
+          context.r(Insets.x4),
+          context.r(Insets.x2h),
+          context.r(Insets.x4),
+          context.r(Insets.x2),
+        ),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          border: Border(top: BorderSide(color: context.colors.outlineVariant)),
+        ),
+        child: SafeArea(
+          top: false,
           child: SingleChildScrollView(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final gap = context.r(Insets.x2);
-                final width =
-                    (constraints.maxWidth - gap * (columns - 1)) / columns;
-                return Wrap(
-                  spacing: gap,
-                  runSpacing: gap,
-                  children: [
-                    for (final b in buttons) SizedBox(width: width, child: b),
-                  ],
-                );
-              },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (attendeesNote != null) ...[
+                  attendeesNote,
+                  SizedBox(height: gap),
+                ],
+                actions,
+              ],
             ),
           ),
         ),

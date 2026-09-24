@@ -92,11 +92,17 @@ class _VisitDetailView extends StatelessWidget {
 
     // Every workflow action changes the visit's state, so the list this page
     // sits on top of is now stale. It is app-scoped and caches its rows, so
-    // without this it keeps serving the pre-action state. Attachment uploads
-    // don't alter the list's rendering, so they're the one action that
-    // doesn't need it.
-    if (action != VisitAction.attachment) {
-      context.read<VisitsListBloc>().add(const VisitsListLoadRequested());
+    // the new state goes into it at once — including an action only queued
+    // offline, which the list would otherwise keep showing as not done.
+    //
+    // A reload then fetches the server's version, except for a queued action:
+    // offline it can only fail, and its error snackbar would replace the
+    // "saved offline" confirmation above (seen on the emulator, 2026-09-17).
+    // The queue reloads the list itself once the action reaches the server.
+    final list = context.read<VisitsListBloc>();
+    if (visit != null) list.add(VisitsListVisitChanged(visit));
+    if (action != VisitAction.attachment && !outcome.queued) {
+      list.add(const VisitsListLoadRequested());
     }
 
     // Start and End each write a point onto the trail server-side (the first

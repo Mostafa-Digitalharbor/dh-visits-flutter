@@ -59,11 +59,6 @@ class ServerConfigCubit extends Cubit<ServerConfig> {
     apiClient.updateBaseUrl(state.baseUrl);
   }
 
-  /// Odoo's version route: public (`auth='none'`) on every Odoo release and
-  /// answered without a database, which makes it the one reliable "is this
-  /// Odoo at all?" question. (Belongs in `Endpoints`; kept here until the
-  /// core layer adopts it.)
-  static const versionInfoPath = '/web/webclient/version_info';
   static const _serverVersionField = 'server_version';
 
   /// Persists the company's server coordinates and repoints the API client.
@@ -91,7 +86,7 @@ class ServerConfigCubit extends Cubit<ServerConfig> {
     final url = ServerConfig.normalizeUrl(baseUrl);
     final client = _probeClient(url);
     try {
-      final version = odooMap(await client.jsonRpc(versionInfoPath));
+      final version = odooMap(await client.jsonRpc(Endpoints.versionInfo));
       if (version?[_serverVersionField] == null) {
         return ServerProbeFailed(ApiException(
           code: ApiErrorCode.invalidResponse,

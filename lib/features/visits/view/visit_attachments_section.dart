@@ -120,52 +120,47 @@ class _VisitAttachmentsSectionState extends State<VisitAttachmentsSection> {
               onTap: _opening.contains(a.id) ? null : () => _open(a),
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: context.r(Insets.x2h)),
-                child: Row(
-                  children: [
-                    IconBadge(
-                      icon: _iconFor(a.mimetype),
-                      color: cs.primary,
-                      size: context.r(CompSz.badge),
-                      iconSize: context.r(IconSz.label),
-                    ),
-                    context.gapW(Insets.x3),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            a.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: context.text.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          context.gapH(Insets.hair),
-                          Text(
-                            a.readableSize(context.s),
-                            maxLines: 1,
-                            style: context.text.labelSmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
+                child: MediaRow(
+                  trailingGap: Insets.x2,
+                  leading: IconBadge(
+                    icon: _iconFor(a.mimetype),
+                    color: cs.primary,
+                    size: context.r(CompSz.badge),
+                    iconSize: context.r(IconSz.label),
+                  ),
+                  lines: [
+                    Text(
+                      a.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.text.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    context.gapW(Insets.x2),
-                    SizedBox.square(
-                      dimension: context.r(IconSz.sm),
-                      child: _opening.contains(a.id)
-                          ? const CircularProgressIndicator(
-                              strokeWidth: _progressStroke,
-                            )
-                          : Icon(
-                              Icons.download_outlined,
-                              size: context.r(IconSz.sm),
-                              color: cs.tertiary,
-                            ),
+                    context.gapH(Insets.hair),
+                    Text(
+                      a.readableSize(context.s),
+                      maxLines: 1,
+                      style: context.text.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                   ],
+                  // Same footprint whether it is the download affordance or
+                  // the spinner that replaces it, so the row does not twitch
+                  // when a tap starts the download.
+                  trailing: SizedBox.square(
+                    dimension: context.r(IconSz.sm),
+                    child: _opening.contains(a.id)
+                        ? const CircularProgressIndicator(
+                            strokeWidth: _progressStroke,
+                          )
+                        : Icon(
+                            Icons.download_outlined,
+                            size: context.r(IconSz.sm),
+                            color: cs.tertiary,
+                          ),
+                  ),
                 ),
               ),
             ),

@@ -5,7 +5,6 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../../../app/theme.dart';
 import '../../../core/utils/app_number.dart';
 import '../../../core/utils/duration_format.dart';
-import '../../../shared/extensions/bloc_extensions.dart';
 import '../../../shared/extensions/context_extensions.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../dashboard/view/visits_list_feedback.dart';
@@ -19,15 +18,6 @@ import 'metric_tile.dart';
 /// per-employee on-time leaderboard.
 class AnalyticsPage extends StatelessWidget {
   const AnalyticsPage({super.key});
-
-  /// Pull-to-refresh, matching the Dashboard. Its bloc is built once and kept
-  /// alive by the shell's stack, so without this stale figures could only be
-  /// cleared by switching tabs. The spinner lasts as long as the reload.
-  static Future<void> _refresh(BuildContext context) {
-    final bloc = context.read<VisitsListBloc>()
-      ..add(const VisitsListLoadRequested(scope: VisitListScope.team));
-    return bloc.untilSettled((s) => s.status == VisitsListStatus.loading);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,14 +39,14 @@ class AnalyticsPage extends StatelessWidget {
           if (state.status == VisitsListStatus.failure && state.items.isEmpty) {
             return ErrorView(
               message: state.error?.localize(context) ?? context.s.errUnknown,
-              onRetry: () => _refresh(context),
+              onRetry: () => reloadTeamVisits(context),
             );
           }
           // One sweep builds this week's and last week's figures, the weekly
           // series and the employee table together — see [AnalyticsSummary].
           final summary = AnalyticsSummary.from(state.items);
           return AppRefreshIndicator(
-            onRefresh: () => _refresh(context),
+            onRefresh: () => reloadTeamVisits(context),
             child: ListView(
               padding: _pagePadding(context),
               children: [

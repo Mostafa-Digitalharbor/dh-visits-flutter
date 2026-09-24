@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'design/app_dimens.dart';
 
 const _duration = AppDurations.slow;
-const _reverseDuration = Duration(milliseconds: 240);
+const _reverseDuration = AppDurations.transitionReverse;
 
 CustomTransitionPage<T> fadeTransition<T>(
   GoRouterState state,

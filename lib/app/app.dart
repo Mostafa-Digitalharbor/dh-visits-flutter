@@ -26,6 +26,7 @@ import '../features/visits/bloc/visit_bloc.dart';
 import '../features/visits/bloc/visits_list_bloc.dart';
 import '../features/visits/data/visits_repository.dart';
 import '../features/visits/data/visit_trail_tracker.dart';
+import '../features/workday/data/workday_tracker.dart';
 import '../l10n/generated/app_localizations.dart';
 import 'router.dart';
 import 'theme.dart';
@@ -155,6 +156,7 @@ class _CustomerVisitsAppState extends State<CustomerVisitsApp>
   /// while the session is still valid.
   Future<void> _cleanUpBeforeLogout() async {
     await slMaybe<VisitTrailTracker>()?.suspend();
+    await slMaybe<WorkdayTracker>()?.suspend();
     await _push.unregister();
     // Matched road geometry describes where this employee went.
     await slMaybe<RouteMatcher>()?.clear();

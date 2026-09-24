@@ -13,6 +13,8 @@ abstract final class WidgetKeys {
       Key('visit-tracking-disclosure-agree');
   static const visitTrackingDisclosureDecline =
       Key('visit-tracking-disclosure-decline');
+  static const workdayDisclosureAgree = Key('workday-disclosure-agree');
+  static const workdayDisclosureDecline = Key('workday-disclosure-decline');
 
   // AsyncListView's cross-fade children.
   static const listSkeleton = ValueKey('skeleton');

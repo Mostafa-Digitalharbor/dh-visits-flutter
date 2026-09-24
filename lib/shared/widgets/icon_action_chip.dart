@@ -57,12 +57,30 @@ class IconActionChip extends StatelessWidget {
         ),
       ),
     );
-    final target = ConstrainedBox(
-      constraints: const BoxConstraints(
-        minWidth: IconSz.hit,
-        minHeight: IconSz.hit,
+    // The panel can be as small as 34dp, and it used to be the only part that
+    // answered a tap: the ring out to the 48dp minimum was dead space. This
+    // detector covers that ring. A tap on the panel still goes to the InkWell
+    // and keeps its ripple, because the InkWell is deeper, joins the gesture
+    // arena first and wins. The detector is left out of semantics so the tap
+    // action is announced once, and [Semantics.button] makes a screen reader
+    // say "button" as well as the tooltip.
+    final target = Semantics(
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: IconSz.hit,
+            minHeight: IconSz.hit,
+          ),
+          // Factors of 1 keep the target at 48dp. A plain Center grows to fill
+          // a bounded parent (a Stack, an Align), and the whole parent then
+          // became the tap and semantics area.
+          child: Center(widthFactor: 1, heightFactor: 1, child: button),
+        ),
       ),
-      child: Center(child: button),
     );
     final label = tooltip;
     return label == null ? target : Tooltip(message: label, child: target);

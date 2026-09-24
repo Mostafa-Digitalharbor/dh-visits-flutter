@@ -38,10 +38,6 @@ internal object VisitLocationStore {
     private const val PREFS = "visit_location_capture"
     private const val JOURNAL = "visit_fixes.jsonl"
 
-    /** What the cancelled whole-work-day capture left on devices that ran it. */
-    private const val LEGACY_PREFS = "workday_location_capture"
-    private const val LEGACY_JOURNAL = "workday_fixes.jsonl"
-
     private const val K_ACTIVE = "active"
     private const val K_VISIT = "visit_id"
     private const val K_STARTED_AT = "started_at_ms"
@@ -71,20 +67,6 @@ internal object VisitLocationStore {
 
     private fun prefs(ctx: Context): SharedPreferences =
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-
-    /**
-     * Removes the state of the cancelled work-day capture: its config (so
-     * nothing can ever read it as active) and its journal. Idempotent and
-     * cheap once done.
-     */
-    fun purgeLegacy(ctx: Context) {
-        synchronized(lock) {
-            File(ctx.filesDir, LEGACY_JOURNAL).delete()
-            File(ctx.filesDir, "$LEGACY_JOURNAL.tmp").delete()
-        }
-        val legacy = ctx.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE)
-        if (legacy.all.isNotEmpty()) legacy.edit().clear().commit()
-    }
 
     /**
      * Marks [config]'s visit as captured. [seedLatitude]/[seedLongitude] is

@@ -359,9 +359,17 @@ class ApiClient {
       );
     }
     // Any other error status: its meaning, whatever the body looks like — a
-    // 413 from nginx is an HTML page, and still means "file too large".
+    // 413 from nginx is an HTML page, and still means "file too large". A web
+    // page with a status that carries no such meaning (400, 410…) came from
+    // whatever answered in Odoo's place, as on a wrong server address.
     if (status >= 400) {
-      throw ApiException(code: _codeForStatus(status), details: where);
+      final code = _codeForStatus(status);
+      throw ApiException(
+        code: html && code == ApiErrorCode.unknown
+            ? ApiErrorCode.invalidResponse
+            : code,
+        details: where,
+      );
     }
   }
 
@@ -374,6 +382,15 @@ class ApiClient {
   /// The meaning of an HTTP status whose body carried no Odoo error block.
   static ApiErrorCode _codeForStatus(int status) => switch (status) {
         404 => ApiErrorCode.notFound,
+        // Every Odoo JSON-RPC route takes a POST, and the app only POSTs, so a
+        // refused method means the server is not Odoo: example.com answers
+        // exactly this.
+        405 => ApiErrorCode.invalidResponse,
+        // A gateway timed the request out on its own (nginx / Cloudflare).
+        // Dio's own timeouts never reach here — those throw — but a 408 is a
+        // real *response*, and without this it read as "unknown", which tells
+        // the user to contact support about what retrying would have fixed.
+        408 => ApiErrorCode.timeout,
         409 => ApiErrorCode.conflict,
         413 => ApiErrorCode.payloadTooLarge,
         422 => ApiErrorCode.validation,

@@ -72,7 +72,18 @@ class _PickerSheetState<T> extends State<_PickerSheet<T>> {
 
   void _search(String query) {
     if (!mounted) return;
-    setState(() => _future = widget.loader(query.isEmpty ? null : query));
+    // Block body, not `=>`: an arrow closure returns the assigned Future, and
+    // setState asserts on that before marking the sheet dirty — in debug
+    // builds every search and retry threw and the results never refreshed.
+    final future = widget.loader(query.isEmpty ? null : query)
+      // The FutureBuilder only subscribes on the next frame; a loader that
+      // fails before then (offline) was reported as an *uncaught* error even
+      // though the sheet shows it. ignore() only silences that report — the
+      // builder still receives the error.
+      ..ignore();
+    setState(() {
+      _future = future;
+    });
   }
 
   @override

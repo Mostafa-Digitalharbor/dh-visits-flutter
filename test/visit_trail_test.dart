@@ -14,6 +14,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:location_gps/core/api/api_exceptions.dart';
 import 'package:location_gps/core/constants.dart';
 import 'package:location_gps/core/location/location_service.dart';
+import 'package:location_gps/core/location/journal_entry.dart';
 import 'package:location_gps/core/location/visit_location_channel.dart';
 import 'package:location_gps/core/network/connectivity_status.dart';
 import 'package:location_gps/core/network/pending_actions_queue.dart';
@@ -138,7 +139,7 @@ class _FakeChannel extends VisitLocationChannel {
       (active: active, running: running, visitId: active ? visitId : null);
 
   @override
-  Future<List<CapturedFix>> read({int max = VisitLocationChannel.defaultReadBatch}) async =>
+  Future<List<CapturedFix>> read({int max = journalReadBatch}) async =>
       journal.take(max).toList();
 
   @override

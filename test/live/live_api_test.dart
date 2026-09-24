@@ -29,6 +29,8 @@ import 'package:cookie_jar/cookie_jar.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
 import 'package:location_gps/core/api/api_client.dart';
 import 'package:location_gps/core/api/api_error_messages.dart';
 import 'package:location_gps/core/api/api_exceptions.dart';
@@ -36,6 +38,7 @@ import 'package:location_gps/core/api/endpoints.dart';
 import 'package:location_gps/core/config/server_config.dart';
 import 'package:location_gps/core/config/server_config_repository.dart';
 import 'package:location_gps/core/location/location_service.dart';
+import 'package:location_gps/core/location/journal_entry.dart';
 import 'package:location_gps/core/location/visit_location_channel.dart';
 import 'package:location_gps/core/network/connectivity_status.dart';
 import 'package:location_gps/core/network/server_clock.dart';
@@ -128,7 +131,7 @@ void main() {
       serverConfig: serverConfig,
     );
     api.reauthenticate = auth.reauthenticate;
-    visits = VisitsRepository(api: api, session: session);
+    visits = VisitsRepository(api: api, session: session, serverClock: clock);
   });
 
   group('auth', () {
@@ -455,6 +458,110 @@ void main() {
       }
       expect((await visits.readTrack(id)).logs, isEmpty);
       await visits.cancel(id);
+    });
+
+    test('every coordinate field reaches the server exactly as sent, '
+        'even with the app in Arabic', () async {
+      final id = await approvedVisit('coordinate round-trip');
+      if (id == null) return markTestSkipped('account cannot approve');
+      // An Arabic UI switches intl to Arabic-Indic digits; the wire formats
+      // must not follow it.
+      await initializeDateFormatting('ar');
+      final previousLocale = Intl.defaultLocale;
+      Intl.defaultLocale = 'ar';
+      addTearDown(() => Intl.defaultLocale = previousLocale);
+
+      const startLat = 24.7136123, startLng = 46.6753456;
+      const endLat = 24.7742789, endLng = 46.7386012;
+      final started = await visits.start(id,
+          latitude: startLat, longitude: startLng, location: '$_qaTag gate');
+      expect(started.state, VisitState.inProgress);
+      await pause(2500);
+
+      // Whole seconds: the server stores fix times to the second.
+      DateTime second(DateTime t) =>
+          DateTime.utc(t.year, t.month, t.day, t.hour, t.minute, t.second);
+      final t1 = second(clock.now().subtract(const Duration(seconds: 1)));
+      final t2 = second(clock.now());
+      const deviceId = 'qa-auto-device';
+      final sent = [
+        // Sent newest first on purpose: the server files by fix time.
+        TrailPoint(
+          latitude: 24.7200987, longitude: 46.6900654, loggedAt: t2,
+          accuracy: 4.25, altitude: 611.5, speed: 13.75, heading: 270.5,
+          deviceId: deviceId,
+        ),
+        TrailPoint(
+          latitude: 24.7150321, longitude: 46.6800123, loggedAt: t1,
+          accuracy: 7.5, altitude: 612.25, speed: 12.5, heading: 41.0,
+          deviceId: deviceId,
+        ),
+      ];
+      final flush = await visits.logLocations(id, sent);
+      expect(flush.created, 2);
+      expect(flush.rejected, isEmpty);
+
+      await pause(1500);
+      final single = await visits.logLocation(id,
+          latitude: 24.7300555, longitude: 46.7000444,
+          accuracy: 3.0, speed: 0.0, heading: 0.0, altitude: 600.0,
+          deviceId: deviceId);
+      expect(single, isNotNull);
+
+      await pause(1200);
+      final ended = await visits.end(id,
+          outcome: '$_qaTag done', latitude: endLat, longitude: endLng,
+          location: '$_qaTag lobby');
+      expect(ended.state, VisitState.done);
+
+      final logs = (await visits.readTrack(id)).logs;
+      print('  round-trip trail: ${[
+        for (final l in logs)
+          '${l.source.name}(${l.latitude},${l.longitude} '
+              'acc=${l.accuracy} alt=${l.altitude} spd=${l.speed} hdg=${l.heading} '
+              'at=${l.loggedAt.toIso8601String()})'
+      ].join(' → ')}');
+      expect(logs.map((l) => l.source).toList(), [
+        TrailSource.start,
+        TrailSource.track,
+        TrailSource.track,
+        TrailSource.track,
+        TrailSource.end,
+      ]);
+
+      void same(VisitLocationLog got, TrailPoint want) {
+        expect(got.latitude, want.latitude);
+        expect(got.longitude, want.longitude);
+        expect(got.loggedAt, want.loggedAt);
+        expect(got.accuracy, want.accuracy);
+        expect(got.altitude, want.altitude);
+        expect(got.speed, want.speed);
+        expect(got.heading, want.heading);
+        expect(got.deviceId, want.deviceId);
+      }
+
+      expect((logs.first.latitude, logs.first.longitude), (startLat, startLng));
+      same(logs[1], sent[1]);
+      same(logs[2], sent[0]);
+      expect((logs[3].latitude, logs[3].longitude), (24.7300555, 46.7000444));
+      expect(logs[3].accuracy, 3.0);
+      expect(logs[3].deviceId, deviceId);
+      expect((logs.last.latitude, logs.last.longitude), (endLat, endLng));
+
+      // The visit record keeps the start/end fixes too.
+      final full = await visits.readVisitFull(id);
+      print('  visit record: start=(${full?.startLat},${full?.startLng}) '
+          'end=(${full?.endLat},${full?.endLng})');
+      expect((full?.startLat, full?.startLng), (startLat, startLng));
+      expect((full?.endLat, full?.endLng), (endLat, endLng));
+      // The trail counters come with the REST payload and the track read
+      // (the full call_kw read deliberately leaves them out).
+      final slim = await visits.getVisit(id);
+      final track = await visits.readTrack(id);
+      expect(slim?.locationLogCount, 5);
+      expect(track.locationLogCount, 5);
+      expect(slim!.trackedDistanceKm, greaterThan(0));
+      expect(track.trackedDistanceKm, slim.trackedDistanceKm);
     });
 
     test('the tracker records only between Start and End; dead-zone points '
@@ -867,7 +974,7 @@ class _ScriptedCapture extends VisitLocationChannel {
       (active: active, running: active, visitId: visitId);
 
   @override
-  Future<List<CapturedFix>> read({int max = VisitLocationChannel.defaultReadBatch}) async =>
+  Future<List<CapturedFix>> read({int max = journalReadBatch}) async =>
       journal.take(max).toList();
 
   @override

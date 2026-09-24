@@ -48,6 +48,17 @@ class VisitsListFocusChanged extends VisitsListEvent {
   List<Object?> get props => [focus];
 }
 
+/// A visit changed on this device (an action the user just took, possibly
+/// still queued offline). Replaces the row in place, so the list shows the new
+/// state without waiting for — or, offline, without being able to make — a
+/// round trip. The next reload brings the server's version.
+class VisitsListVisitChanged extends VisitsListEvent {
+  final Visit visit;
+  const VisitsListVisitChanged(this.visit);
+  @override
+  List<Object?> get props => [visit];
+}
+
 /// Drop every user-scoped value back to the initial state. Dispatched on
 /// logout: this bloc lives for the whole app, so without it the next user
 /// inherits the previous one's items *and* filters — a stale `searchQuery`

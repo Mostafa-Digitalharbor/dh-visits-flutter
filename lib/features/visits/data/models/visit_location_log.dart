@@ -212,6 +212,8 @@ class TrailPoint extends Equatable {
   final double? heading;
   final String? location;
   final String? deviceId;
+  final String? clientUid;
+  final int? visitId;
 
   const TrailPoint({
     required this.latitude,
@@ -223,6 +225,8 @@ class TrailPoint extends Equatable {
     this.heading,
     this.location,
     this.deviceId,
+    this.clientUid,
+    this.visitId,
   });
 
   /// The wire shape of one point inside `points[]`.
@@ -241,6 +245,8 @@ class TrailPoint extends Equatable {
         if (heading != null) 'heading': heading,
         if (location != null) 'location': location,
         if (deviceId != null) 'device_id': deviceId,
+        if (clientUid != null) 'client_uid': clientUid,
+        if (visitId != null) 'visit_id': visitId,
       };
 
   Map<String, dynamic> toJson() => {
@@ -253,6 +259,8 @@ class TrailPoint extends Equatable {
     if (heading != null) 'hdg': heading,
     if (location != null) 'loc': location,
     if (deviceId != null) 'dev': deviceId,
+    if (clientUid != null) 'uid': clientUid,
+    if (visitId != null) 'visit': visitId,
   };
 
   static TrailPoint? tryFromJson(Map<String, dynamic> j) {
@@ -270,11 +278,13 @@ class TrailPoint extends Equatable {
       heading: odooDouble(j['hdg']),
       location: odooString(j['loc']),
       deviceId: odooString(j['dev']),
+      clientUid: odooString(j['uid']),
+      visitId: odooInt(j['visit']),
     );
   }
 
   @override
-  List<Object?> get props => [latitude, longitude, loggedAt];
+  List<Object?> get props => [latitude, longitude, loggedAt, clientUid, visitId];
 }
 
 /// One point the server refused inside a batch, identified by its position in

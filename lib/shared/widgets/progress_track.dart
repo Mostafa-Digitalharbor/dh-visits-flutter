@@ -36,7 +36,9 @@ class ProgressTrack extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(Radii.pill);
-    final fraction = value.clamp(0.0, 1.0);
+    // NaN first: `double.nan.clamp(0, 1)` is 1.0 in Dart, so a raw `0 / 0`
+    // ratio (a board whose leader has a zero count) drew a *full* bar.
+    final fraction = value.isNaN ? 0.0 : value.clamp(0.0, 1.0);
     return Semantics(
       value: AppNumber.percent(context.s, (fraction * 100).round()),
       child: Container(

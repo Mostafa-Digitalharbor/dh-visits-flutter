@@ -441,9 +441,12 @@ class _PickerTile extends StatelessWidget {
             color: value == null ? context.colors.outline : null,
           ),
         ),
-        trailing:
-            trailing ??
-            Icon(context.isRtl ? Icons.chevron_left : Icons.chevron_right),
+        // Not `isRtl ? chevron_left : chevron_right`: both icons are declared
+        // `matchTextDirection: true`, so the framework already mirrors them.
+        // Picking chevron_left for Arabic flipped it a second time and the
+        // chevron pointed back out of the screen it opens. Same reasoning as
+        // [VisitDetailRow].
+        trailing: trailing ?? const Icon(Icons.chevron_right),
         onTap: onTap,
       ),
     );

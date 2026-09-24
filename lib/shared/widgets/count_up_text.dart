@@ -31,11 +31,16 @@ class CountUpText extends StatelessWidget {
       return Text(value, style: style);
     }
     final tail = match!.group(2) ?? '';
+    final end = target.toDouble();
     return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: target.toDouble()),
+      tween: Tween(begin: 0, end: end),
       duration: duration,
       curve: Curves.easeOutCubic,
-      builder: (_, v, __) => Text('${v.round()}$tail', style: style),
+      // The settled frame shows [value] itself, exactly as the reduced-motion
+      // path does: `v.round()` would drop leading zeros and surrounding space,
+      // and past 2^53 a double cannot hold the figure, so it ended one off.
+      builder: (_, v, __) =>
+          Text(v == end ? value : '${v.round()}$tail', style: style),
     );
   }
 }
