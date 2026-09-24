@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_dh_work_session_list" model="ir.ui.view">
+        <field name="name">dh.work.session.list</field>
+        <field name="model">dh.work.session</field>
+        <field name="arch" type="xml">
+            <list create="false" delete="false">
+                <field name="employee_id"/>
+                <field name="started_at"/>
+                <field name="ended_at"/>
+                <field name="state" widget="badge" decoration-success="state == 'active'"/>
+                <field name="location_count"/>
+                <field name="tracked_distance_km"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_dh_work_session_form" model="ir.ui.view">
+        <field name="name">dh.work.session.form</field>
+        <field name="model">dh.work.session</field>
+        <field name="arch" type="xml">
+            <form create="false" delete="false" edit="false">
+                <header>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="employee_id"/>
+                            <field name="started_at"/>
+                            <field name="ended_at"/>
+                            <field name="device_id"/>
+                        </group>
+                        <group>
+                            <field name="location_count"/>
+                            <field name="tracked_distance_km"/>
+                            <field name="start_latitude"/>
+                            <field name="start_longitude"/>
+                            <field name="end_latitude"/>
+                            <field name="end_longitude"/>
+                        </group>
+                    </group>
+                    <field name="location_ids">
+                        <list>
+                            <field name="logged_at"/>
+                            <field name="latitude"/>
+                            <field name="longitude"/>
+                            <field name="accuracy"/>
+                            <field name="speed"/>
+                            <field name="visit_id"/>
+                            <field name="source"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_dh_work_session_search" model="ir.ui.view">
+        <field name="name">dh.work.session.search</field>
+        <field name="model">dh.work.session</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="employee_id"/>
+                <filter name="active_days" string="Active" domain="[('state', '=', 'active')]"/>
+                <filter name="completed_days" string="Completed" domain="[('state', '=', 'completed')]"/>
+                <group>
+                    <filter name="group_employee" string="Employee" context="{'group_by': 'employee_id'}"/>
+                    <filter name="group_day" string="Day" context="{'group_by': 'started_at:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_dh_work_session" model="ir.actions.act_window">
+        <field name="name">Work Days</field>
+        <field name="res_model">dh.work.session</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_dh_work_session"
+              name="Work Days (GPS)"
+              parent="hr.menu_hr_root"
+              action="action_dh_work_session"
+              groups="dh_visit_management.group_visit_manager"
+              sequence="90"/>
+</odoo>
