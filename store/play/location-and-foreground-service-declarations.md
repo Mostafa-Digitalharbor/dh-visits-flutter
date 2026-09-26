@@ -2,14 +2,24 @@
 
 Answers for the Play Console, derived from what the app does
 (AndroidManifest.xml, `visittracking/VisitLocationService.kt`,
-[docs/VISIT_TRACKING.md](../../docs/VISIT_TRACKING.md)). Re-check this file
+`workday/WorkdayLocationService.kt`,
+[docs/VISIT_TRACKING.md](../../docs/VISIT_TRACKING.md),
+[docs/WORKDAY_TRACKING.md](../../docs/WORKDAY_TRACKING.md)). Re-check this file
 whenever a permission, the service type or the disclosure text changes.
 
-> **2026-09-16:** the work-day route (Start/End Work Day), live location
-> sharing, the manager "nearby employees" radar and the hr.attendance mirror
-> were removed from the app. Location is now collected **only for customer
-> visits**. Earlier answers that mention a work day are obsolete — do not
-> reuse them.
+> **2026-09-26:** the work-day route (Start/End work day) was reinstated on
+> 2026-09-21, so the build declares **two** location foreground services
+> again. § 2 covers both. The 2026-09-16 visit-only answers below this note
+> were updated accordingly; sections 4–6 still describe the visit disclosure
+> only and must be re-checked against the work-day disclosure
+> (`workdayDisclosure*` in `app_en.arb`) before submitting for review.
+>
+> **Internal-track uploads fail until § 2 is filled in.** An Android 14+
+> build that declares `FOREGROUND_SERVICE_LOCATION` is rejected at commit
+> time — even on the internal track — with *"You must let us know whether
+> your app uses any Foreground Service permissions."* The upload itself
+> succeeds; only the Edit commit fails. Fill in § 2 in Play Console, then
+> re-run the release workflow.
 
 ---
 
@@ -18,7 +28,7 @@ whenever a permission, the service type or the disclosure text changes.
 | Manifest entry | Why |
 |---|---|
 | `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` | Start Visit / End Visit positions and the GPS trail of a visit in progress (while-in-use grant only) |
-| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION` | `VisitLocationService`, `foregroundServiceType="location"` (the type permission is required from Android 14 / targetSdk 34) |
+| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION` | `VisitLocationService` and `WorkdayLocationService`, both `foregroundServiceType="location"` (the type permission is required from Android 14 / targetSdk 34); never both at once |
 | `POST_NOTIFICATIONS` | Push notifications; makes the ongoing "Visit tracking active" notification visible on Android 13+ |
 
 **Not declared:** `ACCESS_BACKGROUND_LOCATION`. The service is only started
@@ -37,38 +47,49 @@ Play asks this of every app targeting Android 14+ that declares a
 
 **Foreground service type:** Location
 
+Where: Play Console → the app → **Policy and programs → App content →
+Foreground service permissions** → Start / Manage.
+
+1. "Does your app use foreground service permissions?" → **Yes**.
+2. Tick **Location** (the only `FOREGROUND_SERVICE_*` type the manifest
+   declares), then fill in the fields below.
+
 **Use case / task description** (paste):
 
 ```
-Records the GPS trail of a customer visit the employee started, while the
-visit is in progress; stops when the visit ends.
+Records the employee's GPS route for a work task the employee started
+themselves, while that task is running; stops when they end it.
 
-Field employees open an approved customer visit and tap "Start Visit". Once
-the employer's server confirms that the visit has started, the app starts a
-foreground service of type location that records the route of that visit
-(about one GPS position every few seconds while moving, nothing while
+Field employees tap "Start work day" (or, outside a work day, "Start Visit"
+on an approved customer visit). Once the employer's server confirms the
+start, the app runs a foreground service of type location that records the
+route (about one GPS position every few seconds while moving, nothing while
 standing still). Positions are stored on the device and uploaded to the
-employer's own server for the visit report. The service shows an ongoing
-"Visit tracking active" notification for its whole duration and stops
-immediately when the employee taps "End Visit" or signs out. No location is
-recorded before Start Visit, between visits or after End Visit.
+employer's own server for the work-day and visit reports. The service shows
+an ongoing notification ("Workday tracking active" or "Visit tracking
+active") for its whole duration and stops immediately when the employee taps
+"End work day" / "End Visit" or signs out. No location is recorded outside a
+work day or visit the employee started.
 ```
 
-**Is the task started by the user?** Yes — the explicit "Start Visit" button
-on a visit.
+**Is the task started by the user?** Yes — the explicit "Start work day" or
+"Start Visit" button.
 
 **Impact if the task is deferred or interrupted** (paste):
 
 ```
-The visit's route would have gaps: positions taken while the phone is in a
-pocket or the screen is locked during the visit would never be recorded, so
-the route and distance of the visit could not be reported. Recording cannot
-be deferred because positions are only meaningful at the moment they are
-taken.
+The route would have gaps: positions taken while the phone is in a pocket or
+the screen is locked would never be recorded, so the route and distance of
+the work day and its visits could not be reported to the employer. Recording
+cannot be deferred because positions are only meaningful at the moment they
+are taken.
 ```
 
 **Video link:** required (demo video still to be recorded). Record a screen
-capture on a real device and share it as an unlisted YouTube or Drive link:
+capture on a real device and share it as an unlisted YouTube or Drive link.
+Show the work-day flow the same way as the visit flow below (Start work day →
+disclosure → permission → "Workday tracking active" notification → lock and
+move → route shown → End work day → notification gone). Visit flow:
 1. Sign in → open an **approved** visit.
 2. Tap **Start Visit** → the in-app disclosure appears (first time) → accept →
    the location permission prompt → allow **while using the app**.
